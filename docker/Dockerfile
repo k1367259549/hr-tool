@@ -9,6 +9,7 @@ RUN npm ci --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-mintimeout=200
 
 COPY . .
 
+RUN npm run prisma:generate
 RUN npm run build
 
 ENV NODE_ENV=production
