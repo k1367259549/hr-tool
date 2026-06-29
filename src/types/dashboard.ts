@@ -31,3 +31,27 @@ export type DashboardTrendItem = DashboardKpiTotals &
 export type DashboardTrendsResponse = {
   items: DashboardTrendItem[];
 };
+
+export type DashboardMetricCardView = {
+  id: string;
+  title: string;
+  value: string;
+  description: string;
+};
+
+export type DashboardRangeSummaryView = {
+  id: DashboardTimeRange;
+  title: string;
+  description: string;
+  logCountLabel: string;
+  metrics: DashboardMetricCardView[];
+};
+
+export type DashboardFunnelStageView = {
+  id: string;
+  label: string;
+  value: number;
+  valueLabel: string;
+  rateLabel: string;
+  maxValue: number;
+};
