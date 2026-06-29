@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function Home(): JSX.Element {
   return (
@@ -7,11 +8,10 @@ export default function Home(): JSX.Element {
         title="HR Daily AI"
         description="A desktop-first recruiting operations shell for daily logs, KPI visibility, AI review, planning, and reusable knowledge."
       />
-      <section className="flex min-h-64 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-8 text-center">
-        <p className="max-w-lg text-sm leading-6 text-slate-500">
-          Base application layout is ready. Select a module from the sidebar to open its placeholder page.
-        </p>
-      </section>
+      <EmptyState
+        title="Application shell ready"
+        description="Select a module from the sidebar to open its placeholder page."
+      />
     </div>
   );
 }
