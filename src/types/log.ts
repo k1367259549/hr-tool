@@ -17,6 +17,12 @@ export type RecruitLog = {
   updatedAt: Date;
 };
 
+export type RecruitLogDto = Omit<RecruitLog, "date" | "createdAt" | "updatedAt"> & {
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RecruitLogCountField =
   | "resumeCount"
   | "screenCount"
@@ -57,3 +63,8 @@ export type RecruitLogRepositoryQueryOptions = {
   date?: Date;
   limit?: number;
 };
+
+export type RecruitLogFormValues = Record<RecruitLogCountField, number> &
+  Record<RecruitLogTextField, string> & {
+    date: string;
+  };
