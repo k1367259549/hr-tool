@@ -54,3 +54,17 @@ export type DailyReviewRepositoryUpsertInput = {
   rawOutput: Prisma.InputJsonValue;
   parsedOutput: Prisma.InputJsonValue;
 };
+
+export type ReviewResultView = {
+  id: string;
+  dateLabel: string;
+  generatedAtLabel: string;
+  summary: string;
+  strengths: string;
+  weaknesses: string;
+  suggestions: string;
+  score: number;
+  scoreLabel: string;
+  scoreTone: "success" | "warning" | "danger";
+  modelLabel: string;
+};
