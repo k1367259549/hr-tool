@@ -37,6 +37,10 @@ model RecruitLog {
   interviewCount Int           @default(0)
   offerCount     Int           @default(0)
   entryCount     Int           @default(0)
+  source         String?
+  channel        String?
+  roleType       String?
+  priority       String?
   summary        String?
   problems       String?
   reflection     String?
@@ -70,6 +74,22 @@ model DailyReview {
   plans         DailyPlan[]
   knowledge     Knowledge[]
 
+  @@index([createdAt])
+}
+
+model AIRequestLog {
+  id           String   @id @default(uuid())
+  feature      String
+  model        String
+  promptTokens Int?
+  outputTokens Int?
+  totalTokens  Int?
+  latencyMs    Int?
+  success      Boolean
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([feature])
   @@index([createdAt])
 }
 

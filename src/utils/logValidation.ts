@@ -2,6 +2,7 @@ import type {
   RecruitLogCountField,
   RecruitLogCreateInput,
   RecruitLogDateInput,
+  RecruitLogMetadataField,
   RecruitLogQueryOptions,
   RecruitLogRepositoryCreateInput,
   RecruitLogRepositoryQueryOptions,
@@ -84,7 +85,7 @@ function assertRecord(value: unknown): Record<string, unknown> {
 
 function readOptionalString(
   source: Record<string, unknown>,
-  field: "position" | "summary" | "problems" | "reflection"
+  field: "position" | "summary" | "problems" | "reflection" | RecruitLogMetadataField
 ): string | null | undefined {
   const value = source[field];
 
@@ -123,6 +124,10 @@ export function parseRecruitLogCreatePayload(payload: unknown): RecruitLogCreate
   return {
     date,
     position: readOptionalString(body, "position"),
+    source: readOptionalString(body, "source"),
+    channel: readOptionalString(body, "channel"),
+    roleType: readOptionalString(body, "roleType"),
+    priority: readOptionalString(body, "priority"),
     resumeCount: readOptionalNumber(body, "resumeCount"),
     screenCount: readOptionalNumber(body, "screenCount"),
     phoneCount: readOptionalNumber(body, "phoneCount"),
@@ -146,6 +151,10 @@ export function parseRecruitLogUpdatePayload(payload: unknown): RecruitLogUpdate
   return {
     date,
     position: readOptionalString(body, "position"),
+    source: readOptionalString(body, "source"),
+    channel: readOptionalString(body, "channel"),
+    roleType: readOptionalString(body, "roleType"),
+    priority: readOptionalString(body, "priority"),
     resumeCount: readOptionalNumber(body, "resumeCount"),
     screenCount: readOptionalNumber(body, "screenCount"),
     phoneCount: readOptionalNumber(body, "phoneCount"),
@@ -167,6 +176,10 @@ export function normalizeRecruitLogCreateInput(
   return {
     date,
     position: input.position,
+    source: input.source,
+    channel: input.channel,
+    roleType: input.roleType,
+    priority: input.priority,
     resumeCount: input.resumeCount,
     screenCount: input.screenCount,
     phoneCount: input.phoneCount,
@@ -187,6 +200,10 @@ export function normalizeRecruitLogUpdateInput(
   return {
     date: input.date === undefined ? undefined : parseLogDate(input.date),
     position: input.position,
+    source: input.source,
+    channel: input.channel,
+    roleType: input.roleType,
+    priority: input.priority,
     resumeCount: input.resumeCount,
     screenCount: input.screenCount,
     phoneCount: input.phoneCount,

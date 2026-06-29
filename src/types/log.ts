@@ -10,6 +10,10 @@ export type RecruitLog = {
   interviewCount: number;
   offerCount: number;
   entryCount: number;
+  source: string | null;
+  channel: string | null;
+  roleType: string | null;
+  priority: string | null;
   summary: string | null;
   problems: string | null;
   reflection: string | null;
@@ -33,15 +37,18 @@ export type RecruitLogCountField =
 
 export type RecruitLogTextField = "position" | "summary" | "problems" | "reflection";
 
+export type RecruitLogMetadataField = "source" | "channel" | "roleType" | "priority";
+
 export type RecruitLogCreateInput = Partial<
-  Record<RecruitLogCountField, number> & Record<RecruitLogTextField, string | null>
+  Record<RecruitLogCountField, number> &
+    Record<RecruitLogTextField | RecruitLogMetadataField, string | null>
 > & {
   date: RecruitLogDateInput;
 };
 
 export type RecruitLogUpdateInput = Partial<
   Record<RecruitLogCountField, number> &
-    Record<RecruitLogTextField, string | null> & {
+    Record<RecruitLogTextField | RecruitLogMetadataField, string | null> & {
       date: RecruitLogDateInput;
     }
 >;
