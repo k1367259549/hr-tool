@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum KnowledgeType {
+  EXPERIENCE
+  TEMPLATE
+  POSITION
+  NOTE
+}
+
+enum KnowledgeSource {
+  USER
+  AI
+  REVIEW
+  PLAN
+}
+
+enum PlanPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model RecruitLog {
+  id             String        @id @default(uuid())
+  date           DateTime      @unique
+  position       String?
+  resumeCount    Int           @default(0)
+  screenCount    Int           @default(0)
+  phoneCount     Int           @default(0)
+  interviewCount Int           @default(0)
+  offerCount     Int           @default(0)
+  entryCount     Int           @default(0)
+  summary        String?
+  problems       String?
+  reflection     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  review         DailyReview?
+  plans          DailyPlan[]
+
+  @@index([date])
+}
+
+model DailyReview {
+  id            String       @id @default(uuid())
+  logId         String       @unique
+  summary       String
+  strengths     Json
+  weaknesses    Json
+  suggestions   Json
+  score         Int
+  provider      String
+  model         String
+  promptFile    String
+  promptVersion String
+  inputHash     String
+  rawOutput     Json
+  parsedOutput  Json
+  createdAt     DateTime     @default(now())
+
+  log           RecruitLog   @relation(fields: [logId], references: [id])
+  plans         DailyPlan[]
+  knowledge     Knowledge[]
+
+  @@index([createdAt])
+}
+
+model DailyPlan {
+  id               String       @id @default(uuid())
+  date             DateTime
+  logId            String?
+  reviewId         String?
+  schedule         Json
+  priorityTasks    Json
+  goals            Json
+  risks            Json
+  expectedOutcomes Json
+  priority         PlanPriority
+  provider         String
+  model            String
+  promptFile       String
+  promptVersion    String
+  inputHash        String
+  rawOutput        Json
+  parsedOutput     Json
+  createdAt        DateTime     @default(now())
+
+  log              RecruitLog?  @relation(fields: [logId], references: [id])
+  review           DailyReview? @relation(fields: [reviewId], references: [id])
+  knowledge        Knowledge[]
+
+  @@index([date])
+  @@index([logId])
+  @@index([reviewId])
+}
+
+model Knowledge {
+  id             String          @id @default(uuid())
+  title          String
+  content        String
+  type           KnowledgeType
+  source         KnowledgeSource
+  tags           String[]
+  sourceReviewId String?
+  sourcePlanId   String?
+  rawOutput      Json?
+  parsedOutput   Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  sourceReview   DailyReview?    @relation(fields: [sourceReviewId], references: [id])
+  sourcePlan     DailyPlan?      @relation(fields: [sourcePlanId], references: [id])
+
+  @@index([type])
+  @@index([source])
+  @@index([createdAt])
+}
