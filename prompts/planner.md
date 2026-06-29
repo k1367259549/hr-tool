@@ -13,20 +13,27 @@ Constraints:
 - Do not over-schedule.
 - Prioritize weak areas.
 - Tasks must be actionable.
+- Use only LOW, MEDIUM, or HIGH for priority.
+- Use only morning, afternoon, or evening for schedule time.
+- Include schedule, priorityTasks, goals, risks, expectedOutcomes, and priority.
 - Output MUST be valid JSON.
 - Do not include markdown, explanations, or natural language outside JSON.
 
 Output Schema:
 {
   "date": "string",
-  "tasks": [
+  "schedule": [
     {
-      "time": "morning | afternoon | evening",
+      "time": "morning",
       "content": "string",
-      "priority": "LOW | MEDIUM | HIGH"
+      "priority": "LOW"
     }
   ],
-  "focus": "string"
+  "priorityTasks": ["string"],
+  "goals": ["string"],
+  "risks": ["string"],
+  "expectedOutcomes": ["string"],
+  "priority": "LOW"
 }
 
 Return ONLY JSON.
