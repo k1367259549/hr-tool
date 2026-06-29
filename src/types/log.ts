@@ -61,6 +61,8 @@ export type RecruitLogQueryOptions = {
 
 export type RecruitLogRepositoryQueryOptions = {
   date?: Date;
+  startDate?: Date;
+  endDate?: Date;
   limit?: number;
 };
 

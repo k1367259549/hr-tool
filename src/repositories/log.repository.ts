@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type {
   RecruitLog,
   RecruitLogRepositoryCreateInput,
@@ -14,8 +15,22 @@ export const logRepository = {
   },
 
   async findMany(options: RecruitLogRepositoryQueryOptions = {}): Promise<RecruitLog[]> {
+    const dateFilter: Prisma.DateTimeFilter | Date | undefined =
+      options.date ??
+      (options.startDate || options.endDate
+        ? {
+            gte: options.startDate,
+            lt: options.endDate
+          }
+        : undefined);
+    const where: Prisma.RecruitLogWhereInput | undefined = dateFilter
+      ? {
+          date: dateFilter
+        }
+      : undefined;
+
     return prisma.recruitLog.findMany({
-      where: options.date ? { date: options.date } : undefined,
+      where,
       orderBy: {
         date: "desc"
       },
