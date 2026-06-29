@@ -145,7 +145,7 @@ Unstructured text output is not allowed for core features.
 Required services:
 
 - app (Next.js)
-- postgres (PostgreSQL)
+- db (PostgreSQL)
 
 ---
 

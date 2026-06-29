@@ -57,14 +57,14 @@ V1 deployment must follow:
 Required services:
 
 - app (Next.js)
-- postgres (PostgreSQL)
+- db (PostgreSQL)
 
 ## 4.2 docker-compose.yml
 
 File:
 
 ```text
-docker/docker-compose.yml
+docker-compose.yml
 ```
 
 Example:
@@ -73,9 +73,9 @@ Example:
 version: "3.9"
 
 services:
-  postgres:
+  db:
     image: postgres:16
-    container_name: hr_daily_postgres
+    container_name: hr_daily_db
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -95,11 +95,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hr_daily
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/hr_daily
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       NODE_ENV: production
     depends_on:
-      - postgres
+      - db
 
 volumes:
   db_data:
@@ -143,19 +143,19 @@ CMD ["npm", "start"]
 Run from repository root:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose up --build
 ```
 
 ## 6.2 Stop Project
 
 ```bash
-docker compose -f docker/docker-compose.yml down
+docker compose down
 ```
 
 ## 6.3 Reset Database
 
 ```bash
-docker compose -f docker/docker-compose.yml down -v
+docker compose down -v
 ```
 
 ---
@@ -165,7 +165,7 @@ docker compose -f docker/docker-compose.yml down -v
 Required:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hr_daily
+DATABASE_URL=postgresql://postgres:postgres@db:5432/hr_daily
 OPENAI_API_KEY=your_key_here
 ```
 
@@ -317,7 +317,7 @@ Check:
 Check:
 
 - `DATABASE_URL`
-- `postgres` container running
+- `db` container running
 - Docker network resolution
 
 ## 14.3 AI Fails

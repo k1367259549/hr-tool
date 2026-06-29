@@ -33,4 +33,9 @@ npm run build
 
 ## Docker
 
-Docker setup is planned for Task002. This task only creates the `docker/` folder placeholder.
+```bash
+docker compose up --build
+docker compose down
+```
+
+The Docker environment starts the Next.js app on port `3000` and PostgreSQL on port `5432`.

@@ -30,6 +30,7 @@ hr-daily-ai/
 │
 ├── .env.example
 ├── .gitignore
+├── docker-compose.yml
 ├── README.md
 ├── MASTER.md
 ├── AGENTS.md
@@ -311,7 +312,6 @@ Rules:
 docker/
 │
 ├── Dockerfile
-├── docker-compose.yml
 └── .dockerignore
 ```
 

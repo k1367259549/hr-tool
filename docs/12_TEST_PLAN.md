@@ -241,7 +241,7 @@ Expected:
 Run from repository root:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose up --build
 ```
 
 ## 8.2 Validation

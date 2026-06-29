@@ -282,13 +282,13 @@ Prompts MUST:
 Canonical startup command from repository root:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose up --build
 ```
 
-Short form is only allowed if a root-level compose file is added later:
+Stop command from repository root:
 
 ```bash
-docker compose up --build
+docker compose down
 ```
 
 ---

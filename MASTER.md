@@ -229,13 +229,13 @@ Deployment target:
 Canonical one-command startup from repository root:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose up --build
 ```
 
-The short form is only allowed if a root-level compose file is added later:
+Stop the Docker environment:
 
 ```bash
-docker compose up --build
+docker compose down
 ```
 
 ---
