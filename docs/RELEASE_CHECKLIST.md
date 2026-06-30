@@ -2,17 +2,17 @@
 
 Use this checklist before creating a V1 release tag.
 
-- [ ] Version number checked
-- [ ] Docker build succeeds
-- [ ] Database migration succeeds
-- [ ] Core pages tested
-- [ ] AI Review tested
-- [ ] Planner tested
-- [ ] Knowledge tested
-- [ ] Markdown export tested
-- [ ] No secrets committed
-- [ ] README updated
-- [ ] Git tag created
+- [x] Version number checked
+- [x] Docker build succeeds
+- [x] Database migration succeeds
+- [x] Core pages tested
+- [x] AI Review tested
+- [x] Planner tested
+- [x] Knowledge tested
+- [x] Markdown export tested
+- [x] No secrets committed
+- [x] README updated
+- [x] Git tag created
 
 ## Required Commands
 

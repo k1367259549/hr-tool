@@ -23,6 +23,19 @@ npm run dev
 
 Open the local URL printed by Next.js.
 
+## Environment
+
+Create a local `.env` file from `.env.example`.
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@db:5432/hr_daily
+OPENAI_API_KEY=
+```
+
+`OPENAI_API_KEY` is required for AI Review, Tomorrow Planner, and AI Knowledge Extraction. The key is only used on the backend and must not be committed.
+
+For Docker, keep `DATABASE_URL` pointed at `db`. For local Node.js development outside Docker, use the database host reachable from your machine, such as `localhost`.
+
 ## Quality Checks
 
 ```bash
