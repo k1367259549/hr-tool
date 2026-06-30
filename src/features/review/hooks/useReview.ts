@@ -206,7 +206,10 @@ class ReviewRequestError extends Error {
 }
 
 function isNotFoundError(error: unknown): boolean {
-  return error instanceof ReviewRequestError && error.code === "REVIEW_NOT_FOUND";
+  return (
+    error instanceof ReviewRequestError &&
+    (error.code === "REVIEW_NOT_FOUND" || error.code === "NOT_FOUND")
+  );
 }
 
 function getErrorMessage(error: unknown): string {

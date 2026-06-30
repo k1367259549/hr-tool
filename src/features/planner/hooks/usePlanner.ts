@@ -249,7 +249,10 @@ class PlannerRequestError extends Error {
 }
 
 function isNotFoundError(error: unknown): boolean {
-  return error instanceof PlannerRequestError && error.code === "PLAN_NOT_FOUND";
+  return (
+    error instanceof PlannerRequestError &&
+    (error.code === "PLAN_NOT_FOUND" || error.code === "NOT_FOUND")
+  );
 }
 
 function getErrorMessage(error: unknown): string {

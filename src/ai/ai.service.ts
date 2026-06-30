@@ -3,6 +3,7 @@ import { loadPrompt } from "@/ai/prompts/promptLoader";
 import { getAIProvider } from "@/ai/provider/factory";
 import { aiConfig } from "@/config/ai.config";
 import { auditService } from "@/services/audit.service";
+import { AppError, getPublicErrorMessage } from "@/utils/errors";
 import type {
   AIGenerateInput,
   AIGenerateResult,
@@ -61,14 +62,16 @@ async function generate(
 
     return result;
   } catch (error) {
+    const errorMessage = getPublicErrorMessage(error, "AI_ERROR");
+
     await auditService.logAIRequest({
-      errorMessage: getErrorMessage(error),
+      errorMessage,
       feature,
       model,
       success: false
     });
 
-    throw error;
+    throw new AppError("AI_ERROR", errorMessage, 502);
   }
 }
 
@@ -105,14 +108,6 @@ async function runWithTimeout<TValue>(promise: Promise<TValue>, timeoutMs: numbe
       clearTimeout(timeoutId);
     }
   }
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "AI generation failed.";
 }
 
 export const aiService = {

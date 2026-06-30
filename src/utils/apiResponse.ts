@@ -5,6 +5,8 @@ import type {
   ApiResponse,
   ApiSuccessResponse
 } from "@/types/api";
+import type { AppErrorCode } from "@/types/error";
+import { AppError, logHandledError, normalizeAppError, normalizeErrorCode } from "@/utils/errors";
 
 export class ApiRequestError extends Error {
   readonly code: ApiErrorCode;
@@ -35,21 +37,24 @@ export function successResponse<TData>(
 }
 
 export function errorResponse(
-  code: ApiErrorCode,
+  code: AppErrorCode,
   message: string,
   status = 500
 ): NextResponse<ApiErrorResponse> {
+  const normalizedCode = normalizeErrorCode(code);
+  const normalizedError = normalizeAppError(new AppError(normalizedCode, message, status));
+
   return NextResponse.json(
     {
       success: false,
       data: null,
       error: {
-        code,
-        message
+        code: normalizedError.code,
+        message: normalizedError.message
       }
     },
     {
-      status
+      status: normalizedError.status
     }
   );
 }
@@ -67,5 +72,11 @@ export function handleApiError(error: unknown): NextResponse<ApiResponse<null>> 
     return errorResponse(error.code, error.message, error.status);
   }
 
-  return errorResponse("DB_ERROR", "Request failed.", 500);
+  const normalizedError = normalizeAppError(error);
+
+  if (normalizedError.code === "UNKNOWN_ERROR") {
+    logHandledError("Unhandled API error.", error);
+  }
+
+  return errorResponse(normalizedError.code, normalizedError.message, normalizedError.status);
 }
