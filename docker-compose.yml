@@ -12,10 +12,10 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d hr_daily"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   app:
     build:
@@ -28,6 +28,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
     ports:
       - "3000:3000"
     depends_on:

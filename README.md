@@ -36,6 +36,7 @@ npm run build
 ```bash
 docker compose up --build
 docker compose down
+docker compose logs -f
 ```
 
 The Docker environment starts the Next.js app on port `3000` and PostgreSQL on port `5432`.
