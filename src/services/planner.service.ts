@@ -69,6 +69,7 @@ export const plannerService = {
 async function generatePlannerOutput(promptInput: JsonObject): Promise<string> {
   try {
     return await aiService.generateTextFromPrompt({
+      feature: "planner",
       promptFile: plannerPromptFile,
       variables: {
         INPUT: promptInput

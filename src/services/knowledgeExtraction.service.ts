@@ -55,6 +55,7 @@ export const knowledgeExtractionService = {
 async function generateKnowledgeOutput(promptInput: JsonObject): Promise<string> {
   try {
     return await aiService.generateTextFromPrompt({
+      feature: "knowledge_extraction",
       promptFile: knowledgePromptFile,
       variables: {
         INPUT: promptInput

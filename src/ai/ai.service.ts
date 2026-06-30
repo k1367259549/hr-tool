@@ -2,6 +2,7 @@ import { parseJsonOutput } from "@/ai/parser/jsonParser";
 import { loadPrompt } from "@/ai/prompts/promptLoader";
 import { getAIProvider } from "@/ai/provider/factory";
 import { aiConfig } from "@/config/ai.config";
+import { auditService } from "@/services/audit.service";
 import type {
   AIGenerateInput,
   AIGenerateResult,
@@ -27,6 +28,7 @@ async function generateFromPrompt(input: AiPromptGenerationInput): Promise<AIGen
   });
 
   return generate({
+    feature: input.feature,
     prompt,
     model: input.model,
     temperature: input.temperature,
@@ -40,9 +42,34 @@ async function generate(
     provider?: string;
   }
 ): Promise<AIGenerateResult> {
+  const feature = input.feature ?? "unknown";
+  const model = input.model ?? aiConfig.defaultModel;
   const provider = getAIProvider(input.provider ?? aiConfig.defaultProvider);
 
-  return runWithRetry(() => provider.generate(input));
+  try {
+    const result = await runWithRetry(() => provider.generate(input));
+
+    await auditService.logAIRequest({
+      feature,
+      latencyMs: result.latencyMs,
+      model: result.model,
+      outputTokens: result.usage?.completionTokens,
+      promptTokens: result.usage?.promptTokens,
+      success: true,
+      totalTokens: result.usage?.totalTokens
+    });
+
+    return result;
+  } catch (error) {
+    await auditService.logAIRequest({
+      errorMessage: getErrorMessage(error),
+      feature,
+      model,
+      success: false
+    });
+
+    throw error;
+  }
 }
 
 async function runWithRetry(operation: () => Promise<AIGenerateResult>): Promise<AIGenerateResult> {
@@ -78,6 +105,14 @@ async function runWithTimeout<TValue>(promise: Promise<TValue>, timeoutMs: numbe
       clearTimeout(timeoutId);
     }
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "AI generation failed.";
 }
 
 export const aiService = {

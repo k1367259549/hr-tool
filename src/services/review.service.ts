@@ -59,6 +59,7 @@ export const reviewService = {
 async function generateReviewOutput(promptInput: JsonObject): Promise<string> {
   try {
     return await aiService.generateTextFromPrompt({
+      feature: "review",
       promptFile: reviewPromptFile,
       variables: {
         INPUT: promptInput

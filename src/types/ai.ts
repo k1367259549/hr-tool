@@ -16,6 +16,7 @@ export type AIUsage = {
 
 export interface AIGenerateInput {
   prompt: string;
+  feature?: string;
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -50,6 +51,7 @@ export type LoadPromptInput = {
 };
 
 export type AiPromptGenerationInput = {
+  feature?: string;
   promptFile: string;
   variables?: PromptVariables;
   model?: string;

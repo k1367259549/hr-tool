@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { aiConfig } from "@/config/ai.config";
 import { envConfig } from "@/config/env.config";
 import type { AIProvider } from "@/ai/provider/types";
+import { logger } from "@/lib/logger";
 import type { AIGenerateInput, AIGenerateResult, AiErrorCode, AIUsage } from "@/types/ai";
 import { validateOpenAIEnvironment } from "@/utils/configValidation";
 
@@ -42,6 +43,11 @@ export const openAiProvider = {
     const model = input.model ?? aiConfig.defaultModel;
 
     try {
+      logger.info("OpenAI request started.", {
+        feature: input.feature ?? "unknown",
+        model
+      });
+
       const response = await getOpenAiClient().responses.create({
         input: input.prompt,
         max_output_tokens: input.maxTokens ?? aiConfig.defaultMaxTokens,
@@ -62,8 +68,20 @@ export const openAiProvider = {
       };
     } catch (error) {
       if (error instanceof OpenAiProviderError) {
+        logger.error("OpenAI request failed.", {
+          errorMessage: error.message,
+          feature: input.feature ?? "unknown",
+          model
+        });
+
         throw error;
       }
+
+      logger.error("OpenAI request failed.", {
+        errorMessage: "OpenAI request failed.",
+        feature: input.feature ?? "unknown",
+        model
+      });
 
       throw new OpenAiProviderError("AI_PROVIDER_ERROR", "OpenAI request failed.");
     }
