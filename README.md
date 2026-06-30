@@ -28,8 +28,21 @@ Open the local URL printed by Next.js.
 ```bash
 npm run lint
 npm run typecheck
+npm run test
 npm run build
 ```
+
+## CI Status
+
+GitHub Actions validates pushes and pull requests to `main` and `develop`.
+
+The CI workflow runs:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `docker compose build`
 
 ## Docker
 
@@ -40,3 +53,12 @@ docker compose logs -f
 ```
 
 The Docker environment starts the Next.js app on port `3000` and PostgreSQL on port `5432`.
+
+## Release Process
+
+1. Complete `docs/RELEASE_CHECKLIST.md`.
+2. Run the required validation commands locally.
+3. Trigger the manual `Release` workflow in GitHub Actions with the target version.
+4. Create a Git tag after validation succeeds.
+
+The release workflow validates the app and uploads a source artifact. It does not deploy to cloud services or publish Docker images.
