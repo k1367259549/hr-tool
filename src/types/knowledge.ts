@@ -1,4 +1,5 @@
 import type { KnowledgeSource, KnowledgeType, Prisma } from "@prisma/client";
+import type { RecruitLogDateInput } from "@/types/log";
 
 export type Knowledge = {
   id: string;
@@ -40,9 +41,38 @@ export type KnowledgeQueryOptions = {
 
 export type KnowledgeRepositoryQueryOptions = KnowledgeQueryOptions;
 
-export type KnowledgeRepositoryCreateInput = KnowledgeCreateInput;
+export type KnowledgeRepositoryCreateInput = {
+  title: string;
+  content: string;
+  type: KnowledgeType;
+  source: KnowledgeSource;
+  tags: string[];
+  sourceReviewId?: string | null;
+  sourcePlanId?: string | null;
+  rawOutput?: Prisma.InputJsonValue;
+  parsedOutput?: Prisma.InputJsonValue;
+};
 
-export type KnowledgeRepositoryUpdateInput = KnowledgeUpdateInput;
+export type KnowledgeRepositoryUpdateInput = Partial<KnowledgeRepositoryCreateInput>;
+
+export type KnowledgeAiItem = {
+  title: string;
+  content: string;
+  type: KnowledgeType;
+  tags: string[];
+};
+
+export type KnowledgeAiOutput = {
+  items: KnowledgeAiItem[];
+};
+
+export type KnowledgeExtractInput = {
+  date: RecruitLogDateInput;
+};
+
+export type KnowledgeExtractPayload = {
+  date: string;
+};
 
 export type KnowledgeFormValues = {
   title: string;

@@ -11,8 +11,11 @@ Input:
 Constraints:
 - Only extract useful reusable insights.
 - Do not duplicate knowledge items.
+- Do not return two items with the same title.
 - Do not invent missing facts.
 - Keep content concise and actionable.
+- Use only these type values: EXPERIENCE, TEMPLATE, POSITION, NOTE.
+- Tags must be short lowercase strings when possible.
 - Output MUST be valid JSON.
 - Do not include markdown, explanations, or natural language outside JSON.
 

@@ -33,6 +33,14 @@ export const knowledgeRepository = {
     });
   },
 
+  async findByTitle(title: string): Promise<Knowledge | null> {
+    return prisma.knowledge.findFirst({
+      where: {
+        title
+      }
+    });
+  },
+
   async update(id: string, data: KnowledgeRepositoryUpdateInput): Promise<Knowledge> {
     return prisma.knowledge.update({
       where: {
