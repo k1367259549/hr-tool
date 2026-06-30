@@ -6,11 +6,11 @@ export default function Home(): JSX.Element {
     <div className="space-y-8">
       <PageHeader
         title="HR Daily AI"
-        description="A desktop-first recruiting operations shell for daily logs, KPI visibility, AI review, planning, and reusable knowledge."
+        description="面向桌面端的招聘运营工作台，用于每日记录、KPI 查看、AI 复盘、计划生成和知识沉淀。"
       />
       <EmptyState
-        title="Application shell ready"
-        description="Select a module from the sidebar to open its placeholder page."
+        title="应用已准备就绪"
+        description="从侧边栏选择模块即可开始使用。"
       />
     </div>
   );

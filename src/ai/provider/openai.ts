@@ -19,14 +19,14 @@ export class OpenAiProviderError extends Error {
 }
 
 function getOpenAiClient(): OpenAI {
-  validateOpenAIEnvironment();
-
   if (!envConfig.openAiApiKey) {
     throw new OpenAiProviderError(
       "AI_API_KEY_MISSING",
-      "OPENAI_API_KEY is required for backend AI calls."
+      "OPENAI_API_KEY 未配置。请在后端环境变量中配置 API Key 后重启服务。"
     );
   }
+
+  validateOpenAIEnvironment();
 
   if (!client) {
     client = new OpenAI({

@@ -82,7 +82,7 @@ export function ToastProvider({ children }: ToastProviderProps): JSX.Element {
                 className="text-xs font-semibold underline"
                 onClick={() => dismissToast(toast.id)}
               >
-                Dismiss
+                关闭
               </button>
             </div>
           </div>
@@ -96,7 +96,7 @@ export function useToast(): ToastContextValue {
   const contextValue = useContext(toastContext);
 
   if (!contextValue) {
-    throw new Error("useToast must be used within ToastProvider.");
+    throw new Error("useToast 必须在 ToastProvider 内使用。");
   }
 
   return contextValue;

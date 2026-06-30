@@ -5,11 +5,13 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { useI18n, type Language } from "@/hooks/useI18n";
 import type { ApiResponse } from "@/types/api";
 import type { PromptStatusItem, PromptStatusResponse } from "@/types/prompt";
 import type { SettingsStatus } from "@/types/settings";
 
 export default function SettingsPage(): JSX.Element {
+  const { language, setLanguage } = useI18n();
   const [status, setStatus] = useState<SettingsStatus | null>(null);
   const [promptStatus, setPromptStatus] = useState<PromptStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -43,47 +45,49 @@ export default function SettingsPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Settings"
-        description="View read-only system, AI, database, and environment configuration status."
+        title="设置"
+        description="查看只读的系统、AI、数据库和环境配置状态。"
       />
 
       {isLoading ? (
-        <LoadingState title="Loading settings" description="Checking configuration status." />
+        <LoadingState title="正在加载设置" description="正在检查配置状态。" />
       ) : errorMessage ? (
         <ErrorState
-          title="Unable to load settings"
+          title="无法加载设置"
           message={errorMessage}
-          actionLabel="Retry"
+          actionLabel="重试"
           onAction={() => void loadStatus()}
         />
       ) : status ? (
         <div className="grid gap-6 xl:grid-cols-2">
+          <LanguageSettingsSection language={language} onLanguageChange={setLanguage} />
           <SettingsSection
-            title="Application Info"
+            title="应用信息"
             rows={[
-              createTextRow("App name", status.appName),
-              createTextRow("Version", status.version),
-              createTextRow("Environment", status.environment)
+              createTextRow("应用名称", status.appName),
+              createTextRow("版本", status.version),
+              createTextRow("环境", status.environment)
             ]}
           />
           <SettingsSection
-            title="AI Configuration"
+            title="AI 配置"
             rows={[
-              createTextRow("AI provider", status.ai.provider),
-              createTextRow("Configured model", status.ai.model),
-              createStatusRow("API key", status.ai.apiKeyConfigured),
-              createStatusRow("Prompt directory", status.ai.promptDirectoryAvailable)
+              createTextRow("AI 提供商", status.ai.provider),
+              createTextRow("配置模型", status.ai.model),
+              createStatusRow("API Key", status.ai.apiKeyConfigured),
+              createAiStatusRow("AI 状态", status.ai.status),
+              createStatusRow("提示词目录", status.ai.promptDirectoryAvailable)
             ]}
           />
           <SettingsSection
-            title="Database Status"
+            title="数据库状态"
             rows={[
-              createTextRow("Database provider", status.database.provider),
-              createConnectionRow("Connection", status.database.connected)
+              createTextRow("数据库提供商", status.database.provider),
+              createConnectionRow("连接状态", status.database.connected)
             ]}
           />
           <SettingsSection
-            title="Environment Status"
+            title="环境状态"
             rows={[
               createTextRow("NODE_ENV", status.environmentStatus.nodeEnv),
               createStatusRow("DATABASE_URL", status.environmentStatus.databaseUrlConfigured),
@@ -92,11 +96,11 @@ export default function SettingsPage(): JSX.Element {
           />
           <div className="xl:col-span-2">
             <SettingsSection
-              title="Developer Info"
+              title="开发者信息"
               rows={[
-                createTextRow("Runtime", status.developer.runtime),
-                createTextRow("Deployment", status.developer.deployment),
-                createTextRow("Configuration mode", status.developer.configurationMode)
+                createTextRow("运行时", status.developer.runtime),
+                createTextRow("部署方式", status.developer.deployment),
+                createTextRow("配置模式", status.developer.configurationMode)
               ]}
             />
           </div>
@@ -115,19 +119,77 @@ type PromptStatusSectionProps = {
   prompts: PromptStatusItem[];
 };
 
+type LanguageSettingsSectionProps = {
+  language: Language;
+  onLanguageChange: (language: Language) => void;
+};
+
+const languageOptions: Array<{
+  value: Language;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "zh",
+    label: "中文",
+    description: "使用简体中文显示界面。"
+  },
+  {
+    value: "en",
+    label: "English",
+    description: "Use English for the interface."
+  }
+];
+
+function LanguageSettingsSection({
+  language,
+  onLanguageChange
+}: LanguageSettingsSectionProps): JSX.Element {
+  return (
+    <SectionCard title="语言设置" description="只读的界面语言设置，保存在当前浏览器中。">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {languageOptions.map((option) => {
+            const isSelected = option.value === language;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`rounded-md border p-4 text-left transition-colors ${
+                  isSelected
+                    ? "border-slate-950 bg-slate-100"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+                onClick={() => onLanguageChange(option.value)}
+              >
+                <span className="block text-sm font-semibold text-slate-950">{option.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  {option.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-sm leading-6 text-slate-600">可见界面会立即切换语言。</p>
+      </div>
+    </SectionCard>
+  );
+}
+
 function PromptStatusSection({ prompts }: PromptStatusSectionProps): JSX.Element {
   return (
-    <SectionCard title="Prompt Status" description="Read-only validation status for required prompt files.">
+    <SectionCard title="提示词状态" description="必需提示词文件的只读校验状态。">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
-              <th className="px-3 py-2 font-semibold">Prompt</th>
-              <th className="px-3 py-2 font-semibold">Path</th>
-              <th className="px-3 py-2 font-semibold">Exists</th>
-              <th className="px-3 py-2 font-semibold">Valid</th>
-              <th className="px-3 py-2 font-semibold">Input</th>
-              <th className="px-3 py-2 font-semibold">Warnings</th>
+              <th className="px-3 py-2 font-semibold">提示词</th>
+              <th className="px-3 py-2 font-semibold">路径</th>
+              <th className="px-3 py-2 font-semibold">存在</th>
+              <th className="px-3 py-2 font-semibold">有效</th>
+              <th className="px-3 py-2 font-semibold">输入占位符</th>
+              <th className="px-3 py-2 font-semibold">警告</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -136,19 +198,19 @@ function PromptStatusSection({ prompts }: PromptStatusSectionProps): JSX.Element
                 <td className="px-3 py-3 font-semibold text-slate-950">{prompt.name}</td>
                 <td className="px-3 py-3 text-slate-600">{prompt.path}</td>
                 <td className="px-3 py-3">
-                  <StatusBadge value={prompt.exists ? "Exists" : "Missing"} tone={prompt.exists ? "success" : "danger"} />
+                  <StatusBadge value={prompt.exists ? "存在" : "缺失"} tone={prompt.exists ? "success" : "danger"} />
                 </td>
                 <td className="px-3 py-3">
-                  <StatusBadge value={prompt.valid ? "Valid" : "Invalid"} tone={prompt.valid ? "success" : "warning"} />
+                  <StatusBadge value={prompt.valid ? "有效" : "无效"} tone={prompt.valid ? "success" : "warning"} />
                 </td>
                 <td className="px-3 py-3">
                   <StatusBadge
-                    value={prompt.hasInputPlaceholder ? "Present" : "Missing"}
+                    value={prompt.hasInputPlaceholder ? "已包含" : "缺失"}
                     tone={prompt.hasInputPlaceholder ? "success" : "warning"}
                   />
                 </td>
                 <td className="px-3 py-3 text-slate-600">
-                  {prompt.warnings.length > 0 ? prompt.warnings.join(" ") : "None"}
+                  {prompt.warnings.length > 0 ? prompt.warnings.join(" ") : "无"}
                 </td>
               </tr>
             ))}
@@ -225,15 +287,23 @@ function createTextRow(label: string, value: string): SettingsRow {
 function createStatusRow(label: string, isConfigured: boolean): SettingsRow {
   return {
     label,
-    value: isConfigured ? "Configured" : "Missing",
+    value: isConfigured ? "已配置" : "缺失",
     tone: isConfigured ? "success" : "warning"
+  };
+}
+
+function createAiStatusRow(label: string, status: SettingsStatus["ai"]["status"]): SettingsRow {
+  return {
+    label,
+    value: status === "ready" ? "就绪" : "缺少 API Key",
+    tone: status === "ready" ? "success" : "warning"
   };
 }
 
 function createConnectionRow(label: string, isConnected: boolean): SettingsRow {
   return {
     label,
-    value: isConnected ? "Connected" : "Disconnected",
+    value: isConnected ? "已连接" : "未连接",
     tone: isConnected ? "success" : "danger"
   };
 }
@@ -254,5 +324,5 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

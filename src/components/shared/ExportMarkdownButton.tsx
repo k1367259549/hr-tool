@@ -12,14 +12,14 @@ type ExportMarkdownButtonProps = {
 
 export function ExportMarkdownButton({
   date,
-  label = "Export Markdown"
+  label = "导出 Markdown"
 }: ExportMarkdownButtonProps): JSX.Element {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const { showToast } = useToast();
 
   async function handleExport(): Promise<void> {
     if (!date) {
-      showToast("Select a date before exporting.", "error");
+      showToast("请先选择日期再导出。", "error");
       return;
     }
 
@@ -28,9 +28,9 @@ export function ExportMarkdownButton({
     try {
       const exportedReport = await requestExport(date);
       await navigator.clipboard.writeText(exportedReport.markdown);
-      showToast("Markdown copied to clipboard.", "success");
+      showToast("Markdown 已复制到剪贴板。", "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Export failed.", "error");
+      showToast(error instanceof Error ? error.message : "导出失败。", "error");
     } finally {
       setIsExporting(false);
     }
@@ -44,7 +44,7 @@ export function ExportMarkdownButton({
         disabled={isExporting}
         onClick={() => void handleExport()}
       >
-        {isExporting ? "Exporting" : label}
+        {isExporting ? "正在导出" : label}
       </button>
     </div>
   );

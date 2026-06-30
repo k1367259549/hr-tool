@@ -27,27 +27,27 @@ const kpiFields: Array<{
 }> = [
   {
     field: "resumeCount",
-    label: "Resume Count"
+    label: "简历数"
   },
   {
     field: "screenCount",
-    label: "Screen Count"
+    label: "筛选数"
   },
   {
     field: "phoneCount",
-    label: "Phone Count"
+    label: "电话沟通数"
   },
   {
     field: "interviewCount",
-    label: "Interview Count"
+    label: "面试数"
   },
   {
     field: "offerCount",
-    label: "Offer Count"
+    label: "Offer 数"
   },
   {
     field: "entryCount",
-    label: "Entry Count"
+    label: "入职数"
   }
 ];
 
@@ -78,8 +78,8 @@ export function LogForm({
 
   return (
     <SectionCard
-      title="Daily Log"
-      description="Create or update one structured recruiting log for a selected date."
+      title="每日记录"
+      description="为选中日期创建或更新一条结构化招聘记录。"
       actions={
         <PageActions>
           <button
@@ -88,7 +88,7 @@ export function LogForm({
             onClick={onReset}
             disabled={isSaving || isDeleting}
           >
-            New
+            新建
           </button>
           <button
             type="button"
@@ -96,7 +96,7 @@ export function LogForm({
             onClick={() => void onDelete()}
             disabled={!canDelete || isSaving || isDeleting}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isDeleting ? "正在删除..." : "删除"}
           </button>
           <button
             type="button"
@@ -104,16 +104,16 @@ export function LogForm({
             onClick={() => void onSave()}
             disabled={isSaving || isDeleting}
           >
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? "正在保存..." : "保存"}
           </button>
         </PageActions>
       }
     >
       <form className="space-y-6" onSubmit={(event) => event.preventDefault()}>
-        {errorMessage ? <ErrorState title="Unable to save log" message={errorMessage} /> : null}
+        {errorMessage ? <ErrorState title="无法保存记录" message={errorMessage} /> : null}
 
         <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-          <FormField id="date" label="Date" required>
+          <FormField id="date" label="日期" required>
             <input
               id="date"
               type="date"
@@ -128,17 +128,17 @@ export function LogForm({
             onClick={() => void onLoadByDate()}
             disabled={isSaving || isDeleting}
           >
-            Load Date
+            加载日期
           </button>
         </div>
 
-        <FormField id="position" label="Position">
+        <FormField id="position" label="职位">
           <input
             id="position"
             type="text"
             value={values.position}
             onChange={handleTextChange("position")}
-            placeholder="Frontend Engineer"
+            placeholder="前端工程师"
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
           />
         </FormField>
@@ -161,7 +161,7 @@ export function LogForm({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <FormField id="summary" label="Summary">
+          <FormField id="summary" label="总结">
             <textarea
               id="summary"
               value={values.summary}
@@ -170,7 +170,7 @@ export function LogForm({
               className="w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
             />
           </FormField>
-          <FormField id="problems" label="Problems">
+          <FormField id="problems" label="问题">
             <textarea
               id="problems"
               value={values.problems}
@@ -179,7 +179,7 @@ export function LogForm({
               className="w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
             />
           </FormField>
-          <FormField id="reflection" label="Reflection">
+          <FormField id="reflection" label="反思">
             <textarea
               id="reflection"
               value={values.reflection}

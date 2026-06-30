@@ -42,19 +42,19 @@ function createPromptWarnings(input: {
   const warnings: string[] = [];
 
   if (!input.exists) {
-    warnings.push("Prompt file is missing.");
+    warnings.push("提示词文件缺失。");
   }
 
   if (input.exists && !input.isNotEmpty) {
-    warnings.push("Prompt file is empty.");
+    warnings.push("提示词文件为空。");
   }
 
   if (input.exists && !input.hasInputPlaceholder) {
-    warnings.push("Prompt is missing {{INPUT}} placeholder.");
+    warnings.push("提示词缺少 {{INPUT}} 占位符。");
   }
 
   if (input.exists && !input.hasJsonOnlyInstruction) {
-    warnings.push("Prompt does not clearly require JSON-only output.");
+    warnings.push("提示词没有明确要求仅输出 JSON。");
   }
 
   return warnings;

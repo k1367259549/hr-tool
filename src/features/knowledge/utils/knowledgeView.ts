@@ -6,7 +6,7 @@ export function createKnowledgeListItem(entry: KnowledgeDto): KnowledgeListItem 
     contentPreview: createContentPreview(entry.content),
     createdAtLabel: formatDateTime(entry.createdAt),
     updatedAtLabel: formatDateTime(entry.updatedAt),
-    tagsLabel: entry.tags.length > 0 ? entry.tags.join(", ") : "No tags"
+    tagsLabel: entry.tags.length > 0 ? entry.tags.join(", ") : "暂无标签"
   };
 }
 
@@ -21,7 +21,7 @@ function createContentPreview(content: string): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",

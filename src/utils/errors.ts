@@ -8,12 +8,12 @@ import type {
 } from "@/types/error";
 
 const fallbackMessages: Record<StandardErrorCode, string> = {
-  AI_ERROR: "AI generation failed.",
-  CONFIG_ERROR: "System configuration is invalid.",
-  DATABASE_ERROR: "Database request failed.",
-  NOT_FOUND: "Resource not found.",
-  UNKNOWN_ERROR: "Request failed.",
-  VALIDATION_ERROR: "Validation failed."
+  AI_ERROR: "AI 生成失败。",
+  CONFIG_ERROR: "系统配置无效。",
+  DATABASE_ERROR: "数据库请求失败。",
+  NOT_FOUND: "资源不存在。",
+  UNKNOWN_ERROR: "请求失败。",
+  VALIDATION_ERROR: "校验失败。"
 };
 
 const statusByCode: Record<StandardErrorCode, number> = {
@@ -67,7 +67,16 @@ export function normalizeErrorCode(code: AppErrorCode | string): StandardErrorCo
     return "VALIDATION_ERROR";
   }
 
-  if (code === "AI_ERROR") {
+  if (
+    code === "FILE_REQUIRED" ||
+    code === "FILE_TOO_LARGE" ||
+    code === "UNSUPPORTED_FILE_TYPE" ||
+    code === "SPREADSHEET_PARSE_ERROR"
+  ) {
+    return "VALIDATION_ERROR";
+  }
+
+  if (code === "AI_ERROR" || code === "AI_ANALYSIS_ERROR") {
     return "AI_ERROR";
   }
 

@@ -27,8 +27,8 @@ export default function ReviewPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="AI Review"
-        description="Generate and view structured AI analysis for a selected daily recruiting log."
+        title="AI 复盘"
+        description="为选中的每日招聘记录生成并查看结构化 AI 分析。"
       />
       <div className="flex justify-end">
         <ExportMarkdownButton date={review.selectedDate} />
@@ -44,25 +44,25 @@ export default function ReviewPage(): JSX.Element {
       />
       {review.errorMessage ? (
         <ErrorState
-          title="Unable to load AI review"
+          title="无法加载 AI 复盘"
           message={review.errorMessage}
-          actionLabel="Dismiss"
+          actionLabel="关闭"
           onAction={review.dismissError}
         />
       ) : null}
       {review.isLoading ? (
-        <LoadingState title="Loading review" description="Checking for a saved AI review." />
+        <LoadingState title="正在加载复盘" description="正在检查是否已有保存的 AI 复盘。" />
       ) : review.isGenerating ? (
         <LoadingState
-          title="Generating review"
-          description="AI is analyzing the selected daily recruiting log."
+          title="正在生成复盘"
+          description="AI 正在分析选中的每日招聘记录。"
         />
       ) : review.review ? (
         <ReviewResult review={review.review} />
       ) : (
         <EmptyState
-          title="No AI review for this date"
-          description="Select a date with a daily log, then generate an AI review."
+          title="该日期暂无 AI 复盘"
+          description="请选择已有每日记录的日期，然后生成 AI 复盘。"
         />
       )}
     </div>

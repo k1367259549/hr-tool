@@ -2,7 +2,7 @@
 
 import { SectionCard } from "@/components/shared/SectionCard";
 import type { PlanScheduleItem, PlanScheduleTime } from "@/types/planner";
-import { getPriorityBadgeClass } from "./PlannerFocusCard";
+import { getPriorityBadgeClass, getPriorityLabel } from "./PlannerFocusCard";
 
 type PlannerTaskListProps = {
   schedule: PlanScheduleItem[];
@@ -14,15 +14,15 @@ const timeSections: Array<{
 }> = [
   {
     time: "morning",
-    title: "Morning Tasks"
+    title: "上午任务"
   },
   {
     time: "afternoon",
-    title: "Afternoon Tasks"
+    title: "下午任务"
   },
   {
     time: "evening",
-    title: "Evening Tasks"
+    title: "晚上任务"
   }
 ];
 
@@ -57,14 +57,14 @@ function PlannerTimeSection({ title, tasks }: PlannerTimeSectionProps): JSX.Elem
                   task.priority
                 )}`}
               >
-                {task.priority}
+                {getPriorityLabel(task.priority)}
               </span>
               <p className="text-sm leading-6 text-slate-700">{task.content}</p>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm leading-6 text-slate-500">No tasks scheduled.</p>
+        <p className="text-sm leading-6 text-slate-500">暂无已安排任务。</p>
       )}
     </SectionCard>
   );

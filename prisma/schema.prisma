@@ -143,3 +143,33 @@ model Knowledge {
   @@index([source])
   @@index([createdAt])
 }
+
+model UploadedSpreadsheet {
+  id        String               @id @default(uuid())
+  fileName  String
+  fileType  String
+  rowCount  Int?
+  status    String
+  createdAt DateTime             @default(now())
+
+  analysis  SpreadsheetAnalysis?
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SpreadsheetAnalysis {
+  id          String              @id @default(uuid())
+  uploadId    String              @unique
+  summary     String
+  insights    String
+  problems    String
+  suggestions String
+  rawJson      Json?
+  model       String
+  createdAt   DateTime            @default(now())
+
+  upload      UploadedSpreadsheet @relation(fields: [uploadId], references: [id])
+
+  @@index([createdAt])
+}

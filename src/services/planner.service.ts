@@ -15,6 +15,7 @@ import type {
   PlannerAiOutput,
   PlannerGenerateInput
 } from "@/types/planner";
+import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { parseLogDate } from "@/utils/logValidation";
 
 const plannerPromptFile = "planner.md";
@@ -39,7 +40,7 @@ export const plannerService = {
     const log = await logService.getLogByDate(sourceDate);
 
     if (!log) {
-      throw new PlannerServiceError("LOG_NOT_FOUND", "Previous day log not found.");
+      throw new PlannerServiceError("LOG_NOT_FOUND", "未找到前一天的每日记录。");
     }
 
     const review = await reviewRepository.findByLogId(log.id);
@@ -78,8 +79,11 @@ async function generatePlannerOutput(promptInput: JsonObject): Promise<string> {
       provider: aiConfig.defaultProvider,
       temperature: aiConfig.defaultTemperature
     });
-  } catch {
-    throw new PlannerServiceError("AI_ERROR", "AI plan generation failed.");
+  } catch (error) {
+    throw new PlannerServiceError(
+      "AI_ERROR",
+      getSafeAiErrorMessage(error, "AI 计划生成失败。")
+    );
   }
 }
 
@@ -89,7 +93,7 @@ function parseAndValidatePlannerOutput(rawOutput: string): PlannerAiOutput {
 
     return validatePlannerAiOutput(parsedJson);
   } catch {
-    throw new PlannerServiceError("AI_ERROR", "AI planner output is invalid.");
+    throw new PlannerServiceError("AI_ERROR", "AI 计划输出无效。");
   }
 }
 
@@ -97,7 +101,7 @@ function parsePlannerDate(value: PlannerGenerateInput["date"]): Date {
   try {
     return parseLogDate(value);
   } catch {
-    throw new PlannerServiceError("VALIDATION_ERROR", "Date must be a valid date.");
+    throw new PlannerServiceError("VALIDATION_ERROR", "日期必须是有效日期。");
   }
 }
 
@@ -105,7 +109,7 @@ function validatePlannerOutputDate(plannerOutput: PlannerAiOutput, targetDate: D
   const outputDate = parsePlannerDate(plannerOutput.date);
 
   if (outputDate.getTime() !== targetDate.getTime()) {
-    throw new PlannerServiceError("AI_ERROR", "AI planner output date does not match request.");
+    throw new PlannerServiceError("AI_ERROR", "AI 计划输出日期与请求不一致。");
   }
 }
 

@@ -11,6 +11,7 @@ import type {
   MonthlyReviewPromptInput,
   MonthlyReviewResponse
 } from "@/types/monthlyReview";
+import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { calculateKpiSummary } from "@/utils/kpi";
 
 const monthlyReviewPromptFile = "monthly-review.md";
@@ -74,8 +75,11 @@ async function generateMonthlyReviewOutput(promptInput: JsonObject): Promise<str
       provider: aiConfig.defaultProvider,
       temperature: aiConfig.defaultTemperature
     });
-  } catch {
-    throw new MonthlyReviewServiceError("AI_ERROR", "AI monthly review generation failed.");
+  } catch (error) {
+    throw new MonthlyReviewServiceError(
+      "AI_ERROR",
+      getSafeAiErrorMessage(error, "AI monthly review generation failed.")
+    );
   }
 }
 

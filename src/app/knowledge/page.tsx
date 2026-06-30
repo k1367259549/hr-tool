@@ -27,8 +27,8 @@ export default function KnowledgePage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Knowledge Base"
-        description="Create, search, filter, edit, and delete reusable recruiting knowledge."
+        title="知识库"
+        description="创建、搜索、筛选、编辑和删除可复用的招聘知识。"
       />
       <KnowledgeFilters
         filters={knowledge.filters}
@@ -41,9 +41,9 @@ export default function KnowledgePage(): JSX.Element {
 
       {knowledge.errorMessage && !knowledge.isFormOpen ? (
         <ErrorState
-          title="Unable to load knowledge"
+          title="无法加载知识库"
           message={knowledge.errorMessage}
-          actionLabel="Dismiss"
+          actionLabel="关闭"
           onAction={knowledge.dismissError}
         />
       ) : null}
@@ -60,7 +60,7 @@ export default function KnowledgePage(): JSX.Element {
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto">
             <SectionCard
               title={knowledge.formMode === "edit" ? "Edit Knowledge" : "Create Knowledge"}
-              description="Store structured recruiting knowledge for future reference."
+              description="沉淀结构化招聘知识，便于后续复用。"
             >
               <KnowledgeForm
                 values={knowledge.formValues}
@@ -79,9 +79,9 @@ export default function KnowledgePage(): JSX.Element {
 
       <ConfirmDialog
         open={knowledge.deleteCandidate !== null}
-        title="Delete Knowledge"
-        description={`Delete "${knowledge.deleteCandidate?.title ?? "this knowledge entry"}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title="删除知识"
+        description={`确定删除“${knowledge.deleteCandidate?.title ?? "这条知识"}”吗？此操作无法撤销。`}
+        confirmLabel="删除"
         tone="danger"
         isConfirming={knowledge.isDeleting}
         onCancel={knowledge.cancelDelete}

@@ -25,13 +25,13 @@ export function DashboardTrendChart({
 }: DashboardTrendChartProps): JSX.Element {
   return (
     <SectionCard
-      title="Trend Chart"
-      description={`Available daily recruiting activity for ${rangeLabel}.`}
+      title="趋势图"
+      description={`${rangeLabel} 的每日招聘活动趋势。`}
     >
       {items.length === 0 ? (
         <EmptyState
-          title="No trend data"
-          description="Create daily logs to populate recruiting trend data."
+          title="暂无趋势数据"
+          description="创建每日记录后即可生成招聘趋势数据。"
           className="min-h-72"
         />
       ) : (
@@ -46,7 +46,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="resumeCount"
-                name="Resumes"
+                name="简历"
                 stroke="#2563eb"
                 strokeWidth={2}
                 dot={false}
@@ -54,7 +54,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="screenCount"
-                name="Screen"
+                name="筛选"
                 stroke="#0f766e"
                 strokeWidth={2}
                 dot={false}
@@ -62,7 +62,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="phoneCount"
-                name="Phone"
+                name="电话沟通"
                 stroke="#0891b2"
                 strokeWidth={2}
                 dot={false}
@@ -70,7 +70,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="interviewCount"
-                name="Interview"
+                name="面试"
                 stroke="#7c3aed"
                 strokeWidth={2}
                 dot={false}
@@ -78,7 +78,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="offerCount"
-                name="Offers"
+                name="Offer"
                 stroke="#c2410c"
                 strokeWidth={2}
                 dot={false}
@@ -86,7 +86,7 @@ export function DashboardTrendChart({
               <Line
                 type="monotone"
                 dataKey="entryCount"
-                name="Entries"
+                name="入职"
                 stroke="#15803d"
                 strokeWidth={2}
                 dot={false}

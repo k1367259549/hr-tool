@@ -185,7 +185,7 @@ export function useKnowledge(): UseKnowledgeResult {
           : await createKnowledgeEntry(payload satisfies KnowledgeCreateInput);
 
       setSelectedEntry(createKnowledgeListItem(savedEntry));
-      setSuccessMessage(formMode === "edit" ? "Knowledge entry updated." : "Knowledge entry created.");
+      setSuccessMessage(formMode === "edit" ? "知识条目已更新。" : "知识条目已创建。");
       setIsFormOpen(false);
       await refreshEntries();
     } catch (error) {
@@ -215,7 +215,7 @@ export function useKnowledge(): UseKnowledgeResult {
     try {
       await deleteKnowledgeEntry(deleteCandidate.id);
       setDeleteCandidate(null);
-      setSuccessMessage("Knowledge entry deleted.");
+      setSuccessMessage("知识条目已删除。");
       await refreshEntries();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -276,11 +276,11 @@ export function useKnowledge(): UseKnowledgeResult {
 
 function validateFormValues(values: KnowledgeFormValues): string | null {
   if (values.title.trim().length === 0) {
-    return "Title is required.";
+    return "标题为必填项。";
   }
 
   if (values.content.trim().length === 0) {
-    return "Content is required.";
+    return "内容为必填项。";
   }
 
   return null;
@@ -308,5 +308,5 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

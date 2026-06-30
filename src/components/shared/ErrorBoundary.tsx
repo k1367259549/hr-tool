@@ -48,11 +48,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               onClick={this.handleRetry}
               type="button"
             >
-              Retry
+              重试
             </button>
           }
-          message="Something went wrong while rendering this page. Please retry the action."
-          title="Page error"
+          message="页面渲染时出现问题，请重试。"
+          title="页面出错"
         />
       );
     }

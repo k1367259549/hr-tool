@@ -23,8 +23,8 @@ export function LogList({
 }: LogListProps): JSX.Element {
   return (
     <SectionCard
-      title="Log History"
-      description="Select an existing log to view or edit it."
+      title="记录历史"
+      description="选择已有记录进行查看或编辑。"
       actions={
         <button
           type="button"
@@ -32,14 +32,14 @@ export function LogList({
           onClick={() => void onRefresh()}
           disabled={isLoading}
         >
-          Refresh
+          刷新
         </button>
       }
     >
       {isLoading ? (
-        <LoadingState title="Loading logs" description="Fetching daily recruiting logs." />
+        <LoadingState title="正在加载记录" description="正在获取每日招聘记录。" />
       ) : logs.length === 0 ? (
-        <EmptyState title="No logs yet" description="Create the first daily log from the form." />
+        <EmptyState title="暂无记录" description="请先在表单中创建第一条每日记录。" />
       ) : (
         <div className="space-y-3">
           {logs.map((log) => (

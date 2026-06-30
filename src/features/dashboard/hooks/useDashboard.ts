@@ -132,5 +132,5 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

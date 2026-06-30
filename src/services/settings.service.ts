@@ -26,6 +26,7 @@ export const settingsService = {
         provider: aiConfig.defaultProvider,
         model: aiConfig.defaultModel,
         apiKeyConfigured: openAiApiKeyConfigured,
+        status: openAiApiKeyConfigured ? "ready" : "missing_api_key",
         promptDirectoryAvailable
       },
       database: {

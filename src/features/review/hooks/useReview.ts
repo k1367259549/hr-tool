@@ -48,7 +48,7 @@ export function useReview(): UseReviewResult {
   const loadReviewForDate = useCallback(async (date: string): Promise<void> => {
     if (!date) {
       setReview(null);
-      setErrorMessage("Date is required.");
+      setErrorMessage("日期为必填项。");
       return;
     }
 
@@ -86,7 +86,7 @@ export function useReview(): UseReviewResult {
 
   const generateReview = useCallback(async (): Promise<void> => {
     if (!selectedDate) {
-      setErrorMessage("Date is required.");
+      setErrorMessage("日期为必填项。");
       return;
     }
 
@@ -101,7 +101,7 @@ export function useReview(): UseReviewResult {
         })
       });
       setReview(createReviewResultView(nextReview, selectedDate));
-      setSuccessMessage("AI review generated.");
+      setSuccessMessage("AI 复盘已生成。");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -179,7 +179,7 @@ function getScoreTone(score: number): "success" | "warning" | "danger" {
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     month: "short",
     year: "numeric"
@@ -187,7 +187,7 @@ function formatDate(value: string): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
@@ -235,5 +235,5 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

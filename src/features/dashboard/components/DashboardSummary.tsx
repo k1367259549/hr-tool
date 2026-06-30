@@ -49,7 +49,7 @@ export function DashboardSummary({
         </div>
 
         <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-slate-950">Selected range</p>
+          <p className="text-sm font-semibold text-slate-950">当前范围</p>
           <span className="w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
             {summary.logCountLabel}
           </span>

@@ -11,6 +11,7 @@ import type {
   WeeklyReviewPromptInput,
   WeeklyReviewResponse
 } from "@/types/weeklyReview";
+import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { calculateKpiSummary } from "@/utils/kpi";
 import { parseLogDate } from "@/utils/logValidation";
 
@@ -71,8 +72,11 @@ async function generateWeeklyReviewOutput(promptInput: JsonObject): Promise<stri
       provider: aiConfig.defaultProvider,
       temperature: aiConfig.defaultTemperature
     });
-  } catch {
-    throw new WeeklyReviewServiceError("AI_ERROR", "AI weekly review generation failed.");
+  } catch (error) {
+    throw new WeeklyReviewServiceError(
+      "AI_ERROR",
+      getSafeAiErrorMessage(error, "AI weekly review generation failed.")
+    );
   }
 }
 

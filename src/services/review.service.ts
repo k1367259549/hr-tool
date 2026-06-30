@@ -13,6 +13,7 @@ import type {
   ReviewAiOutput,
   ReviewGenerateInput
 } from "@/types/review";
+import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 
 const reviewPromptFile = "review.md";
 const reviewPromptVersion = "1.0";
@@ -34,7 +35,7 @@ export const reviewService = {
     const log = await logService.getLogByDate(input.date);
 
     if (!log) {
-      throw new ReviewServiceError("LOG_NOT_FOUND", "Log not found.");
+      throw new ReviewServiceError("LOG_NOT_FOUND", "未找到每日记录。");
     }
 
     const promptInput = createReviewPromptInput(log);
@@ -68,8 +69,11 @@ async function generateReviewOutput(promptInput: JsonObject): Promise<string> {
       provider: aiConfig.defaultProvider,
       temperature: aiConfig.defaultTemperature
     });
-  } catch {
-    throw new ReviewServiceError("AI_ERROR", "AI review generation failed.");
+  } catch (error) {
+    throw new ReviewServiceError(
+      "AI_ERROR",
+      getSafeAiErrorMessage(error, "AI 复盘生成失败。")
+    );
   }
 }
 
@@ -79,7 +83,7 @@ function parseAndValidateReviewOutput(rawOutput: string): ReviewAiOutput {
 
     return validateReviewAiOutput(parsedJson);
   } catch {
-    throw new ReviewServiceError("AI_ERROR", "AI review output is invalid.");
+    throw new ReviewServiceError("AI_ERROR", "AI 复盘输出无效。");
   }
 }
 

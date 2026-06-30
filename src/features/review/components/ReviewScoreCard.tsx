@@ -10,10 +10,10 @@ type ReviewScoreCardProps = {
 export function ReviewScoreCard({ review }: ReviewScoreCardProps): JSX.Element {
   return (
     <KpiCard
-      title="Daily Score"
+      title="每日评分"
       value={review.scoreLabel}
-      description={`Review for ${review.dateLabel}`}
-      footer={`Generated ${review.generatedAtLabel}`}
+      description={`${review.dateLabel} 的复盘`}
+      footer={`生成时间：${review.generatedAtLabel}`}
       tone={review.scoreTone}
     />
   );

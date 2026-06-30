@@ -15,6 +15,7 @@ import type {
 } from "@/types/knowledge";
 import type { RecruitLog } from "@/types/log";
 import type { DailyReview } from "@/types/review";
+import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { parseLogDate } from "@/utils/logValidation";
 
 const knowledgePromptFile = "knowledge.md";
@@ -40,7 +41,7 @@ export const knowledgeExtractionService = {
     const log = await logService.getLogByDate(date);
 
     if (!log) {
-      throw new KnowledgeExtractionServiceError("LOG_NOT_FOUND", "Log not found.");
+      throw new KnowledgeExtractionServiceError("LOG_NOT_FOUND", "未找到每日记录。");
     }
 
     const review = await reviewRepository.findByLogId(log.id);
@@ -64,10 +65,10 @@ async function generateKnowledgeOutput(promptInput: JsonObject): Promise<string>
       provider: aiConfig.defaultProvider,
       temperature: aiConfig.defaultTemperature
     });
-  } catch {
+  } catch (error) {
     throw new KnowledgeExtractionServiceError(
       "AI_ERROR",
-      "AI knowledge extraction failed."
+      getSafeAiErrorMessage(error, "AI 知识提取失败。")
     );
   }
 }
@@ -80,7 +81,7 @@ function parseAndValidateKnowledgeOutput(rawOutput: string): KnowledgeAiOutput {
   } catch {
     throw new KnowledgeExtractionServiceError(
       "AI_ERROR",
-      "AI knowledge output is invalid."
+      "AI 知识输出无效。"
     );
   }
 }
@@ -91,7 +92,7 @@ function parseKnowledgeDate(value: KnowledgeExtractInput["date"]): Date {
   } catch {
     throw new KnowledgeExtractionServiceError(
       "VALIDATION_ERROR",
-      "Date must be a valid date."
+      "日期必须是有效日期。"
     );
   }
 }

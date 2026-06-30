@@ -19,7 +19,7 @@ export async function GET(
     const log = await logService.getLogByDate(decodeURIComponent(date));
 
     if (!log) {
-      return errorResponse("LOG_NOT_FOUND", "Log not found.", 404);
+      return errorResponse("LOG_NOT_FOUND", "未找到每日记录。", 404);
     }
 
     return successResponse<RecruitLog>(log);

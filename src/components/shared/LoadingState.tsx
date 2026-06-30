@@ -5,8 +5,8 @@ type LoadingStateProps = {
 };
 
 export function LoadingState({
-  title = "Loading",
-  description = "Please wait while the content is prepared.",
+  title = "正在加载",
+  description = "内容准备中，请稍候。",
   className = ""
 }: LoadingStateProps): JSX.Element {
   return (

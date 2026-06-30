@@ -30,11 +30,20 @@ Create a local `.env` file from `.env.example`.
 ```env
 DATABASE_URL=postgresql://postgres:postgres@db:5432/hr_daily
 OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1
+OPENAI_TEMPERATURE=0.2
+OPENAI_MAX_TOKENS=2000
 ```
 
 `OPENAI_API_KEY` is required for AI Review, Tomorrow Planner, and AI Knowledge Extraction. The key is only used on the backend and must not be committed.
 
 For Docker, keep `DATABASE_URL` pointed at `db`. For local Node.js development outside Docker, use the database host reachable from your machine, such as `localhost`.
+
+## AI API Setup
+
+AI features require `OPENAI_API_KEY` in the backend environment. The app only displays whether the key is configured and never exposes the key itself.
+
+See [docs/AI_API_SETUP.md](docs/AI_API_SETUP.md) for setup, Docker restart steps, verification, and troubleshooting.
 
 ## Quality Checks
 

@@ -63,7 +63,7 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   try {
     return await request.json();
   } catch {
-    throw new ApiRequestError("VALIDATION_ERROR", "Request body must be valid JSON.", 400);
+    throw new ApiRequestError("VALIDATION_ERROR", "请求体必须是有效 JSON。", 400);
   }
 }
 

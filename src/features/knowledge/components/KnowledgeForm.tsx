@@ -28,21 +28,21 @@ export function KnowledgeForm({
 }: KnowledgeFormProps): JSX.Element {
   return (
     <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
-      {errorMessage ? <ErrorState title="Unable to save knowledge" message={errorMessage} /> : null}
+      {errorMessage ? <ErrorState title="无法保存知识" message={errorMessage} /> : null}
 
-      <FormField id="knowledge-title" label="Title" required>
+      <FormField id="knowledge-title" label="标题" required>
         <input
           id="knowledge-title"
           type="text"
           value={values.title}
           onChange={(event) => onChange("title", event.target.value)}
-          placeholder="Interview follow-up template"
+          placeholder="面试跟进模板"
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
         />
       </FormField>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id="knowledge-type" label="Type" required>
+        <FormField id="knowledge-type" label="类型" required>
           <select
             id="knowledge-type"
             value={values.type}
@@ -51,20 +51,20 @@ export function KnowledgeForm({
           >
             {typeOptions.map((type) => (
               <option key={type} value={type}>
-                {type}
+                {getKnowledgeTypeLabel(type)}
               </option>
             ))}
           </select>
         </FormField>
 
-        <FormField id="knowledge-source" label="Source" required>
+        <FormField id="knowledge-source" label="来源" required>
           <select
             id="knowledge-source"
             value={values.source}
             onChange={(event) => onChange("source", event.target.value)}
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
           >
-            <option value="USER">USER</option>
+            <option value="USER">用户</option>
             <option value="AI">AI</option>
           </select>
         </FormField>
@@ -72,8 +72,8 @@ export function KnowledgeForm({
 
       <FormField
         id="knowledge-tags"
-        label="Tags"
-        description="Use commas to separate tags."
+        label="标签"
+        description="使用英文逗号分隔多个标签。"
       >
         <input
           id="knowledge-tags"
@@ -85,7 +85,7 @@ export function KnowledgeForm({
         />
       </FormField>
 
-      <FormField id="knowledge-content" label="Content" required>
+      <FormField id="knowledge-content" label="内容" required>
         <textarea
           id="knowledge-content"
           value={values.content}
@@ -102,7 +102,7 @@ export function KnowledgeForm({
           onClick={onCancel}
           disabled={isSaving}
         >
-          Cancel
+          取消
         </button>
         <button
           type="button"
@@ -110,9 +110,20 @@ export function KnowledgeForm({
           onClick={() => void onSave()}
           disabled={isSaving}
         >
-          {isSaving ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Entry"}
+          {isSaving ? "正在保存..." : mode === "edit" ? "保存修改" : "创建条目"}
         </button>
       </div>
     </form>
   );
+}
+
+function getKnowledgeTypeLabel(type: KnowledgeType): string {
+  const labels: Record<KnowledgeType, string> = {
+    EXPERIENCE: "经验",
+    NOTE: "笔记",
+    POSITION: "岗位",
+    TEMPLATE: "模板"
+  };
+
+  return labels[type];
 }

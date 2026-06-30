@@ -22,19 +22,19 @@ export function LogItem({ log, isSelected, onSelect }: LogItemProps): JSX.Elemen
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-950">{formatDate(log.date)}</p>
-          <p className="mt-1 text-sm text-slate-500">{log.position || "No position"}</p>
+          <p className="mt-1 text-sm text-slate-500">{log.position || "未填写职位"}</p>
         </div>
         <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
-          {log.resumeCount} resumes
+          {log.resumeCount} 份简历
         </span>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-slate-500">
         <div>
-          <dt>Screen</dt>
+          <dt>筛选</dt>
           <dd className="font-semibold text-slate-900">{log.screenCount}</dd>
         </div>
         <div>
-          <dt>Interview</dt>
+          <dt>面试</dt>
           <dd className="font-semibold text-slate-900">{log.interviewCount}</dd>
         </div>
         <div>
@@ -47,7 +47,7 @@ export function LogItem({ log, isSelected, onSelect }: LogItemProps): JSX.Elemen
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "short",
     day: "2-digit"

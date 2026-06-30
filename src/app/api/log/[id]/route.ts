@@ -30,7 +30,7 @@ export async function GET(
     const log = await logService.getLogById(id);
 
     if (!log) {
-      return errorResponse("LOG_NOT_FOUND", "Log not found.", 404);
+      return errorResponse("LOG_NOT_FOUND", "未找到每日记录。", 404);
     }
 
     return successResponse<RecruitLog>(log);
@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest, context: LogIdRouteContext): Pro
     const existingLog = await logService.getLogById(id);
 
     if (!existingLog) {
-      return errorResponse("LOG_NOT_FOUND", "Log not found.", 404);
+      return errorResponse("LOG_NOT_FOUND", "未找到每日记录。", 404);
     }
 
     const body = await readJsonBody(request);
@@ -71,7 +71,7 @@ export async function DELETE(
     const existingLog = await logService.getLogById(id);
 
     if (!existingLog) {
-      return errorResponse("LOG_NOT_FOUND", "Log not found.", 404);
+      return errorResponse("LOG_NOT_FOUND", "未找到每日记录。", 404);
     }
 
     const log = await logService.deleteLog(id);

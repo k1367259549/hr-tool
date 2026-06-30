@@ -38,7 +38,7 @@ function createLogResult(log: RecruitLog): SearchResultItem {
   return {
     id: log.id,
     type: "RecruitLog",
-    title: `${dateLabel} Recruiting Log`,
+    title: `${dateLabel} 招聘记录`,
     content: createPreview([log.position, log.summary, log.problems, log.reflection]),
     url: "/log"
   };

@@ -21,7 +21,7 @@ export async function GET(
     });
 
     if (!review) {
-      return errorResponse("REVIEW_NOT_FOUND", "Review not found.", 404);
+      return errorResponse("REVIEW_NOT_FOUND", "未找到复盘。", 404);
     }
 
     return successResponse<DailyReview>(review);

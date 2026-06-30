@@ -23,14 +23,14 @@ function parseKnowledgeExtractPayload(payload: unknown): KnowledgeExtractPayload
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
     throw new KnowledgeExtractionServiceError(
       "VALIDATION_ERROR",
-      "Request body must be a JSON object."
+      "请求体必须是 JSON 对象。"
     );
   }
 
   const date = (payload as Record<string, unknown>).date;
 
   if (typeof date !== "string" || !date) {
-    throw new KnowledgeExtractionServiceError("VALIDATION_ERROR", "Date is required.");
+    throw new KnowledgeExtractionServiceError("VALIDATION_ERROR", "日期为必填项。");
   }
 
   return {

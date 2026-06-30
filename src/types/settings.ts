@@ -6,6 +6,7 @@ export type SettingsStatus = {
     provider: string;
     model: string;
     apiKeyConfigured: boolean;
+    status: "ready" | "missing_api_key";
     promptDirectoryAvailable: boolean;
   };
   database: {

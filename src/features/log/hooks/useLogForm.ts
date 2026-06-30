@@ -173,7 +173,7 @@ export function useLogForm(): UseLogFormResult {
 
       setSelectedLog(savedLog);
       setFormValues(toFormValues(savedLog));
-      setSuccessMessage("Daily log saved.");
+      setSuccessMessage("每日记录已保存。");
       await refreshLogs();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -195,7 +195,7 @@ export function useLogForm(): UseLogFormResult {
         method: "DELETE"
       });
       resetForm();
-      setSuccessMessage("Daily log deleted.");
+      setSuccessMessage("每日记录已删除。");
       await refreshLogs();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -262,12 +262,12 @@ function toApiPayload(values: RecruitLogFormValues): RecruitLogFormValues {
 
 function validateFormValues(values: RecruitLogFormValues): string | null {
   if (!values.date) {
-    return "Date is required.";
+    return "日期为必填项。";
   }
 
   for (const field of numericFields) {
     if (!Number.isInteger(values[field]) || values[field] < 0) {
-      return `${field} must be a non-negative integer.`;
+      return `${getCountFieldLabel(field)}必须是非负整数。`;
     }
   }
 
@@ -308,5 +308,18 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
+}
+
+function getCountFieldLabel(field: RecruitLogCountField): string {
+  const labels: Record<RecruitLogCountField, string> = {
+    entryCount: "入职数",
+    interviewCount: "面试数",
+    offerCount: "Offer 数",
+    phoneCount: "电话沟通数",
+    resumeCount: "简历数",
+    screenCount: "筛选数"
+  };
+
+  return labels[field];
 }

@@ -8,37 +8,42 @@ type NavigationItem = {
 
 const navigationItems: NavigationItem[] = [
   {
-    label: "Dashboard",
+    label: "仪表盘",
     href: "/dashboard",
     marker: "D"
   },
   {
-    label: "Daily Log",
+    label: "每日记录",
     href: "/log",
     marker: "L"
   },
   {
-    label: "AI Review",
+    label: "表格分析",
+    href: "/upload",
+    marker: "U"
+  },
+  {
+    label: "AI 复盘",
     href: "/review",
     marker: "R"
   },
   {
-    label: "Tomorrow Planner",
+    label: "明日计划",
     href: "/planner",
     marker: "P"
   },
   {
-    label: "Knowledge Base",
+    label: "知识库",
     href: "/knowledge",
     marker: "K"
   },
   {
-    label: "Search",
+    label: "全局搜索",
     href: "/search",
     marker: "F"
   },
   {
-    label: "Settings",
+    label: "设置",
     href: "/settings",
     marker: "S"
   }
@@ -50,12 +55,12 @@ export function Sidebar(): JSX.Element {
       <div className="border-b border-slate-200 px-5 py-4 md:py-5">
         <Link href="/" className="block">
           <span className="text-base font-semibold text-slate-950">HR Daily AI</span>
-          <span className="mt-1 block text-xs text-slate-500">Recruiting OS</span>
+          <span className="mt-1 block text-xs text-slate-500">招聘工作台</span>
         </Link>
       </div>
       <nav
         className="flex gap-1 overflow-x-auto px-3 py-3 md:flex-1 md:flex-col md:overflow-x-visible md:py-4"
-        aria-label="Primary navigation"
+        aria-label="主导航"
       >
         {navigationItems.map((item) => (
           <Link

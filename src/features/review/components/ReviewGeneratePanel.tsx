@@ -25,8 +25,8 @@ export function ReviewGeneratePanel({
 }: ReviewGeneratePanelProps): JSX.Element {
   return (
     <SectionCard
-      title="Daily Review"
-      description="Select a daily log date, load any saved AI review, or generate a fresh analysis."
+      title="每日复盘"
+      description="选择每日记录日期，加载已保存的 AI 复盘，或生成新的分析。"
       actions={
         <PageActions>
           <button
@@ -35,7 +35,7 @@ export function ReviewGeneratePanel({
             onClick={() => void onLoadReview()}
             disabled={isLoading || isGenerating}
           >
-            {isLoading ? "Loading..." : "Load"}
+            {isLoading ? "加载中..." : "加载"}
           </button>
           <button
             type="button"
@@ -43,12 +43,12 @@ export function ReviewGeneratePanel({
             onClick={() => void onGenerateReview()}
             disabled={isLoading || isGenerating || !selectedDate}
           >
-            {isGenerating ? "Generating..." : hasReview ? "Regenerate Review" : "Generate Review"}
+            {isGenerating ? "生成中..." : hasReview ? "重新生成复盘" : "生成复盘"}
           </button>
         </PageActions>
       }
     >
-      <FormField id="review-date" label="Date" required>
+      <FormField id="review-date" label="日期" required>
         <input
           id="review-date"
           type="date"

@@ -1,29 +1,66 @@
-import type { DailyExportData } from "@/types/export";
+import type { DailyExportData, SpreadsheetAnalysisExportData } from "@/types/export";
 import type { PlanScheduleItem } from "@/types/planner";
 
 export function formatDailyReportMarkdown(data: DailyExportData): string {
   return [
-    "# HR Daily Report",
+    "# HR 每日报告",
     "",
-    "## Date",
+    "## 日期",
     "",
     data.date,
     "",
-    "## Daily Log",
+    "## 每日记录",
     "",
     formatDailyLog(data),
     "",
-    "## KPI Summary",
+    "## KPI 汇总",
     "",
     formatKpiSummary(data),
     "",
-    "## AI Review",
+    "## AI 复盘",
     "",
     formatReview(data),
     "",
-    "## Tomorrow Plan",
+    "## 明日计划",
     "",
     formatPlan(data)
+  ].join("\n");
+}
+
+export function formatSpreadsheetAnalysisMarkdown(data: SpreadsheetAnalysisExportData): string {
+  const { analysis, upload } = data;
+
+  return [
+    "# Spreadsheet Analysis Report",
+    "",
+    "## File Information",
+    "",
+    `- File Name: ${upload.fileName}`,
+    `- File Type: ${upload.fileType.toUpperCase()}`,
+    `- Row Count: ${upload.rowCount ?? 0}`,
+    `- Upload Status: ${upload.status}`,
+    `- Uploaded At: ${upload.createdAt}`,
+    `- Model: ${analysis.model}`,
+    "",
+    "## Summary",
+    "",
+    analysis.summary,
+    "",
+    "## Insights",
+    "",
+    analysis.insights,
+    "",
+    "## Problems",
+    "",
+    analysis.problems,
+    "",
+    "## Suggestions",
+    "",
+    analysis.suggestions,
+    "",
+    "## Generated At",
+    "",
+    analysis.createdAt
   ].join("\n");
 }
 
@@ -31,21 +68,21 @@ function formatDailyLog(data: DailyExportData): string {
   const { log } = data;
 
   return [
-    `- Position: ${formatOptionalText(log.position)}`,
-    `- Source: ${formatOptionalText(log.source)}`,
-    `- Channel: ${formatOptionalText(log.channel)}`,
-    `- Role Type: ${formatOptionalText(log.roleType)}`,
-    `- Priority: ${formatOptionalText(log.priority)}`,
+    `- 职位：${formatOptionalText(log.position)}`,
+    `- 来源：${formatOptionalText(log.source)}`,
+    `- 渠道：${formatOptionalText(log.channel)}`,
+    `- 岗位类型：${formatOptionalText(log.roleType)}`,
+    `- 优先级：${formatOptionalText(log.priority)}`,
     "",
-    "### Summary",
+    "### 总结",
     "",
     formatOptionalText(log.summary),
     "",
-    "### Problems",
+    "### 问题",
     "",
     formatOptionalText(log.problems),
     "",
-    "### Reflection",
+    "### 反思",
     "",
     formatOptionalText(log.reflection)
   ].join("\n");
@@ -55,39 +92,39 @@ function formatKpiSummary(data: DailyExportData): string {
   const { log } = data;
 
   return [
-    `- Resume Count: ${log.resumeCount}`,
-    `- Screen Count: ${log.screenCount}`,
-    `- Phone Count: ${log.phoneCount}`,
-    `- Interview Count: ${log.interviewCount}`,
-    `- Offer Count: ${log.offerCount}`,
-    `- Entry Count: ${log.entryCount}`
+    `- 简历数：${log.resumeCount}`,
+    `- 筛选数：${log.screenCount}`,
+    `- 电话沟通数：${log.phoneCount}`,
+    `- 面试数：${log.interviewCount}`,
+    `- Offer 数：${log.offerCount}`,
+    `- 入职数：${log.entryCount}`
   ].join("\n");
 }
 
 function formatReview(data: DailyExportData): string {
   if (!data.review) {
-    return "No AI review generated for this date.";
+    return "该日期暂无 AI 复盘。";
   }
 
   const { review } = data;
 
   return [
-    `- Score: ${review.score}/100`,
-    `- Model: ${review.provider} / ${review.model}`,
+    `- 评分：${review.score}/100`,
+    `- 模型：${review.provider} / ${review.model}`,
     "",
-    "### Summary",
+    "### 总结",
     "",
     review.summary,
     "",
-    "### Strengths",
+    "### 亮点",
     "",
     formatJsonText(review.strengths),
     "",
-    "### Weaknesses",
+    "### 问题",
     "",
     formatJsonText(review.weaknesses),
     "",
-    "### Suggestions",
+    "### 建议",
     "",
     formatJsonText(review.suggestions)
   ].join("\n");
@@ -95,32 +132,32 @@ function formatReview(data: DailyExportData): string {
 
 function formatPlan(data: DailyExportData): string {
   if (!data.plan) {
-    return "No tomorrow plan generated for this date.";
+    return "该日期暂无明日计划。";
   }
 
   const { plan } = data;
 
   return [
-    `- Priority: ${plan.priority}`,
-    `- Model: ${plan.provider} / ${plan.model}`,
+    `- 优先级：${formatPriority(plan.priority)}`,
+    `- 模型：${plan.provider} / ${plan.model}`,
     "",
-    "### Schedule",
+    "### 日程",
     "",
     formatSchedule(plan.schedule),
     "",
-    "### Priority Tasks",
+    "### 重点任务",
     "",
     formatStringList(plan.priorityTasks),
     "",
-    "### Goals",
+    "### 目标",
     "",
     formatStringList(plan.goals),
     "",
-    "### Risks",
+    "### 风险",
     "",
     formatStringList(plan.risks),
     "",
-    "### Expected Outcomes",
+    "### 预期结果",
     "",
     formatStringList(plan.expectedOutcomes)
   ].join("\n");
@@ -128,17 +165,17 @@ function formatPlan(data: DailyExportData): string {
 
 function formatSchedule(value: unknown): string {
   if (!Array.isArray(value)) {
-    return "- No schedule provided.";
+    return "- 暂无日程。";
   }
 
   const items = value.filter(isScheduleItem);
 
   if (items.length === 0) {
-    return "- No schedule provided.";
+    return "- 暂无日程。";
   }
 
   return items
-    .map((item) => `- ${capitalize(item.time)} (${item.priority}): ${item.content}`)
+    .map((item) => `- ${formatScheduleTime(item.time)}（${formatPriority(item.priority)}）：${item.content}`)
     .join("\n");
 }
 
@@ -166,13 +203,13 @@ function isPriority(value: unknown): value is PlanScheduleItem["priority"] {
 
 function formatStringList(value: unknown): string {
   if (!Array.isArray(value)) {
-    return "- None.";
+    return "- 无。";
   }
 
   const items = value.filter((item): item is string => typeof item === "string" && item.length > 0);
 
   if (items.length === 0) {
-    return "- None.";
+    return "- 无。";
   }
 
   return items.map((item) => `- ${item}`).join("\n");
@@ -191,15 +228,31 @@ function formatJsonText(value: unknown): string {
     return JSON.stringify(value, null, 2);
   }
 
-  return "None.";
+  return "无。";
 }
 
 function formatOptionalText(value: string | null): string {
   const normalizedValue = value?.trim() ?? "";
 
-  return normalizedValue.length > 0 ? normalizedValue : "None.";
+  return normalizedValue.length > 0 ? normalizedValue : "无。";
 }
 
-function capitalize(value: string): string {
-  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+function formatScheduleTime(value: PlanScheduleItem["time"]): string {
+  const labels: Record<PlanScheduleItem["time"], string> = {
+    afternoon: "下午",
+    evening: "晚上",
+    morning: "上午"
+  };
+
+  return labels[value];
+}
+
+function formatPriority(value: PlanScheduleItem["priority"]): string {
+  const labels: Record<PlanScheduleItem["priority"], string> = {
+    HIGH: "高",
+    LOW: "低",
+    MEDIUM: "中"
+  };
+
+  return labels[value];
 }

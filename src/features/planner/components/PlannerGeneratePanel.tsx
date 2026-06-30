@@ -25,8 +25,8 @@ export function PlannerGeneratePanel({
 }: PlannerGeneratePanelProps): JSX.Element {
   return (
     <SectionCard
-      title="Tomorrow Planner"
-      description="Select a target date, load any saved plan, or generate a fresh next-day plan."
+      title="明日计划"
+      description="选择目标日期，加载已保存的计划，或生成新的次日计划。"
       actions={
         <PageActions>
           <button
@@ -35,7 +35,7 @@ export function PlannerGeneratePanel({
             onClick={() => void onLoadPlan()}
             disabled={isLoading || isGenerating}
           >
-            {isLoading ? "Loading..." : "Load"}
+            {isLoading ? "加载中..." : "加载"}
           </button>
           <button
             type="button"
@@ -43,12 +43,12 @@ export function PlannerGeneratePanel({
             onClick={() => void onGeneratePlan()}
             disabled={isLoading || isGenerating || !selectedDate}
           >
-            {isGenerating ? "Generating..." : hasPlan ? "Regenerate Plan" : "Generate Plan"}
+            {isGenerating ? "生成中..." : hasPlan ? "重新生成计划" : "生成计划"}
           </button>
         </PageActions>
       }
     >
-      <FormField id="planner-date" label="Target date" required>
+      <FormField id="planner-date" label="目标日期" required>
         <input
           id="planner-date"
           type="date"

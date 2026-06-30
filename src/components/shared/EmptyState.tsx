@@ -8,8 +8,8 @@ type EmptyStateProps = {
 };
 
 export function EmptyState({
-  title = "No data yet",
-  description = "There is nothing to show right now.",
+  title = "暂无数据",
+  description = "当前还没有可展示的内容。",
   action,
   className = ""
 }: EmptyStateProps): JSX.Element {

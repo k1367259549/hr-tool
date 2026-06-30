@@ -57,7 +57,7 @@ export function usePlanner(): UsePlannerResult {
   const loadPlanForDate = useCallback(async (date: string): Promise<void> => {
     if (!date) {
       setPlan(null);
-      setErrorMessage("Date is required.");
+      setErrorMessage("日期为必填项。");
       return;
     }
 
@@ -93,7 +93,7 @@ export function usePlanner(): UsePlannerResult {
 
   const generatePlan = useCallback(async (): Promise<void> => {
     if (!selectedDate) {
-      setErrorMessage("Date is required.");
+      setErrorMessage("日期为必填项。");
       return;
     }
 
@@ -108,7 +108,7 @@ export function usePlanner(): UsePlannerResult {
         })
       });
       setPlan(createPlannerPlanView(nextPlan, selectedDate));
-      setSuccessMessage("Plan generated.");
+      setSuccessMessage("计划已生成。");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -222,7 +222,7 @@ function getPriorityTone(priority: PlanPriorityValue): "neutral" | "success" | "
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     month: "short",
     year: "numeric"
@@ -230,7 +230,7 @@ function formatDate(value: string): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
@@ -278,5 +278,5 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Request failed.";
+  return "请求失败。";
 }

@@ -25,7 +25,7 @@ export async function GET(
     const knowledge = await knowledgeService.getKnowledgeById(id);
 
     if (!knowledge) {
-      return errorResponse("KNOWLEDGE_NOT_FOUND", "Knowledge entry not found.", 404);
+      return errorResponse("KNOWLEDGE_NOT_FOUND", "未找到知识条目。", 404);
     }
 
     return successResponse<Knowledge>(knowledge);
@@ -45,7 +45,7 @@ export async function PUT(
     const existingKnowledge = await knowledgeService.getKnowledgeById(id);
 
     if (!existingKnowledge) {
-      return errorResponse("KNOWLEDGE_NOT_FOUND", "Knowledge entry not found.", 404);
+      return errorResponse("KNOWLEDGE_NOT_FOUND", "未找到知识条目。", 404);
     }
 
     const body = await readJsonBody(request);
@@ -69,7 +69,7 @@ export async function DELETE(
     const existingKnowledge = await knowledgeService.getKnowledgeById(id);
 
     if (!existingKnowledge) {
-      return errorResponse("KNOWLEDGE_NOT_FOUND", "Knowledge entry not found.", 404);
+      return errorResponse("KNOWLEDGE_NOT_FOUND", "未找到知识条目。", 404);
     }
 
     const knowledge = await knowledgeService.deleteKnowledge(id);

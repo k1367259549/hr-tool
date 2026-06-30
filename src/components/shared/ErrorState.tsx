@@ -10,8 +10,8 @@ type ErrorStateProps = {
 };
 
 export function ErrorState({
-  title = "Something went wrong",
-  message = "Please try again.",
+  title = "出错了",
+  message = "请稍后重试。",
   actionLabel,
   action,
   className = "",

@@ -14,13 +14,13 @@ export function DashboardFunnel({ stages, rangeLabel }: DashboardFunnelProps): J
 
   return (
     <SectionCard
-      title="Recruiting Funnel"
-      description={`Resume to entry movement for ${rangeLabel}.`}
+      title="招聘漏斗"
+      description={`${rangeLabel} 的简历到入职转化情况。`}
     >
       {!hasData ? (
         <EmptyState
-          title="No funnel data"
-          description="Create recruiting logs to see funnel movement."
+          title="暂无漏斗数据"
+          description="创建招聘记录后即可查看漏斗转化。"
           className="min-h-72"
         />
       ) : (
@@ -43,7 +43,7 @@ export function DashboardFunnel({ stages, rangeLabel }: DashboardFunnelProps): J
                 min={0}
                 max={stage.maxValue}
                 value={stage.value}
-                aria-label={`${stage.label} funnel value`}
+                aria-label={`${stage.label} 漏斗数值`}
               />
               </div>
               {index < stages.length - 1 ? (

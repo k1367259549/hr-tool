@@ -25,8 +25,8 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = "确认",
+  cancelLabel = "取消",
   tone = "neutral",
   isConfirming = false,
   onCancel,
@@ -57,7 +57,7 @@ export function ConfirmDialog({
                 onClick={() => void onConfirm()}
                 disabled={isConfirming}
               >
-                {isConfirming ? "Working..." : confirmLabel}
+                {isConfirming ? "处理中..." : confirmLabel}
               </button>
             </div>
           </div>

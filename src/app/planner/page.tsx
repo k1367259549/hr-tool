@@ -28,8 +28,8 @@ export default function PlannerPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Tomorrow Planner"
-        description="Generate and view structured next-day recruiting plans."
+        title="明日计划"
+        description="生成并查看结构化的次日招聘工作计划。"
       />
       <div className="flex justify-end">
         <ExportMarkdownButton date={getReportDateForPlan(planner.selectedDate)} />
@@ -45,18 +45,18 @@ export default function PlannerPage(): JSX.Element {
       />
       {planner.errorMessage ? (
         <ErrorState
-          title="Unable to load planner"
+          title="无法加载计划"
           message={planner.errorMessage}
-          actionLabel="Dismiss"
+          actionLabel="关闭"
           onAction={planner.dismissError}
         />
       ) : null}
       {planner.isLoading ? (
-        <LoadingState title="Loading plan" description="Checking for a saved plan." />
+        <LoadingState title="正在加载计划" description="正在检查是否已有保存的计划。" />
       ) : planner.isGenerating ? (
         <LoadingState
-          title="Generating plan"
-          description="AI is creating the selected next-day recruiting plan."
+          title="正在生成计划"
+          description="AI 正在创建选中日期的次日招聘计划。"
         />
       ) : planner.plan ? (
         <div className="space-y-6">
@@ -65,8 +65,8 @@ export default function PlannerPage(): JSX.Element {
         </div>
       ) : (
         <EmptyState
-          title="No plan for this date"
-          description="Select a target date with previous-day recruiting data, then generate a plan."
+          title="该日期暂无计划"
+          description="请选择前一天已有招聘记录的目标日期，然后生成计划。"
         />
       )}
     </div>

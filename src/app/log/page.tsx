@@ -31,8 +31,8 @@ export default function LogPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Daily Log"
-        description="Record structured recruiting activity including screening, communication, interviews, offers, entries, and reflection."
+        title="每日记录"
+        description="记录结构化招聘活动，包括简历、筛选、沟通、面试、Offer、入职和复盘。"
       />
       <div className="flex justify-end">
         <ExportMarkdownButton date={logForm.formValues.date} />
@@ -63,9 +63,9 @@ export default function LogPage(): JSX.Element {
       </div>
       <ConfirmDialog
         open={isDeleteDialogOpen}
-        title="Delete Daily Log"
-        description="Delete the selected daily log? This action cannot be undone."
-        confirmLabel="Delete"
+        title="删除每日记录"
+        description="确定删除选中的每日记录吗？此操作无法撤销。"
+        confirmLabel="删除"
         tone="danger"
         isConfirming={logForm.isDeleting}
         onCancel={() => setIsDeleteDialogOpen(false)}

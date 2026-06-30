@@ -21,7 +21,7 @@ export async function GET(
     });
 
     if (!plan) {
-      return errorResponse("PLAN_NOT_FOUND", "Plan not found.", 404);
+      return errorResponse("PLAN_NOT_FOUND", "未找到计划。", 404);
     }
 
     return successResponse<DailyPlan>(plan);

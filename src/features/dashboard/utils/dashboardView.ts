@@ -19,71 +19,71 @@ type MetricDefinition = {
 const metricDefinitions: MetricDefinition[] = [
   {
     id: "resumeCount",
-    title: "Resume Count",
-    description: "Total resumes received.",
+    title: "简历数",
+    description: "收到的简历总数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "screenCount",
-    title: "Screen Count",
-    description: "Candidates screened.",
+    title: "筛选数",
+    description: "已筛选的候选人数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "phoneCount",
-    title: "Phone Count",
-    description: "Phone communications completed.",
+    title: "电话沟通数",
+    description: "已完成的电话沟通次数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "interviewCount",
-    title: "Interview Count",
-    description: "Interviews completed.",
+    title: "面试数",
+    description: "已完成的面试次数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "offerCount",
-    title: "Offer Count",
-    description: "Offers sent.",
+    title: "Offer 数",
+    description: "已发出的 Offer 数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "entryCount",
-    title: "Entry Count",
-    description: "Entries completed.",
+    title: "入职数",
+    description: "已完成的入职人数。",
     format: "number",
     tone: "neutral"
   },
   {
     id: "screenRate",
-    title: "Screen Rate",
-    description: "Screened resumes divided by resumes.",
+    title: "筛选率",
+    description: "筛选数 / 简历数。",
     format: "rate",
     tone: "success"
   },
   {
     id: "interviewRate",
-    title: "Interview Rate",
-    description: "Interviews divided by screened candidates.",
+    title: "面试率",
+    description: "面试数 / 筛选数。",
     format: "rate",
     tone: "success"
   },
   {
     id: "offerRate",
-    title: "Offer Rate",
-    description: "Offers divided by interviews.",
+    title: "Offer 率",
+    description: "Offer 数 / 面试数。",
     format: "rate",
     tone: "warning"
   },
   {
     id: "entryRate",
-    title: "Entry Rate",
-    description: "Entries divided by offers.",
+    title: "入职率",
+    description: "入职数 / Offer 数。",
     format: "rate",
     tone: "warning"
   }
@@ -97,27 +97,27 @@ const rangeLabels: Record<
   }
 > = {
   today: {
-    title: "Today Summary",
-    description: "Current UTC day recruiting performance."
+    title: "今日汇总",
+    description: "当前 UTC 日期的招聘表现。"
   },
   week: {
-    title: "Weekly Summary",
-    description: "Current UTC week recruiting performance."
+    title: "本周汇总",
+    description: "当前 UTC 周的招聘表现。"
   },
   month: {
-    title: "Monthly Summary",
-    description: "Current UTC month recruiting performance."
+    title: "本月汇总",
+    description: "当前 UTC 月的招聘表现。"
   },
   all: {
-    title: "All Logs Summary",
-    description: "All saved recruiting logs."
+    title: "全部汇总",
+    description: "所有已保存的招聘记录。"
   }
 };
 
 const rangeOrder: DashboardTimeRange[] = ["today", "week", "month", "all"];
 
-const numberFormatter = new Intl.NumberFormat("en");
-const rateFormatter = new Intl.NumberFormat("en", {
+const numberFormatter = new Intl.NumberFormat("zh-CN");
+const rateFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 1,
   style: "percent"
 });
@@ -130,7 +130,7 @@ export function createRangeSummaryView(
     id: range,
     title: rangeLabels[range].title,
     description: rangeLabels[range].description,
-    logCountLabel: `${formatNumber(summary.logCount)} logs`,
+    logCountLabel: `${formatNumber(summary.logCount)} 条记录`,
     metrics: metricDefinitions.map((definition) => createMetricCardView(definition, summary))
   };
 }
@@ -140,9 +140,9 @@ export function createRangeOptions(
 ): DashboardRangeOptionView[] {
   return rangeOrder.map((range) => ({
     id: range,
-    label: rangeLabels[range].title.replace(" Summary", ""),
+    label: rangeLabels[range].title.replace("汇总", ""),
     description: rangeLabels[range].description,
-    logCountLabel: `${formatNumber(summary[range].logCount)} logs`
+    logCountLabel: `${formatNumber(summary[range].logCount)} 条记录`
   }));
 }
 
@@ -150,12 +150,12 @@ export function createFunnelStages(summary: DashboardKpiSummary): DashboardFunne
   const maxValue = Math.max(summary.resumeCount, 1);
 
   return [
-    createFunnelStage("resume", "Resume", summary.resumeCount, "Base", "100%", maxValue),
-    createFunnelStage("screen", "Screen", summary.screenCount, formatRate(summary.screenRate), formatPreviousStageRate(summary.screenCount, summary.resumeCount), maxValue),
-    createFunnelStage("phone", "Phone", summary.phoneCount, "Contact", formatPreviousStageRate(summary.phoneCount, summary.screenCount), maxValue),
-    createFunnelStage("interview", "Interview", summary.interviewCount, formatRate(summary.interviewRate), formatPreviousStageRate(summary.interviewCount, summary.phoneCount), maxValue),
+    createFunnelStage("resume", "简历", summary.resumeCount, "基准", "100%", maxValue),
+    createFunnelStage("screen", "筛选", summary.screenCount, formatRate(summary.screenRate), formatPreviousStageRate(summary.screenCount, summary.resumeCount), maxValue),
+    createFunnelStage("phone", "电话沟通", summary.phoneCount, "沟通", formatPreviousStageRate(summary.phoneCount, summary.screenCount), maxValue),
+    createFunnelStage("interview", "面试", summary.interviewCount, formatRate(summary.interviewRate), formatPreviousStageRate(summary.interviewCount, summary.phoneCount), maxValue),
     createFunnelStage("offer", "Offer", summary.offerCount, formatRate(summary.offerRate), formatPreviousStageRate(summary.offerCount, summary.interviewCount), maxValue),
-    createFunnelStage("entry", "Entry", summary.entryCount, formatRate(summary.entryRate), formatPreviousStageRate(summary.entryCount, summary.offerCount), maxValue)
+    createFunnelStage("entry", "入职", summary.entryCount, formatRate(summary.entryRate), formatPreviousStageRate(summary.entryCount, summary.offerCount), maxValue)
   ];
 }
 
@@ -189,8 +189,8 @@ function createMetricCardView(
     description: definition.description,
     footer:
       definition.format === "rate"
-        ? `${formatNumber(Math.round(rawValue * 1000) / 10)} percentage points`
-        : "Count",
+        ? `${formatNumber(Math.round(rawValue * 1000) / 10)} 个百分点`
+        : "数量",
     tone: definition.tone
   };
 }
@@ -262,8 +262,8 @@ function formatRate(value: number): string {
 
 function formatPreviousStageRate(value: number, previousValue: number): string {
   if (previousValue === 0) {
-    return "0% from previous";
+    return "较上一阶段 0%";
   }
 
-  return `${formatRate(value / previousValue)} from previous`;
+  return `较上一阶段 ${formatRate(value / previousValue)}`;
 }

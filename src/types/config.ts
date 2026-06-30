@@ -12,6 +12,9 @@ export type AppConfig = {
 export type EnvConfig = {
   databaseUrl: string | undefined;
   openAiApiKey: string | undefined;
+  openAiModel: string | undefined;
+  openAiTemperature: string | undefined;
+  openAiMaxTokens: string | undefined;
   nodeEnv: AppEnvironment;
 };
 

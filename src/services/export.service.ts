@@ -1,11 +1,19 @@
 import { plannerRepository } from "@/repositories/planner.repository";
 import { reviewRepository } from "@/repositories/review.repository";
 import { logService } from "@/services/log.service";
-import type { DailyExportInput, DailyExportResponse } from "@/types/export";
-import { formatDailyReportMarkdown } from "@/utils/markdownExport";
+import { spreadsheetService } from "@/services/spreadsheet.service";
+import type {
+  DailyExportInput,
+  DailyExportResponse,
+  SpreadsheetAnalysisExportResponse
+} from "@/types/export";
+import {
+  formatDailyReportMarkdown,
+  formatSpreadsheetAnalysisMarkdown
+} from "@/utils/markdownExport";
 import { LogValidationError, parseLogDate } from "@/utils/logValidation";
 
-export type ExportServiceErrorCode = "LOG_NOT_FOUND" | "VALIDATION_ERROR";
+export type ExportServiceErrorCode = "LOG_NOT_FOUND" | "NOT_FOUND" | "VALIDATION_ERROR";
 
 export class ExportServiceError extends Error {
   readonly code: ExportServiceErrorCode;
@@ -24,7 +32,7 @@ export const exportService = {
     const log = await logService.getLogByDate(date);
 
     if (!log) {
-      throw new ExportServiceError("LOG_NOT_FOUND", "Log not found.");
+      throw new ExportServiceError("LOG_NOT_FOUND", "未找到每日记录。");
     }
 
     const planDate = getNextDate(date);
@@ -41,6 +49,31 @@ export const exportService = {
 
     return {
       date: dateLabel,
+      markdown
+    };
+  },
+
+  async exportSpreadsheetAnalysisMarkdown(
+    uploadId: string
+  ): Promise<SpreadsheetAnalysisExportResponse> {
+    if (uploadId.trim().length === 0) {
+      throw new ExportServiceError("VALIDATION_ERROR", "上传记录 ID 不能为空。");
+    }
+
+    const report = await spreadsheetService.getAnalysisByUploadId(uploadId);
+
+    if (!report.analysis) {
+      throw new ExportServiceError("NOT_FOUND", "未找到表格分析报告。");
+    }
+
+    const markdown = formatSpreadsheetAnalysisMarkdown({
+      analysis: report.analysis,
+      upload: report.upload
+    });
+
+    return {
+      id: report.upload.id,
+      fileName: report.upload.fileName,
       markdown
     };
   }

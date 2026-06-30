@@ -15,10 +15,10 @@ export function KnowledgeItem({ entry, onEdit, onDelete }: KnowledgeItemProps): 
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
-              {entry.type}
+              {getKnowledgeTypeLabel(entry.type)}
             </span>
             <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">
-              {entry.source}
+              {getKnowledgeSourceLabel(entry.source)}
             </span>
           </div>
           <div className="space-y-1">
@@ -42,7 +42,7 @@ export function KnowledgeItem({ entry, onEdit, onDelete }: KnowledgeItemProps): 
             )}
           </div>
           <p className="text-xs leading-5 text-slate-500">
-            Created {entry.createdAtLabel} · Updated {entry.updatedAtLabel}
+            创建于 {entry.createdAtLabel} · 更新于 {entry.updatedAtLabel}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -51,17 +51,32 @@ export function KnowledgeItem({ entry, onEdit, onDelete }: KnowledgeItemProps): 
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => void onEdit(entry)}
           >
-            Edit
+            编辑
           </button>
           <button
             type="button"
             className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
             onClick={() => onDelete(entry)}
           >
-            Delete
+            删除
           </button>
         </div>
       </div>
     </article>
   );
+}
+
+function getKnowledgeTypeLabel(type: KnowledgeListItem["type"]): string {
+  const labels: Record<KnowledgeListItem["type"], string> = {
+    EXPERIENCE: "经验",
+    NOTE: "笔记",
+    POSITION: "岗位",
+    TEMPLATE: "模板"
+  };
+
+  return labels[type];
+}
+
+function getKnowledgeSourceLabel(source: KnowledgeListItem["source"]): string {
+  return source === "USER" ? "用户" : "AI";
 }
