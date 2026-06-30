@@ -33,6 +33,11 @@ const navigationItems: NavigationItem[] = [
     marker: "K"
   },
   {
+    label: "Search",
+    href: "/search",
+    marker: "F"
+  },
+  {
     label: "Settings",
     href: "/settings",
     marker: "S"
