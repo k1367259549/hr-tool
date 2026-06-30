@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ExportMarkdownButton } from "@/components/shared/ExportMarkdownButton";
 import { LogForm } from "@/features/log/components/LogForm";
 import { LogList } from "@/features/log/components/LogList";
 import { useLogForm } from "@/features/log/hooks/useLogForm";
@@ -14,6 +15,9 @@ export default function LogPage(): JSX.Element {
         title="Daily Log"
         description="Record structured recruiting activity including screening, communication, interviews, offers, entries, and reflection."
       />
+      <div className="flex justify-end">
+        <ExportMarkdownButton date={logForm.formValues.date} />
+      </div>
       {logForm.successMessage ? (
         <div className="fixed right-6 top-6 z-50 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm">
           <div className="flex items-center gap-3">

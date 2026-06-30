@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ExportMarkdownButton } from "@/components/shared/ExportMarkdownButton";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { PlannerFocusCard } from "@/features/planner/components/PlannerFocusCard";
 import { PlannerGeneratePanel } from "@/features/planner/components/PlannerGeneratePanel";
@@ -18,6 +19,9 @@ export default function PlannerPage(): JSX.Element {
         title="Tomorrow Planner"
         description="Generate and view structured next-day recruiting plans."
       />
+      <div className="flex justify-end">
+        <ExportMarkdownButton date={getReportDateForPlan(planner.selectedDate)} />
+      </div>
       <PlannerGeneratePanel
         selectedDate={planner.selectedDate}
         isLoading={planner.isLoading}
@@ -62,4 +66,20 @@ export default function PlannerPage(): JSX.Element {
       )}
     </div>
   );
+}
+
+function getReportDateForPlan(planDate: string): string {
+  if (!planDate) {
+    return "";
+  }
+
+  const date = new Date(`${planDate}T00:00:00Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  date.setUTCDate(date.getUTCDate() - 1);
+
+  return date.toISOString().slice(0, 10);
 }

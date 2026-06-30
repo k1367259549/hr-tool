@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ExportMarkdownButton } from "@/components/shared/ExportMarkdownButton";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ReviewGeneratePanel } from "@/features/review/components/ReviewGeneratePanel";
 import { ReviewResult } from "@/features/review/components/ReviewResult";
@@ -17,6 +18,9 @@ export default function ReviewPage(): JSX.Element {
         title="AI Review"
         description="Generate and view structured AI analysis for a selected daily recruiting log."
       />
+      <div className="flex justify-end">
+        <ExportMarkdownButton date={review.selectedDate} />
+      </div>
       <ReviewGeneratePanel
         selectedDate={review.selectedDate}
         isLoading={review.isLoading}
