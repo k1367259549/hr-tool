@@ -1,4 +1,4 @@
-export type DashboardTimeRange = "today" | "week" | "month";
+export type DashboardTimeRange = "today" | "week" | "month" | "all";
 
 export type DashboardKpiTotals = {
   resumeCount: number;
@@ -37,6 +37,8 @@ export type DashboardMetricCardView = {
   title: string;
   value: string;
   description: string;
+  footer: string;
+  tone: "neutral" | "success" | "warning" | "danger";
 };
 
 export type DashboardRangeSummaryView = {
@@ -47,11 +49,19 @@ export type DashboardRangeSummaryView = {
   metrics: DashboardMetricCardView[];
 };
 
+export type DashboardRangeOptionView = {
+  id: DashboardTimeRange;
+  label: string;
+  description: string;
+  logCountLabel: string;
+};
+
 export type DashboardFunnelStageView = {
   id: string;
   label: string;
   value: number;
   valueLabel: string;
   rateLabel: string;
+  previousRateLabel: string;
   maxValue: number;
 };

@@ -1,40 +1,73 @@
 "use client";
 
 import { KpiCard } from "@/components/shared/KpiCard";
-import type { DashboardRangeSummaryView } from "@/types/dashboard";
+import { SectionCard } from "@/components/shared/SectionCard";
+import type {
+  DashboardRangeOptionView,
+  DashboardRangeSummaryView,
+  DashboardTimeRange
+} from "@/types/dashboard";
 
 type DashboardSummaryProps = {
-  summaries: DashboardRangeSummaryView[];
+  summary: DashboardRangeSummaryView;
+  rangeOptions: DashboardRangeOptionView[];
+  selectedRange: DashboardTimeRange;
+  onRangeChange: (range: DashboardTimeRange) => void;
 };
 
-export function DashboardSummary({ summaries }: DashboardSummaryProps): JSX.Element {
+export function DashboardSummary({
+  summary,
+  rangeOptions,
+  selectedRange,
+  onRangeChange
+}: DashboardSummaryProps): JSX.Element {
   return (
-    <div className="space-y-6">
-      {summaries.map((summary) => (
-        <section key={summary.id} className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-slate-950">{summary.title}</h2>
-              <p className="text-sm leading-6 text-slate-500">{summary.description}</p>
-            </div>
-            <div className="shrink-0">
-              <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
-                {summary.logCountLabel}
-              </span>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {summary.metrics.map((metric) => (
-              <KpiCard
-                key={metric.id}
-                title={metric.title}
-                value={metric.value}
-                description={metric.description}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
+    <SectionCard title={summary.title} description={summary.description}>
+      <div className="space-y-6">
+        <div className="grid gap-3 md:grid-cols-4">
+          {rangeOptions.map((option) => {
+            const isSelected = option.id === selectedRange;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                className={`rounded-md border p-3 text-left transition-colors ${
+                  isSelected
+                    ? "border-slate-950 bg-slate-100"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+                onClick={() => onRangeChange(option.id)}
+              >
+                <span className="block text-sm font-semibold text-slate-950">{option.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  {option.logCountLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-slate-950">Selected range</p>
+          <span className="w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
+            {summary.logCountLabel}
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {summary.metrics.map((metric) => (
+            <KpiCard
+              key={metric.id}
+              title={metric.title}
+              value={metric.value}
+              description={metric.description}
+              footer={metric.footer}
+              tone={metric.tone}
+            />
+          ))}
+        </div>
+      </div>
+    </SectionCard>
   );
 }

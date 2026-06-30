@@ -59,16 +59,21 @@ async function getSummaryForRange(range: DateRange): Promise<DashboardKpiSummary
 
 export const dashboardService = {
   async getSummary(referenceDate: Date = new Date()): Promise<DashboardSummaryResponse> {
-    const [today, week, month] = await Promise.all([
+    const [today, week, month, all] = await Promise.all([
       getSummaryForRange(getUtcDayRange(referenceDate)),
       getSummaryForRange(getUtcWeekRange(referenceDate)),
-      getSummaryForRange(getUtcMonthRange(referenceDate))
+      getSummaryForRange(getUtcMonthRange(referenceDate)),
+      getSummaryForRange({
+        startDate: new Date(0),
+        endDate: new Date(Date.UTC(9999, 11, 31))
+      })
     ]);
 
     return {
       today,
       week,
-      month
+      month,
+      all
     };
   },
 

@@ -16,13 +16,17 @@ import type { DashboardTrendItem } from "@/types/dashboard";
 
 type DashboardTrendChartProps = {
   items: DashboardTrendItem[];
+  rangeLabel: string;
 };
 
-export function DashboardTrendChart({ items }: DashboardTrendChartProps): JSX.Element {
+export function DashboardTrendChart({
+  items,
+  rangeLabel
+}: DashboardTrendChartProps): JSX.Element {
   return (
     <SectionCard
-      title="Simple Trend Chart"
-      description="Recent daily recruiting activity from saved logs."
+      title="Trend Chart"
+      description={`Available daily recruiting activity for ${rangeLabel}.`}
     >
       {items.length === 0 ? (
         <EmptyState
@@ -50,15 +54,23 @@ export function DashboardTrendChart({ items }: DashboardTrendChartProps): JSX.El
               <Line
                 type="monotone"
                 dataKey="screenCount"
-                name="Screens"
+                name="Screen"
                 stroke="#0f766e"
                 strokeWidth={2}
                 dot={false}
               />
               <Line
                 type="monotone"
+                dataKey="phoneCount"
+                name="Phone"
+                stroke="#0891b2"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
                 dataKey="interviewCount"
-                name="Interviews"
+                name="Interview"
                 stroke="#7c3aed"
                 strokeWidth={2}
                 dot={false}

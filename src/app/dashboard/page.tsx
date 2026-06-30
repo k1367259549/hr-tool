@@ -45,10 +45,23 @@ export default function DashboardPage(): JSX.Element {
         />
       ) : (
         <>
-          <DashboardSummary summaries={dashboard.rangeSummaries} />
+          {dashboard.selectedSummary ? (
+            <DashboardSummary
+              summary={dashboard.selectedSummary}
+              rangeOptions={dashboard.rangeOptions}
+              selectedRange={dashboard.selectedRange}
+              onRangeChange={dashboard.updateRange}
+            />
+          ) : null}
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
-            <DashboardTrendChart items={dashboard.trendItems} />
-            <DashboardFunnel stages={dashboard.funnelStages} />
+            <DashboardTrendChart
+              items={dashboard.trendItems}
+              rangeLabel={dashboard.selectedSummary?.title ?? "selected range"}
+            />
+            <DashboardFunnel
+              stages={dashboard.funnelStages}
+              rangeLabel={dashboard.selectedSummary?.title ?? "selected range"}
+            />
           </div>
         </>
       )}
