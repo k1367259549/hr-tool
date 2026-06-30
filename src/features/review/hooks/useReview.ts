@@ -10,10 +10,12 @@ type UseReviewResult = {
   isLoading: boolean;
   isGenerating: boolean;
   errorMessage: string | null;
+  successMessage: string | null;
   hasReview: boolean;
   updateDate: (date: string) => void;
   loadReview: () => Promise<void>;
   generateReview: () => Promise<void>;
+  consumeSuccessMessage: () => string | null;
   dismissError: () => void;
 };
 
@@ -23,11 +25,24 @@ export function useReview(): UseReviewResult {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const hasReview = useMemo<boolean>(() => review !== null, [review]);
 
   const dismissError = useCallback((): void => {
     setErrorMessage(null);
+  }, []);
+
+  const consumeSuccessMessage = useCallback((): string | null => {
+    let consumedMessage: string | null = null;
+
+    setSuccessMessage((currentMessage) => {
+      consumedMessage = currentMessage;
+
+      return null;
+    });
+
+    return consumedMessage;
   }, []);
 
   const loadReviewForDate = useCallback(async (date: string): Promise<void> => {
@@ -86,6 +101,7 @@ export function useReview(): UseReviewResult {
         })
       });
       setReview(createReviewResultView(nextReview, selectedDate));
+      setSuccessMessage("AI review generated.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -99,10 +115,12 @@ export function useReview(): UseReviewResult {
     isLoading,
     isGenerating,
     errorMessage,
+    successMessage,
     hasReview,
     updateDate,
     loadReview,
     generateReview,
+    consumeSuccessMessage,
     dismissError
   };
 }

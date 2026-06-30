@@ -43,6 +43,7 @@ type UseKnowledgeResult = {
   cancelDelete: () => void;
   confirmDelete: () => Promise<void>;
   refreshEntries: () => Promise<void>;
+  consumeSuccessMessage: () => string | null;
   dismissError: () => void;
   dismissSuccessMessage: () => void;
 };
@@ -231,6 +232,18 @@ export function useKnowledge(): UseKnowledgeResult {
     setSuccessMessage(null);
   }, []);
 
+  const consumeSuccessMessage = useCallback((): string | null => {
+    let consumedMessage: string | null = null;
+
+    setSuccessMessage((currentMessage) => {
+      consumedMessage = currentMessage;
+
+      return null;
+    });
+
+    return consumedMessage;
+  }, []);
+
   return {
     entries,
     filters,
@@ -255,6 +268,7 @@ export function useKnowledge(): UseKnowledgeResult {
     cancelDelete,
     confirmDelete,
     refreshEntries,
+    consumeSuccessMessage,
     dismissError,
     dismissSuccessMessage
   };

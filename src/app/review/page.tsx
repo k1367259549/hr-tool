@@ -1,16 +1,28 @@
 "use client";
 
+import { useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ExportMarkdownButton } from "@/components/shared/ExportMarkdownButton";
 import { LoadingState } from "@/components/shared/LoadingState";
+import { useToast } from "@/components/shared/ToastProvider";
 import { ReviewGeneratePanel } from "@/features/review/components/ReviewGeneratePanel";
 import { ReviewResult } from "@/features/review/components/ReviewResult";
 import { useReview } from "@/features/review/hooks/useReview";
 
 export default function ReviewPage(): JSX.Element {
   const review = useReview();
+  const { showToast } = useToast();
+  const { consumeSuccessMessage, successMessage } = review;
+
+  useEffect(() => {
+    const message = consumeSuccessMessage();
+
+    if (message) {
+      showToast(message, "success");
+    }
+  }, [consumeSuccessMessage, showToast, successMessage]);
 
   return (
     <div className="space-y-8">
@@ -34,15 +46,8 @@ export default function ReviewPage(): JSX.Element {
         <ErrorState
           title="Unable to load AI review"
           message={review.errorMessage}
-          action={
-            <button
-              type="button"
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-              onClick={review.dismissError}
-            >
-              Dismiss
-            </button>
-          }
+          actionLabel="Dismiss"
+          onAction={review.dismissError}
         />
       ) : null}
       {review.isLoading ? (

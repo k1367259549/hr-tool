@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ExportMarkdownButton } from "@/components/shared/ExportMarkdownButton";
 import { LoadingState } from "@/components/shared/LoadingState";
+import { useToast } from "@/components/shared/ToastProvider";
 import { PlannerFocusCard } from "@/features/planner/components/PlannerFocusCard";
 import { PlannerGeneratePanel } from "@/features/planner/components/PlannerGeneratePanel";
 import { PlannerTaskList } from "@/features/planner/components/PlannerTaskList";
@@ -12,6 +14,16 @@ import { usePlanner } from "@/features/planner/hooks/usePlanner";
 
 export default function PlannerPage(): JSX.Element {
   const planner = usePlanner();
+  const { showToast } = useToast();
+  const { consumeSuccessMessage, successMessage } = planner;
+
+  useEffect(() => {
+    const message = consumeSuccessMessage();
+
+    if (message) {
+      showToast(message, "success");
+    }
+  }, [consumeSuccessMessage, showToast, successMessage]);
 
   return (
     <div className="space-y-8">
@@ -35,15 +47,8 @@ export default function PlannerPage(): JSX.Element {
         <ErrorState
           title="Unable to load planner"
           message={planner.errorMessage}
-          action={
-            <button
-              type="button"
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-              onClick={planner.dismissError}
-            >
-              Dismiss
-            </button>
-          }
+          actionLabel="Dismiss"
+          onAction={planner.dismissError}
         />
       ) : null}
       {planner.isLoading ? (

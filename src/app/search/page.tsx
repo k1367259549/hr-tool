@@ -89,21 +89,14 @@ export default function SearchPage(): JSX.Element {
         <ErrorState
           title="Unable to search"
           message={errorMessage}
-          action={
-            <button
-              type="button"
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-              onClick={() => {
-                setErrorMessage(null);
-                setSearchData({
-                  query: "",
-                  results: []
-                });
-              }}
-            >
-              Clear
-            </button>
-          }
+          actionLabel="Clear"
+          onAction={() => {
+            setErrorMessage(null);
+            setSearchData({
+              query: "",
+              results: []
+            });
+          }}
         />
       ) : searchData.results.length > 0 ? (
         <SearchResults query={searchData.query} results={searchData.results} />

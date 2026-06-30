@@ -16,10 +16,12 @@ type UsePlannerResult = {
   isLoading: boolean;
   isGenerating: boolean;
   errorMessage: string | null;
+  successMessage: string | null;
   hasPlan: boolean;
   updateDate: (date: string) => void;
   loadPlan: () => Promise<void>;
   generatePlan: () => Promise<void>;
+  consumeSuccessMessage: () => string | null;
   dismissError: () => void;
 };
 
@@ -32,11 +34,24 @@ export function usePlanner(): UsePlannerResult {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const hasPlan = useMemo<boolean>(() => plan !== null, [plan]);
 
   const dismissError = useCallback((): void => {
     setErrorMessage(null);
+  }, []);
+
+  const consumeSuccessMessage = useCallback((): string | null => {
+    let consumedMessage: string | null = null;
+
+    setSuccessMessage((currentMessage) => {
+      consumedMessage = currentMessage;
+
+      return null;
+    });
+
+    return consumedMessage;
   }, []);
 
   const loadPlanForDate = useCallback(async (date: string): Promise<void> => {
@@ -93,6 +108,7 @@ export function usePlanner(): UsePlannerResult {
         })
       });
       setPlan(createPlannerPlanView(nextPlan, selectedDate));
+      setSuccessMessage("Plan generated.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -106,10 +122,12 @@ export function usePlanner(): UsePlannerResult {
     isLoading,
     isGenerating,
     errorMessage,
+    successMessage,
     hasPlan,
     updateDate,
     loadPlan,
     generatePlan,
+    consumeSuccessMessage,
     dismissError
   };
 }

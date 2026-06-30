@@ -21,6 +21,7 @@ type UseLogFormResult = {
   saveLog: () => Promise<void>;
   deleteSelectedLog: () => Promise<void>;
   refreshLogs: () => Promise<void>;
+  consumeSuccessMessage: () => string | null;
   dismissSuccessMessage: () => void;
 };
 
@@ -54,6 +55,18 @@ export function useLogForm(): UseLogFormResult {
 
   const dismissSuccessMessage = useCallback((): void => {
     setSuccessMessage(null);
+  }, []);
+
+  const consumeSuccessMessage = useCallback((): string | null => {
+    let consumedMessage: string | null = null;
+
+    setSuccessMessage((currentMessage) => {
+      consumedMessage = currentMessage;
+
+      return null;
+    });
+
+    return consumedMessage;
   }, []);
 
   const refreshLogs = useCallback(async (): Promise<void> => {
@@ -208,6 +221,7 @@ export function useLogForm(): UseLogFormResult {
     saveLog,
     deleteSelectedLog,
     refreshLogs,
+    consumeSuccessMessage,
     dismissSuccessMessage
   };
 }

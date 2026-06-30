@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
 
 type EmptyStateProps = {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   action?: ReactNode;
   className?: string;
 };
 
 export function EmptyState({
-  title,
-  description,
+  title = "No data yet",
+  description = "There is nothing to show right now.",
   action,
   className = ""
 }: EmptyStateProps): JSX.Element {

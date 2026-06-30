@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { ToastProvider } from "@/components/shared/ToastProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ErrorBoundary>
-          <AppShell>{children}</AppShell>
+          <ToastProvider>
+            <AppShell>{children}</AppShell>
+          </ToastProvider>
         </ErrorBoundary>
       </body>
     </html>

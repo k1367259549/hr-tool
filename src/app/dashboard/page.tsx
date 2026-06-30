@@ -28,15 +28,8 @@ export default function DashboardPage(): JSX.Element {
         <ErrorState
           title="Unable to load dashboard"
           message={dashboard.errorMessage}
-          action={
-            <button
-              type="button"
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-              onClick={() => void dashboard.refreshDashboard()}
-            >
-              Retry
-            </button>
-          }
+          actionLabel="Retry"
+          onAction={() => void dashboard.refreshDashboard()}
         />
       ) : dashboard.isEmpty ? (
         <EmptyState

@@ -53,15 +53,8 @@ export default function SettingsPage(): JSX.Element {
         <ErrorState
           title="Unable to load settings"
           message={errorMessage}
-          action={
-            <button
-              type="button"
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-              onClick={() => void loadStatus()}
-            >
-              Retry
-            </button>
-          }
+          actionLabel="Retry"
+          onAction={() => void loadStatus()}
         />
       ) : status ? (
         <div className="grid gap-6 xl:grid-cols-2">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useToast } from "@/components/shared/ToastProvider";
 import type { ApiResponse } from "@/types/api";
 import type { DailyExportResponse } from "@/types/export";
 
@@ -14,26 +15,11 @@ export function ExportMarkdownButton({
   label = "Export Markdown"
 }: ExportMarkdownButtonProps): JSX.Element {
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [tone, setTone] = useState<"success" | "error">("success");
-
-  useEffect(() => {
-    if (!message) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setMessage(null);
-    }, 3000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [message]);
+  const { showToast } = useToast();
 
   async function handleExport(): Promise<void> {
     if (!date) {
-      showMessage("Select a date before exporting.", "error");
+      showToast("Select a date before exporting.", "error");
       return;
     }
 
@@ -42,17 +28,12 @@ export function ExportMarkdownButton({
     try {
       const exportedReport = await requestExport(date);
       await navigator.clipboard.writeText(exportedReport.markdown);
-      showMessage("Markdown copied to clipboard.", "success");
+      showToast("Markdown copied to clipboard.", "success");
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "Export failed.", "error");
+      showToast(error instanceof Error ? error.message : "Export failed.", "error");
     } finally {
       setIsExporting(false);
     }
-  }
-
-  function showMessage(nextMessage: string, nextTone: "success" | "error"): void {
-    setTone(nextTone);
-    setMessage(nextMessage);
   }
 
   return (
@@ -65,25 +46,6 @@ export function ExportMarkdownButton({
       >
         {isExporting ? "Exporting" : label}
       </button>
-      {message ? <ExportToast message={message} tone={tone} /> : null}
-    </div>
-  );
-}
-
-type ExportToastProps = {
-  message: string;
-  tone: "success" | "error";
-};
-
-function ExportToast({ message, tone }: ExportToastProps): JSX.Element {
-  const toneClass =
-    tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : "border-rose-200 bg-rose-50 text-rose-800";
-
-  return (
-    <div className={`fixed right-6 top-6 z-50 rounded-md border px-4 py-3 text-sm font-medium shadow-sm ${toneClass}`}>
-      {message}
     </div>
   );
 }
