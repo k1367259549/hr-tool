@@ -43,3 +43,26 @@ export type KnowledgeRepositoryQueryOptions = KnowledgeQueryOptions;
 export type KnowledgeRepositoryCreateInput = KnowledgeCreateInput;
 
 export type KnowledgeRepositoryUpdateInput = KnowledgeUpdateInput;
+
+export type KnowledgeFormValues = {
+  title: string;
+  content: string;
+  type: KnowledgeType;
+  source: KnowledgeManualSource;
+  tagsText: string;
+};
+
+export type KnowledgeFilterValues = {
+  keyword: string;
+  type: KnowledgeType | "";
+  tag: string;
+};
+
+export type KnowledgeFormMode = "create" | "edit";
+
+export type KnowledgeListItem = KnowledgeDto & {
+  contentPreview: string;
+  createdAtLabel: string;
+  updatedAtLabel: string;
+  tagsLabel: string;
+};
