@@ -31,6 +31,11 @@ const navigationItems: NavigationItem[] = [
     label: "Knowledge Base",
     href: "/knowledge",
     marker: "K"
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    marker: "S"
   }
 ];
 
