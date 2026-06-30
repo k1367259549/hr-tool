@@ -4,8 +4,8 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json ./
-RUN npm ci --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --legacy-peer-deps --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 
 COPY . .
 
