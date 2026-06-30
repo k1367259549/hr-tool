@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { parseJsonOutput } from "@/ai/parser/jsonParser";
 import { validatePlannerAiOutput } from "@/ai/schemas/planner.schema";
 import { aiService } from "@/ai/ai.service";
+import { aiConfig } from "@/config/ai.config";
 import { plannerRepository } from "@/repositories/planner.repository";
 import { reviewRepository } from "@/repositories/review.repository";
 import { logService } from "@/services/log.service";
@@ -18,9 +19,6 @@ import { parseLogDate } from "@/utils/logValidation";
 
 const plannerPromptFile = "planner.md";
 const plannerPromptVersion = "1.0";
-const plannerProvider = "openai";
-const plannerModel = "gpt-4.1";
-const plannerTemperature = 0.2;
 
 export type PlannerServiceErrorCode = "LOG_NOT_FOUND" | "AI_ERROR" | "VALIDATION_ERROR";
 
@@ -75,8 +73,9 @@ async function generatePlannerOutput(promptInput: JsonObject): Promise<string> {
       variables: {
         INPUT: promptInput
       },
-      model: plannerModel,
-      temperature: plannerTemperature
+      model: aiConfig.defaultModel,
+      provider: aiConfig.defaultProvider,
+      temperature: aiConfig.defaultTemperature
     });
   } catch {
     throw new PlannerServiceError("AI_ERROR", "AI plan generation failed.");
@@ -183,8 +182,8 @@ function createRepositoryInput(
     risks: plannerOutput.risks,
     expectedOutcomes: plannerOutput.expectedOutcomes,
     priority: plannerOutput.priority,
-    provider: plannerProvider,
-    model: plannerModel,
+    provider: aiConfig.defaultProvider,
+    model: aiConfig.defaultModel,
     promptFile: plannerPromptFile,
     promptVersion: plannerPromptVersion,
     inputHash: createInputHash(promptInput),

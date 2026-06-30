@@ -1,13 +1,12 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
-import packageJson from "../../package.json";
+import { aiConfig } from "@/config/ai.config";
+import { appConfig } from "@/config/app.config";
+import { envConfig } from "@/config/env.config";
 import { logRepository } from "@/repositories/log.repository";
 import type { SettingsStatus } from "@/types/settings";
+import { isConfigured } from "@/utils/configValidation";
 
-const appName = "HR Daily AI";
-const aiProvider = "OpenAI";
-const aiModel = "gpt-4.1";
-const databaseProvider = "PostgreSQL";
 const promptsDirectory = path.resolve(process.cwd(), "prompts");
 
 export const settingsService = {
@@ -16,33 +15,32 @@ export const settingsService = {
       checkDatabaseConnection(),
       checkPromptDirectory()
     ]);
-    const environment = process.env.NODE_ENV ?? "development";
-    const openAiApiKeyConfigured = isConfigured(process.env.OPENAI_API_KEY);
-    const databaseUrlConfigured = isConfigured(process.env.DATABASE_URL);
+    const openAiApiKeyConfigured = isConfigured(envConfig.openAiApiKey);
+    const databaseUrlConfigured = isConfigured(envConfig.databaseUrl);
 
     return {
-      appName,
-      version: packageJson.version,
-      environment,
+      appName: appConfig.appName,
+      version: appConfig.appVersion,
+      environment: appConfig.environment,
       ai: {
-        provider: aiProvider,
-        model: aiModel,
+        provider: aiConfig.defaultProvider,
+        model: aiConfig.defaultModel,
         apiKeyConfigured: openAiApiKeyConfigured,
         promptDirectoryAvailable
       },
       database: {
-        provider: databaseProvider,
+        provider: appConfig.databaseProvider,
         connected: databaseConnected
       },
       environmentStatus: {
-        nodeEnv: environment,
+        nodeEnv: envConfig.nodeEnv,
         databaseUrlConfigured,
         openAiApiKeyConfigured
       },
       developer: {
         runtime: process.version,
-        deployment: "Docker Compose",
-        configurationMode: "Read-only V1"
+        deployment: appConfig.deployment,
+        configurationMode: appConfig.configurationMode
       }
     };
   }
@@ -68,8 +66,4 @@ async function checkPromptDirectory(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function isConfigured(value: string | undefined): boolean {
-  return typeof value === "string" && value.trim().length > 0;
 }

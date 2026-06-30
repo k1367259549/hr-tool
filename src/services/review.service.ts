@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { parseJsonOutput } from "@/ai/parser/jsonParser";
 import { validateReviewAiOutput } from "@/ai/schemas/review.schema";
 import { aiService } from "@/ai/ai.service";
+import { aiConfig } from "@/config/ai.config";
 import { reviewRepository } from "@/repositories/review.repository";
 import { logService } from "@/services/log.service";
 import type { JsonObject, JsonValue } from "@/types/ai";
@@ -15,9 +16,6 @@ import type {
 
 const reviewPromptFile = "review.md";
 const reviewPromptVersion = "1.0";
-const reviewProvider = "openai";
-const reviewModel = "gpt-4.1";
-const reviewTemperature = 0.2;
 
 export type ReviewServiceErrorCode = "LOG_NOT_FOUND" | "AI_ERROR" | "VALIDATION_ERROR";
 
@@ -65,8 +63,9 @@ async function generateReviewOutput(promptInput: JsonObject): Promise<string> {
       variables: {
         INPUT: promptInput
       },
-      model: reviewModel,
-      temperature: reviewTemperature
+      model: aiConfig.defaultModel,
+      provider: aiConfig.defaultProvider,
+      temperature: aiConfig.defaultTemperature
     });
   } catch {
     throw new ReviewServiceError("AI_ERROR", "AI review generation failed.");
@@ -121,8 +120,8 @@ function createRepositoryInput(
     weaknesses: reviewOutput.weaknesses,
     suggestions: reviewOutput.suggestions,
     score: reviewOutput.score,
-    provider: reviewProvider,
-    model: reviewModel,
+    provider: aiConfig.defaultProvider,
+    model: aiConfig.defaultModel,
     promptFile: reviewPromptFile,
     promptVersion: reviewPromptVersion,
     inputHash: createInputHash(promptInput),

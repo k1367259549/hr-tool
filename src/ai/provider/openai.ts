@@ -1,7 +1,9 @@
 import OpenAI from "openai";
 import { aiConfig } from "@/config/ai.config";
+import { envConfig } from "@/config/env.config";
 import type { AIProvider } from "@/ai/provider/types";
 import type { AIGenerateInput, AIGenerateResult, AiErrorCode, AIUsage } from "@/types/ai";
+import { validateOpenAIEnvironment } from "@/utils/configValidation";
 
 let client: OpenAI | null = null;
 
@@ -16,9 +18,9 @@ export class OpenAiProviderError extends Error {
 }
 
 function getOpenAiClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY;
+  validateOpenAIEnvironment();
 
-  if (!apiKey) {
+  if (!envConfig.openAiApiKey) {
     throw new OpenAiProviderError(
       "AI_API_KEY_MISSING",
       "OPENAI_API_KEY is required for backend AI calls."
@@ -27,7 +29,7 @@ function getOpenAiClient(): OpenAI {
 
   if (!client) {
     client = new OpenAI({
-      apiKey
+      apiKey: envConfig.openAiApiKey
     });
   }
 

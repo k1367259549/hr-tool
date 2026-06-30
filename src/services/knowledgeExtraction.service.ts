@@ -1,6 +1,7 @@
 import { parseJsonOutput } from "@/ai/parser/jsonParser";
 import { validateKnowledgeAiOutput } from "@/ai/schemas/knowledge.schema";
 import { aiService } from "@/ai/ai.service";
+import { aiConfig } from "@/config/ai.config";
 import { knowledgeRepository } from "@/repositories/knowledge.repository";
 import { reviewRepository } from "@/repositories/review.repository";
 import { logService } from "@/services/log.service";
@@ -17,8 +18,6 @@ import type { DailyReview } from "@/types/review";
 import { parseLogDate } from "@/utils/logValidation";
 
 const knowledgePromptFile = "knowledge.md";
-const knowledgeModel = "gpt-4.1";
-const knowledgeTemperature = 0.2;
 
 export type KnowledgeExtractionServiceErrorCode =
   | "LOG_NOT_FOUND"
@@ -60,8 +59,9 @@ async function generateKnowledgeOutput(promptInput: JsonObject): Promise<string>
       variables: {
         INPUT: promptInput
       },
-      model: knowledgeModel,
-      temperature: knowledgeTemperature
+      model: aiConfig.defaultModel,
+      provider: aiConfig.defaultProvider,
+      temperature: aiConfig.defaultTemperature
     });
   } catch {
     throw new KnowledgeExtractionServiceError(
