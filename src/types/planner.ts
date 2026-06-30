@@ -72,3 +72,17 @@ export type DailyPlanRepositoryCreateInput = {
   rawOutput: Prisma.InputJsonValue;
   parsedOutput: Prisma.InputJsonValue;
 };
+
+export type PlannerPlanView = {
+  id: string;
+  dateLabel: string;
+  generatedAtLabel: string;
+  priority: PlanPriorityValue;
+  priorityTone: "neutral" | "success" | "warning" | "danger";
+  modelLabel: string;
+  schedule: PlanScheduleItem[];
+  priorityTasks: string[];
+  goals: string[];
+  risks: string[];
+  expectedOutcomes: string[];
+};
