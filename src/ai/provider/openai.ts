@@ -1,8 +1,7 @@
 import OpenAI from "openai";
-import type { AiErrorCode, AiGenerateTextInput } from "@/types/ai";
-
-const defaultModel = "gpt-4.1";
-const defaultTemperature = 0.2;
+import { aiConfig } from "@/config/ai.config";
+import type { AIProvider } from "@/ai/provider/types";
+import type { AIGenerateInput, AIGenerateResult, AiErrorCode, AIUsage } from "@/types/ai";
 
 let client: OpenAI | null = null;
 
@@ -36,12 +35,16 @@ function getOpenAiClient(): OpenAI {
 }
 
 export const openAiProvider = {
-  async generateText(input: AiGenerateTextInput): Promise<string> {
+  async generate(input: AIGenerateInput): Promise<AIGenerateResult> {
+    const startedAt = Date.now();
+    const model = input.model ?? aiConfig.defaultModel;
+
     try {
       const response = await getOpenAiClient().responses.create({
         input: input.prompt,
-        model: input.model ?? defaultModel,
-        temperature: input.temperature ?? defaultTemperature
+        max_output_tokens: input.maxTokens ?? aiConfig.defaultMaxTokens,
+        model,
+        temperature: input.temperature ?? aiConfig.defaultTemperature
       });
       const text = response.output_text.trim();
 
@@ -49,7 +52,12 @@ export const openAiProvider = {
         throw new OpenAiProviderError("AI_EMPTY_RESPONSE", "OpenAI returned an empty response.");
       }
 
-      return text;
+      return {
+        content: text,
+        model,
+        usage: normalizeUsage(response.usage),
+        latencyMs: Date.now() - startedAt
+      };
     } catch (error) {
       if (error instanceof OpenAiProviderError) {
         throw error;
@@ -57,5 +65,25 @@ export const openAiProvider = {
 
       throw new OpenAiProviderError("AI_PROVIDER_ERROR", "OpenAI request failed.");
     }
+  },
+
+  async generateText(input: AIGenerateInput): Promise<string> {
+    const result = await this.generate(input);
+
+    return result.content;
   }
+} satisfies AIProvider & {
+  generateText(input: AIGenerateInput): Promise<string>;
 };
+
+function normalizeUsage(usage: OpenAI.Responses.ResponseUsage | null | undefined): AIUsage | undefined {
+  if (!usage) {
+    return undefined;
+  }
+
+  return {
+    promptTokens: usage.input_tokens,
+    completionTokens: usage.output_tokens,
+    totalTokens: usage.total_tokens
+  };
+}

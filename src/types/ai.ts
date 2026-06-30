@@ -1,16 +1,33 @@
 export type AiErrorCode =
   | "AI_API_KEY_MISSING"
   | "AI_PROVIDER_ERROR"
+  | "AI_PROVIDER_UNSUPPORTED"
   | "AI_EMPTY_RESPONSE"
   | "PROMPT_NOT_FOUND"
   | "PROMPT_PATH_INVALID"
   | "JSON_PARSE_ERROR";
 
-export type AiGenerateTextInput = {
+export type AIUsage = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+};
+
+export interface AIGenerateInput {
   prompt: string;
   model?: string;
   temperature?: number;
-};
+  maxTokens?: number;
+}
+
+export interface AIGenerateResult {
+  content: string;
+  model: string;
+  usage?: AIUsage;
+  latencyMs?: number;
+}
+
+export type AiGenerateTextInput = AIGenerateInput;
 
 export type JsonPrimitive = string | number | boolean | null;
 
@@ -36,4 +53,6 @@ export type AiPromptGenerationInput = {
   variables?: PromptVariables;
   model?: string;
   temperature?: number;
+  maxTokens?: number;
+  provider?: string;
 };
