@@ -6,10 +6,12 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { SectionCard } from "@/components/shared/SectionCard";
 import type { ApiResponse } from "@/types/api";
+import type { PromptStatusItem, PromptStatusResponse } from "@/types/prompt";
 import type { SettingsStatus } from "@/types/settings";
 
 export default function SettingsPage(): JSX.Element {
   const [status, setStatus] = useState<SettingsStatus | null>(null);
+  const [promptStatus, setPromptStatus] = useState<PromptStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -18,9 +20,16 @@ export default function SettingsPage(): JSX.Element {
     setErrorMessage(null);
 
     try {
-      setStatus(await requestApi<SettingsStatus>("/api/settings/status"));
+      const [nextStatus, nextPromptStatus] = await Promise.all([
+        requestApi<SettingsStatus>("/api/settings/status"),
+        requestApi<PromptStatusResponse>("/api/prompts/status")
+      ]);
+
+      setStatus(nextStatus);
+      setPromptStatus(nextPromptStatus);
     } catch (error) {
       setStatus(null);
+      setPromptStatus(null);
       setErrorMessage(getErrorMessage(error));
     } finally {
       setIsLoading(false);
@@ -98,9 +107,75 @@ export default function SettingsPage(): JSX.Element {
               ]}
             />
           </div>
+          {promptStatus ? (
+            <div className="xl:col-span-2">
+              <PromptStatusSection prompts={promptStatus.prompts} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+type PromptStatusSectionProps = {
+  prompts: PromptStatusItem[];
+};
+
+function PromptStatusSection({ prompts }: PromptStatusSectionProps): JSX.Element {
+  return (
+    <SectionCard title="Prompt Status" description="Read-only validation status for required prompt files.">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
+              <th className="px-3 py-2 font-semibold">Prompt</th>
+              <th className="px-3 py-2 font-semibold">Path</th>
+              <th className="px-3 py-2 font-semibold">Exists</th>
+              <th className="px-3 py-2 font-semibold">Valid</th>
+              <th className="px-3 py-2 font-semibold">Input</th>
+              <th className="px-3 py-2 font-semibold">Warnings</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {prompts.map((prompt) => (
+              <tr key={prompt.name}>
+                <td className="px-3 py-3 font-semibold text-slate-950">{prompt.name}</td>
+                <td className="px-3 py-3 text-slate-600">{prompt.path}</td>
+                <td className="px-3 py-3">
+                  <StatusBadge value={prompt.exists ? "Exists" : "Missing"} tone={prompt.exists ? "success" : "danger"} />
+                </td>
+                <td className="px-3 py-3">
+                  <StatusBadge value={prompt.valid ? "Valid" : "Invalid"} tone={prompt.valid ? "success" : "warning"} />
+                </td>
+                <td className="px-3 py-3">
+                  <StatusBadge
+                    value={prompt.hasInputPlaceholder ? "Present" : "Missing"}
+                    tone={prompt.hasInputPlaceholder ? "success" : "warning"}
+                  />
+                </td>
+                <td className="px-3 py-3 text-slate-600">
+                  {prompt.warnings.length > 0 ? prompt.warnings.join(" ") : "None"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+type StatusBadgeProps = {
+  value: string;
+  tone: SettingsRow["tone"];
+};
+
+function StatusBadge({ value, tone }: StatusBadgeProps): JSX.Element {
+  return (
+    <span className={`inline-flex rounded-md border px-2 py-1 text-sm font-semibold ${toneClasses[tone]}`}>
+      {value}
+    </span>
   );
 }
 
