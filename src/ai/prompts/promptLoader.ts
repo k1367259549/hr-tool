@@ -33,7 +33,7 @@ export async function loadPrompt(input: LoadPromptInput): Promise<string> {
   }
 }
 
-function resolvePromptPath(fileName: string): string {
+export function resolvePromptPath(fileName: string): string {
   const promptPath = path.resolve(promptsDirectory, fileName);
   const relativePath = path.relative(promptsDirectory, promptPath);
 
@@ -44,7 +44,7 @@ function resolvePromptPath(fileName: string): string {
   return promptPath;
 }
 
-function applyPromptVariables(
+export function applyPromptVariables(
   template: string,
   variables: Record<string, PromptVariableValue>
 ): string {

@@ -7,6 +7,7 @@ import type { AIGenerateInput, AIGenerateResult, AiErrorCode, AIUsage } from "@/
 import { validateOpenAIEnvironment } from "@/utils/configValidation";
 
 let client: OpenAI | null = null;
+let clientBaseUrl: string | undefined;
 
 export class OpenAiProviderError extends Error {
   readonly code: AiErrorCode;
@@ -28,10 +29,13 @@ function getOpenAiClient(): OpenAI {
 
   validateOpenAIEnvironment();
 
-  if (!client) {
+  if (!client || clientBaseUrl !== envConfig.openAiBaseUrl) {
     client = new OpenAI({
-      apiKey: envConfig.openAiApiKey
+      apiKey: envConfig.openAiApiKey,
+      baseURL: envConfig.openAiBaseUrl,
+      timeout: aiConfig.timeoutMs
     });
+    clientBaseUrl = envConfig.openAiBaseUrl;
   }
 
   return client;
@@ -53,6 +57,8 @@ export const openAiProvider = {
         max_output_tokens: input.maxTokens ?? aiConfig.defaultMaxTokens,
         model,
         temperature: input.temperature ?? aiConfig.defaultTemperature
+      }, {
+        timeout: aiConfig.timeoutMs
       });
       const text = response.output_text.trim();
 

@@ -1,9 +1,11 @@
 export type AiErrorCode =
   | "AI_API_KEY_MISSING"
+  | "AI_BASE_URL_MISSING"
   | "AI_PROVIDER_ERROR"
   | "AI_PROVIDER_UNSUPPORTED"
   | "AI_EMPTY_RESPONSE"
   | "AI_TIMEOUT"
+  | "AI_VALIDATION_ERROR"
   | "PROMPT_NOT_FOUND"
   | "PROMPT_PATH_INVALID"
   | "JSON_PARSE_ERROR";
@@ -27,6 +29,7 @@ export interface AIGenerateResult {
   model: string;
   usage?: AIUsage;
   latencyMs?: number;
+  retryCount?: number;
 }
 
 export type AiGenerateTextInput = AIGenerateInput;
@@ -50,6 +53,28 @@ export type LoadPromptInput = {
   variables?: PromptVariables;
 };
 
+export type PromptCategory =
+  | "candidate-understanding"
+  | "daily-workspace"
+  | "job-understanding"
+  | "knowledge"
+  | "planner"
+  | "recruit-together"
+  | "resume-evaluation"
+  | "review"
+  | "spreadsheet-analysis";
+
+export type PromptMetadata = {
+  fileName: string;
+  path: string;
+  version: string;
+  category: PromptCategory;
+};
+
+export type RegisteredPrompt = PromptMetadata & {
+  template: string;
+};
+
 export type AiPromptGenerationInput = {
   feature?: string;
   promptFile: string;
@@ -58,4 +83,23 @@ export type AiPromptGenerationInput = {
   temperature?: number;
   maxTokens?: number;
   provider?: string;
+  workflow?: string;
+  promptCategory?: PromptCategory;
+  recruitingContext?: JsonValue;
+};
+
+export type AiValidatedJsonGenerationInput<TOutput> = AiPromptGenerationInput & {
+  validate: (value: JsonValue) => TOutput;
+};
+
+export type AiValidatedJsonGenerationResult<TOutput> = {
+  output: TOutput;
+  rawOutput: string;
+  model: string;
+  provider: string;
+  prompt: PromptMetadata;
+  generationTimeMs: number;
+  retryCount: number;
+  providerRetryCount: number;
+  validationResult: "success";
 };

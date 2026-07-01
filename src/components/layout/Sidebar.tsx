@@ -46,6 +46,11 @@ const navigationItems: NavigationItem[] = [
     label: "设置",
     href: "/settings",
     marker: "S"
+  },
+  {
+    label: "飞书 V2",
+    href: "/feishu",
+    marker: "V2"
   }
 ];
 

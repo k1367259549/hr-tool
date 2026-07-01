@@ -73,6 +73,7 @@ export default function SettingsPage(): JSX.Element {
             title="AI 配置"
             rows={[
               createTextRow("AI 提供商", status.ai.provider),
+              createTextRow("Base URL", status.ai.baseUrl),
               createTextRow("配置模型", status.ai.model),
               createStatusRow("API Key", status.ai.apiKeyConfigured),
               createAiStatusRow("AI 状态", status.ai.status),
@@ -91,7 +92,10 @@ export default function SettingsPage(): JSX.Element {
             rows={[
               createTextRow("NODE_ENV", status.environmentStatus.nodeEnv),
               createStatusRow("DATABASE_URL", status.environmentStatus.databaseUrlConfigured),
-              createStatusRow("OPENAI_API_KEY", status.environmentStatus.openAiApiKeyConfigured)
+              createStatusRow("AI_API_KEY", status.environmentStatus.aiApiKeyConfigured),
+              createStatusRow("AI_BASE_URL", status.environmentStatus.aiBaseUrlConfigured),
+              createStatusRow("OPENAI_API_KEY", status.environmentStatus.openAiApiKeyConfigured),
+              createStatusRow("OPENAI_BASE_URL", status.environmentStatus.openAiBaseUrlConfigured)
             ]}
           />
           <div className="xl:col-span-2">
@@ -293,6 +297,14 @@ function createStatusRow(label: string, isConfigured: boolean): SettingsRow {
 }
 
 function createAiStatusRow(label: string, status: SettingsStatus["ai"]["status"]): SettingsRow {
+  if (status === "missing_base_url") {
+    return {
+      label,
+      value: "缺少 Base URL",
+      tone: "warning"
+    };
+  }
+
   return {
     label,
     value: status === "ready" ? "就绪" : "缺少 API Key",

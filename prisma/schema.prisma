@@ -173,3 +173,235 @@ model SpreadsheetAnalysis {
 
   @@index([createdAt])
 }
+
+model JobProfile {
+  id                         String   @id @default(uuid())
+  workflowId                 String
+  jobTitle                   String
+  jd                         String
+  leaderRequirements         String?
+  teamBackground             String?
+  hiringGoal                 String?
+  notes                      String?
+  jobSummary                 String
+  coreResponsibilities       String[]
+  requiredCompetencies       String[]
+  preferredCompetencies      String[]
+  potentialRisks             String[]
+  hiringFocus                String[]
+  interviewFocus             String[]
+  missingInformation         String[]
+  suggestedFollowUpQuestions String[]
+  aiProvider                 String
+  aiModel                    String
+  promptFile                 String
+  promptVersion              String
+  generationTimeMs           Int?
+  reviewedAt                 DateTime
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  candidateResumes           CandidateResume[]
+  candidateInsights          CandidateInsight[]
+  recruitTogetherWorkflows   RecruitTogetherWorkflow[]
+
+  @@index([workflowId])
+  @@index([createdAt])
+}
+
+model CandidateResume {
+  id                String             @id @default(uuid())
+  workflowId        String
+  jobProfileId      String
+  fileName          String
+  fileType          String
+  fileSize          Int
+  originalFile      Bytes
+  parsedText        String?
+  parsingStatus     String
+  parsingError      String?
+  structureChunks   Json
+  semanticChunks    Json
+  resumeVersion     String
+  candidateSource   String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  jobProfile        JobProfile         @relation(fields: [jobProfileId], references: [id])
+  insight           CandidateInsight?
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([createdAt])
+}
+
+model CandidateInsight {
+  id                            String          @id @default(uuid())
+  workflowId                    String
+  jobProfileId                  String
+  resumeId                      String          @unique
+  candidateSource               String?
+  notes                         String?
+  summary                       Json
+  insights                      Json
+  strengths                     String[]
+  potentialRisks                String[]
+  missingInformation            String[]
+  suggestedPhoneScreenQuestions String[]
+  suggestedInterviewQuestions   String[]
+  suggestedNextActions          String[]
+  evidence                      Json
+  aiProvider                    String
+  aiModel                       String
+  promptFile                    String
+  promptVersion                 String
+  generationTimeMs              Int?
+  jobProfileVersion             String
+  resumeVersion                 String
+  reviewedAt                    DateTime
+  createdAt                     DateTime        @default(now())
+  updatedAt                     DateTime        @updatedAt
+
+  jobProfile                    JobProfile      @relation(fields: [jobProfileId], references: [id])
+  resume                        CandidateResume @relation(fields: [resumeId], references: [id])
+  recruitTogetherWorkflows      RecruitTogetherWorkflow[]
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([createdAt])
+}
+
+model RecruitTogetherWorkflow {
+  id                    String           @id @default(uuid())
+  workflowId            String
+  jobProfileId          String
+  candidateInsightId    String
+  phonePreparation      Json
+  phoneNotes            Json
+  interviewPreparation  Json
+  interviewNotes        Json
+  recruiterSummary      Json
+  aiProvider            String
+  aiModel               String
+  promptVersions        Json
+  generationTimes       Json
+  humanReview           Json
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  jobProfile            JobProfile       @relation(fields: [jobProfileId], references: [id])
+  candidateInsight      CandidateInsight @relation(fields: [candidateInsightId], references: [id])
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([candidateInsightId])
+  @@index([createdAt])
+}
+
+model DailyRecruitingWorkspace {
+  id                     String   @id @default(uuid())
+  workflowId             String
+  date                   DateTime
+  activitySnapshot       Json
+  dailySummary           Json
+  recruitingInsights     Json
+  tomorrowPriorities     Json
+  improvementSuggestions Json
+  manualNotes            String?
+  aiProvider             String
+  aiModel                String
+  promptVersions         Json
+  generationTimes        Json
+  humanReview            Json
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([date])
+  @@index([createdAt])
+}
+
+model RecruiterWorkspaceNote {
+  id             String   @id @default(uuid())
+  date           DateTime
+  content        String
+  category       String?
+  source         String   @default("MANUAL")
+  searchableText String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([date])
+  @@index([createdAt])
+}
+
+model RecruiterWorkspaceScheduleItem {
+  id          String   @id @default(uuid())
+  date        DateTime
+  itemType    String
+  title       String
+  startTime   String?
+  relatedName String?
+  notes       String?
+  completed   Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([itemType])
+  @@index([createdAt])
+}
+
+model RecruitmentTask {
+  id                    String   @id @default(uuid())
+  sourceKey             String   @unique
+  sourceType            String
+  category              String
+  title                 String
+  priority              String
+  priorityReason        String
+  reason                String
+  evidence              String[]
+  relatedWorkflow       String?
+  relatedCandidate      String?
+  relatedJob            String?
+  dueTime               DateTime?
+  confidence            String   @default("MEDIUM")
+  recommendedNextAction String
+  status                String   @default("TODO")
+  quickStartHref        String?
+  createdBy             String   @default("AI_RECRUITER")
+  reviewedByRecruiter   Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  audits                RecruitmentTaskAudit[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([sourceType])
+  @@index([dueTime])
+  @@index([createdAt])
+}
+
+model RecruitmentTaskAudit {
+  id           String   @id @default(uuid())
+  taskId       String
+  action       String
+  actor        String
+  beforeStatus String?
+  afterStatus  String?
+  beforeValue  Json?
+  afterValue   Json?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  task         RecruitmentTask @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+  @@index([action])
+  @@index([createdAt])
+}
