@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  isSupportedResumeFileName,
+  MAX_RESUME_FILE_SIZE_BYTES,
+  RESUME_FILE_SIZE_LIMIT_LABEL
+} from "@/config/resume.config";
 import type { ApiResponse } from "@/types/api";
 import type {
   CandidateInsightDetails,
@@ -108,10 +113,29 @@ export function useCandidateUnderstanding(): UseCandidateUnderstandingResult {
   );
 
   const selectFile = useCallback((file: File | null): void => {
+    if (file && file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+      setErrorMessage(`简历文件不能超过 ${RESUME_FILE_SIZE_LIMIT_LABEL}。`);
+      setFormValues((currentValues) => ({
+        ...currentValues,
+        file: null
+      }));
+      return;
+    }
+
+    if (file && !isSupportedResumeFileName(file.name)) {
+      setErrorMessage("仅支持 PDF、DOCX、TXT 简历。");
+      setFormValues((currentValues) => ({
+        ...currentValues,
+        file: null
+      }));
+      return;
+    }
+
     setFormValues((currentValues) => ({
       ...currentValues,
       file
     }));
+    setErrorMessage(null);
     setResult(null);
     setReviewedOutput(null);
     setSavedInsight(null);

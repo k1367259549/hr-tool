@@ -148,7 +148,7 @@ export type CandidateInsight = {
   generationTimeMs: number | null;
   jobProfileVersion: string;
   resumeVersion: string;
-  reviewedAt: Date;
+  reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -160,7 +160,7 @@ export type CandidateInsightDto = Omit<
   summary: CandidateInsightSummary;
   insights: CandidateInsightDetails;
   evidence: CandidateInsightEvidence[];
-  reviewedAt: string;
+  reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

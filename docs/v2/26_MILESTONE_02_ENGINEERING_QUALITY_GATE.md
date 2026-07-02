@@ -38,7 +38,18 @@ Reviewed areas:
 
 ### 3.1 Critical Findings
 
-No remaining critical engineering issues were found after remediation.
+PR #1 final review identified additional release blockers after the original quality-gate pass.
+
+Current remediation status:
+
+- V1 `matchScore` is isolated to the legacy `/api/ai/resume-evaluate` flow.
+- V2 Candidate Understanding and AI Recruiter workflows do not use scoring, ranking, hire recommendation, or reject recommendation fields.
+- `JobProfile.reviewedAt` and `CandidateInsight.reviewedAt` are nullable so AI-generated but unconfirmed records are not marked as reviewed.
+- Resume original binary storage is documented as a v0.1 PostgreSQL BYTEA decision.
+- The PostgreSQL BYTEA approach is accepted only for v0.1 small-scale usage.
+- Feishu API integration remains outside this task and outside v0.1 runtime behavior.
+
+Current remediation validation commands passed after the PR #1 blocker fixes.
 
 ### 3.2 Issues Fixed
 
@@ -61,6 +72,17 @@ No remaining critical engineering issues were found after remediation.
 
 5. Shared AI response panel naming was inconsistent with milestone documentation.
    - Fixed by using `AIResponsePanel.tsx` and `AIResponsePanel`.
+
+6. V1 resume evaluation used `matchScore` without an explicit V1/V2 boundary.
+   - Fixed by documenting the endpoint, prompt, schema, and type as legacy V1.
+   - V2 Candidate Understanding schema tests reject `matchScore`, `score`, `rank`, `hireRecommendation`, and `rejectRecommendation`.
+
+7. Human review timestamps were required too early.
+   - Fixed by making `JobProfile.reviewedAt` and `CandidateInsight.reviewedAt` nullable in Prisma, TypeScript DTOs, service serialization, and UI display.
+
+8. Resume original binary storage needed an explicit release decision.
+   - Fixed by adding `docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md`.
+   - The document records PostgreSQL BYTEA usage, the 10MB PDF/DOCX/TXT boundary, risks, and future object storage migration triggers.
 
 ---
 
@@ -172,6 +194,7 @@ Status:
 - All prompt files have version metadata.
 - V2 workflow prompts explicitly prohibit scoring, ranking, hiring recommendations, rejection recommendations, and automatic decisions.
 - V1 review and resume evaluation prompts still include score fields by design from existing V1 requirements.
+- The V1 resume evaluation prompt is now explicitly marked as legacy and must not be reused by V2 Candidate Understanding.
 
 ---
 
@@ -240,6 +263,7 @@ The following items are not release blockers for v0.1:
 - Vitest prints a Vite CJS API deprecation warning. Tests pass; this is not a current application failure.
 - AI generation reliability depends on the configured provider, model availability, and network conditions.
 - Existing local database may contain smoke-test records from release validation.
+- PostgreSQL BYTEA resume storage is acceptable only for v0.1 small-scale use; future production usage should migrate binaries to object storage with PostgreSQL metadata.
 
 ---
 
@@ -257,14 +281,30 @@ docker compose up --build -d
 docker compose down
 ```
 
+Current PR #1 remediation validation:
+
+- `npx prisma format` passed.
+- `npx prisma validate` passed after providing a one-time local `DATABASE_URL` for the command environment.
+- `npx prisma generate` passed.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed.
+- `npm run build` passed.
+- `docker compose build --progress=plain` passed.
+- `docker compose up --build -d` passed.
+- `docker compose ps` showed app and database healthy.
+- Smoke tests returned HTTP 200 for `/feishu`, `/feishu/job-profile/new`, `/feishu/candidate-understanding/new`, `/feishu/recruit-together`, `/feishu/daily-workspace`, `/feishu/tasks`, and `/log`.
+- `docker compose down` completed.
+
 ---
 
 ## 15. Release Recommendation
 
-AI Recruiter MVP v0.1 is ready for internship usage after final command validation.
+AI Recruiter MVP v0.1 passed the PR #1 blocker remediation validation.
 
 Recommendation:
 
 - Proceed to Claude final review.
 - Treat the remaining technical debt as post-v0.1 maintainability work.
 - Do not add new workflows before release stabilization is accepted.
+- Do not merge PR #1 until the final remediation report has been reviewed.

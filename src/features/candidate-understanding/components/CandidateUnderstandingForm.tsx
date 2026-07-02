@@ -1,6 +1,7 @@
 "use client";
 
 import { FormField } from "@/components/shared/FormField";
+import { RESUME_FILE_SIZE_LIMIT_LABEL } from "@/config/resume.config";
 import type { CandidateUnderstandingFormValues } from "@/types/candidateUnderstanding";
 import type { JobProfileDto } from "@/types/jobProfile";
 
@@ -45,7 +46,12 @@ export function CandidateUnderstandingForm({
         </select>
       </FormField>
 
-      <FormField id="resume-file" label="候选人简历" required description="支持 PDF、DOCX、TXT，文件最大 10MB。">
+      <FormField
+        id="resume-file"
+        label="候选人简历"
+        required
+        description={`支持 PDF、DOCX、TXT，文件最大 ${RESUME_FILE_SIZE_LIMIT_LABEL}。`}
+      >
         <input
           id="resume-file"
           type="file"

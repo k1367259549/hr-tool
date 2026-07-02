@@ -58,9 +58,11 @@ AI features require a backend-only API key. Use `OPENAI_API_KEY` for the officia
 
 See [docs/AI_API_SETUP.md](docs/AI_API_SETUP.md) for setup, Docker restart steps, verification, and troubleshooting.
 
-## Resume Evaluation API
+## Legacy V1 Resume Evaluation API
 
-The backend provides an OpenAI-powered resume evaluation endpoint. The API key is read from `OPENAI_API_KEY` on the server only and is never exposed to the browser.
+The backend keeps a legacy V1 OpenAI-powered resume evaluation endpoint for backward compatibility. The API key is read from `OPENAI_API_KEY` on the server only and is never exposed to the browser.
+
+This endpoint is not part of V2 Candidate Understanding. V2 AI Recruiter does not generate candidate scores, rankings, hire recommendations, reject recommendations, or automatic pipeline movement.
 
 ```http
 POST /api/ai/resume-evaluate
@@ -142,10 +144,12 @@ See [docs/V2_FEISHU_PRODUCT_SPEC.md](docs/V2_FEISHU_PRODUCT_SPEC.md) and [docs/v
 2. Start Docker with `docker compose up --build`.
 3. Open `/feishu`.
 4. Create a Job Understanding from a JD.
-5. Upload a TXT, PDF, or DOCX resume in Candidate Understanding.
+5. Upload a TXT, PDF, or DOCX resume in Candidate Understanding. The current upload limit is 10MB.
 6. Continue into Recruit Together, Daily Workspace, and Task Center.
 
 Each AI output must be reviewed and saved by the recruiter. The app does not automatically persist AI output before review.
+
+Original resume binaries are stored in PostgreSQL for v0.1 small-scale use. See [docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md](docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md) for the storage boundary and future migration direction.
 
 ### Release Notes v0.1 Beta
 
@@ -160,6 +164,7 @@ Each AI output must be reviewed and saved by the recruiter. The app does not aut
 - ATS, CRM, Pipeline, Offer, Analytics, and Learning Assets are not implemented.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
+- Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.
 - AI outputs may be incomplete or wrong and require recruiter review.
 - There is no authentication or multi-user permission model in this beta.
 

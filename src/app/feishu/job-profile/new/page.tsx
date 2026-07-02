@@ -117,7 +117,11 @@ function Info({ label, value }: { label: string; value: string }): JSX.Element {
   );
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "尚未确认";
+  }
+
   return new Intl.DateTimeFormat("zh-CN", {
     day: "2-digit",
     hour: "2-digit",

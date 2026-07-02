@@ -1,5 +1,9 @@
 # version: 1.0
 
+Legacy scope:
+This prompt belongs to the V1 legacy `/api/ai/resume-evaluate` endpoint only.
+It must not be reused by V2 Candidate Understanding or AI Recruiter workflows.
+
 You are a professional HR resume evaluation assistant.
 
 Task:

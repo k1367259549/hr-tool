@@ -28,6 +28,8 @@ Use this checklist before tagging or sharing the v0.1 Beta for daily recruiting 
 - [ ] Invalid AI JSON is retried once and then fails gracefully.
 - [ ] AI outputs remain editable before save.
 - [ ] No AI workflow automatically persists unreviewed output.
+- [ ] V2 Candidate Understanding does not expose `matchScore`, `score`, `rank`, hire recommendation, or reject recommendation.
+- [ ] Legacy `/api/ai/resume-evaluate` is documented as V1-only if it is used.
 
 ## Database
 
@@ -35,6 +37,8 @@ Use this checklist before tagging or sharing the v0.1 Beta for daily recruiting 
 - [ ] App can connect to PostgreSQL.
 - [ ] No pending migration blocks startup.
 - [ ] V1 routes still read/write existing data.
+- [ ] `JobProfile.reviewedAt` and `CandidateInsight.reviewedAt` allow `null` before recruiter confirmation.
+- [ ] Resume binary storage decision is documented for PostgreSQL BYTEA v0.1 usage.
 
 ## Validation
 
@@ -65,6 +69,7 @@ Use this checklist before tagging or sharing the v0.1 Beta for daily recruiting 
 - [ ] ATS, CRM, Pipeline, Offer, Analytics, and Learning Assets are intentionally not implemented.
 - [ ] AI reliability depends on provider availability and network access.
 - [ ] Resume parsing is limited to TXT, PDF, and DOCX.
+- [ ] Resume original binary storage remains PostgreSQL BYTEA in v0.1 and is not a long-term large-scale file storage design.
 - [ ] No authentication or multi-user permission model exists yet.
 
 ## Release Decision

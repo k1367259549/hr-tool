@@ -231,7 +231,7 @@ export function toCandidateInsightDto(insight: CandidateInsight): CandidateInsig
     createdAt: insight.createdAt.toISOString(),
     evidence: insight.evidence as unknown as CandidateInsightDto["evidence"],
     insights: insight.insights as unknown as CandidateInsightDto["insights"],
-    reviewedAt: insight.reviewedAt.toISOString(),
+    reviewedAt: insight.reviewedAt?.toISOString() ?? null,
     summary: insight.summary as unknown as CandidateInsightDto["summary"],
     updatedAt: insight.updatedAt.toISOString()
   };

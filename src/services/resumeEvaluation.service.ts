@@ -37,7 +37,7 @@ export const resumeEvaluationService = {
 
     logger.info("Resume evaluation completed.", {
       feature: "resume-evaluate",
-      matchScore: evaluation.matchScore
+      legacy: true
     });
 
     return evaluation;

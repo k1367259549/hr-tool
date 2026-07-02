@@ -53,13 +53,13 @@ export type JobProfile = JobUnderstandingOutput & {
   promptFile: string;
   promptVersion: string;
   generationTimeMs: number | null;
-  reviewedAt: Date;
+  reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type JobProfileDto = Omit<JobProfile, "reviewedAt" | "createdAt" | "updatedAt"> & {
-  reviewedAt: string;
+  reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

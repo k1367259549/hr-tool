@@ -1,8 +1,11 @@
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
-
-const supportedExtensions = [".pdf", ".docx", ".txt"];
-const maxResumeFileSize = 10 * 1024 * 1024;
+import {
+  getResumeFileExtension,
+  isSupportedResumeFileName,
+  MAX_RESUME_FILE_SIZE_BYTES,
+  RESUME_FILE_SIZE_LIMIT_LABEL
+} from "@/config/resume.config";
 
 export class ResumeParserError extends Error {
   readonly code:
@@ -34,14 +37,14 @@ export async function parseResumeFile(file: File | null): Promise<ParsedResumeFi
     throw new ResumeParserError("FILE_REQUIRED", "请上传简历文件。");
   }
 
-  if (file.size > maxResumeFileSize) {
-    throw new ResumeParserError("FILE_TOO_LARGE", "简历文件不能超过 10MB。");
+  if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+    throw new ResumeParserError("FILE_TOO_LARGE", `简历文件不能超过 ${RESUME_FILE_SIZE_LIMIT_LABEL}。`);
   }
 
   const fileName = file.name;
-  const extension = getFileExtension(fileName);
+  const extension = getResumeFileExtension(fileName);
 
-  if (!supportedExtensions.includes(extension)) {
+  if (!isSupportedResumeFileName(fileName)) {
     throw new ResumeParserError("UNSUPPORTED_FILE_TYPE", "仅支持 PDF、DOCX、TXT 简历。");
   }
 
@@ -62,13 +65,6 @@ export async function parseResumeFile(file: File | null): Promise<ParsedResumeFi
     originalFile,
     parsedText
   };
-}
-
-function getFileExtension(fileName: string): string {
-  const normalizedFileName = fileName.toLowerCase();
-  const dotIndex = normalizedFileName.lastIndexOf(".");
-
-  return dotIndex >= 0 ? normalizedFileName.slice(dotIndex) : "";
 }
 
 async function parseBufferByExtension(buffer: Buffer, extension: string): Promise<string> {

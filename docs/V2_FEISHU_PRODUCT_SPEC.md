@@ -139,15 +139,15 @@ Current implementation scope:
 
 ---
 
-## 5. AI Resume Evaluation
+## 5. Candidate Understanding And Resume Analysis
 
-AI resume evaluation is the first major V2 AI workflow.
+Candidate Understanding and Resume Analysis are V2 decision-support workflows.
 
 Purpose:
 
-- compare resume content with a job description
+- understand resume content in the context of a reviewed Job Profile
 - produce structured evaluation output
-- help recruiters identify strengths, risks, match score, and interview questions
+- help recruiters identify strengths, risks, missing information, evidence, and interview questions
 
 Expected AI output shape:
 
@@ -156,13 +156,16 @@ Expected AI output shape:
   "summary": "string",
   "strengths": ["string"],
   "risks": ["string"],
-  "matchScore": 85,
+  "missingInformation": ["string"],
+  "evidence": ["string"],
   "interviewQuestions": ["string"]
 }
 ```
 
 Rules:
 
+- V2 must not generate candidate scores, rankings, hire recommendations, reject recommendations, or automatic pipeline movement.
+- The legacy V1 `/api/ai/resume-evaluate` endpoint is separate from V2 Candidate Understanding and may keep its V1 `matchScore` response for backward compatibility.
 - AI calls must happen on the backend only.
 - API keys must come from environment variables only.
 - Prompts must live in `/prompts`.
@@ -362,7 +365,7 @@ Included in MVP:
 - Interview skeleton
 - Offer skeleton
 - Feishu Settings skeleton
-- AI resume evaluation endpoint
+- Candidate Understanding workflow entry
 - backend-only AI provider usage
 - no secrets exposed to frontend
 
@@ -399,7 +402,7 @@ Future versions may add:
 - Feishu chat summary workspace
 - recruiting analytics across V1 and V2 data
 - AI interview question generation
-- AI candidate ranking
+- AI-supported candidate comparison without automatic ranking
 - AI pipeline bottleneck analysis
 - audit logs for Feishu sync operations
 
@@ -526,7 +529,7 @@ Completed UI structure:
 - V2 navigation for switching between Feishu pages
 - Candidate management placeholder page
 - Resume parsing placeholder page
-- AI resume evaluation entry card
+- Candidate Understanding entry card
 - Recruiting Pipeline placeholder page
 - Interview records placeholder page
 - Offer management placeholder page
@@ -539,6 +542,7 @@ Current stage guarantees:
 - no real Feishu API calls
 - no database access from V2 pages
 - no V1 page or API rewrite
+- no V2 candidate score, ranking, hire recommendation, or reject recommendation
 - Chinese HR recruiting scenario copy
 - route-level skeleton only
 

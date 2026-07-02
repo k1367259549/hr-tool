@@ -13,7 +13,7 @@ export function toJobProfileDto(jobProfile: JobProfile): JobProfileDto {
   return {
     ...jobProfile,
     createdAt: jobProfile.createdAt.toISOString(),
-    reviewedAt: jobProfile.reviewedAt.toISOString(),
+    reviewedAt: jobProfile.reviewedAt?.toISOString() ?? null,
     updatedAt: jobProfile.updatedAt.toISOString()
   };
 }

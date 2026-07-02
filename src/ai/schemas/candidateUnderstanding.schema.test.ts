@@ -34,10 +34,32 @@ describe("candidateUnderstandingAiOutputSchema", () => {
   });
 
   it("rejects forbidden scoring fields", () => {
+    const forbiddenFields = [
+      "matchScore",
+      "score",
+      "rank",
+      "hireRecommendation",
+      "rejectRecommendation"
+    ];
+
+    forbiddenFields.forEach((field) => {
+      expect(() =>
+        validateCandidateUnderstandingAiOutput({
+          ...validOutput,
+          [field]: "forbidden"
+        })
+      ).toThrow("禁止");
+    });
+  });
+
+  it("rejects nested forbidden decision fields", () => {
     expect(() =>
       validateCandidateUnderstandingAiOutput({
         ...validOutput,
-        score: 90
+        summary: {
+          ...validOutput.summary,
+          hireRecommendation: "hire"
+        }
       })
     ).toThrow("禁止");
   });

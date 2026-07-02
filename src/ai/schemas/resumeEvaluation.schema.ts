@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { ResumeEvaluateOutput } from "@/types/resumeEvaluation";
 
+// Legacy V1 schema for `/api/ai/resume-evaluate`.
+// V2 Candidate Understanding uses its own score-free schema.
 export const resumeEvaluationAiOutputSchema = z
   .object({
     summary: z.string().min(1),
