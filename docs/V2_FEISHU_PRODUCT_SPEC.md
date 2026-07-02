@@ -110,7 +110,8 @@ Current implementation scope:
 - no automatic Candidate creation from resumes
 - no automatic Candidate-Resume linking
 - no automatic Resume matching or transfer
-- no Pipeline, Interview, or Offer model
+- no Interview or Offer model
+- Candidate detail shows role-specific Candidate Applications, but Candidate itself does not own a single current Pipeline stage
 
 ---
 
@@ -230,10 +231,16 @@ Initial route:
 
 Current implementation scope:
 
-- page skeleton only
+- CandidateApplication model connecting Candidate and reviewed JobProfile
+- ApplicationEvent model for minimal stage history
+- manual Application stage movement only
+- stage board, create page, and detail page under `/feishu/pipeline`
+- PostgreSQL partial unique index preventing duplicate active Candidate + JobProfile applications
+- atomic conditional stage updates to prevent stale concurrent movement
 - no drag and drop
-- no pipeline database model
-- no real Feishu synchronization
+- no Interview record implementation
+- no Offer entity implementation
+- no scoring, ranking, hire recommendation, reject recommendation, automatic stage movement, or real Feishu synchronization
 
 ---
 
@@ -370,7 +377,7 @@ Included in MVP:
 - V2 navigation
 - Candidate CRM Foundation
 - Resume skeleton
-- Pipeline skeleton
+- Pipeline Foundation
 - Interview skeleton
 - Offer skeleton
 - Feishu Settings skeleton
@@ -406,7 +413,7 @@ Future versions may add:
 - explicit recruiter-reviewed Candidate-Resume linking
 - richer Resume Library management after manual linking is stable
 - Resume parsing persistence
-- Pipeline board with stage movement
+- configurable Pipeline stages after the manual foundation is stable
 - Interview feedback forms
 - Offer approval and onboarding handoff
 - Recruiting report workspace
@@ -539,7 +546,7 @@ Completed UI structure:
 - Candidate CRM list, create, and detail pages
 - Resume parsing placeholder page
 - Candidate Understanding entry card
-- Recruiting Pipeline placeholder page
+- Recruiting Pipeline board, Application create page, and Application detail page
 - Interview records placeholder page
 - Offer management placeholder page
 - Recruiting report placeholder page

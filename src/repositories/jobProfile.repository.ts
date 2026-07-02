@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { JobProfile, JobProfileCreateInput } from "@/types/jobProfile";
+import type { CandidateDbClient } from "@/repositories/candidate.repository";
 
 export const jobProfileRepository = {
   async findMany(): Promise<JobProfile[]> {
@@ -37,8 +38,8 @@ export const jobProfileRepository = {
     });
   },
 
-  async findById(id: string): Promise<JobProfile | null> {
-    return prisma.jobProfile.findUnique({
+  async findById(id: string, client: CandidateDbClient = prisma): Promise<JobProfile | null> {
+    return client.jobProfile.findUnique({
       where: {
         id
       }
