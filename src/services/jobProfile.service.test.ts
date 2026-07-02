@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { toJobProfileDto } from "@/services/jobProfile.service";
+import { jobProfileService, toJobProfileDto } from "@/services/jobProfile.service";
+import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import type { JobProfile } from "@/types/jobProfile";
 
 vi.mock("@/repositories/jobProfile.repository", () => ({
   jobProfileRepository: {
-    findMany: vi.fn()
+    findManyReviewed: vi.fn()
   }
 }));
 
@@ -48,5 +49,22 @@ describe("toJobProfileDto", () => {
         reviewedAt: new Date("2026-01-03T00:00:00.000Z")
       }).reviewedAt
     ).toBe("2026-01-03T00:00:00.000Z");
+  });
+});
+
+describe("jobProfileService", () => {
+  it("lists only repository-reviewed job profiles", async () => {
+    vi.mocked(jobProfileRepository.findManyReviewed).mockResolvedValueOnce([
+      {
+        ...baseJobProfile,
+        reviewedAt: new Date("2026-01-03T00:00:00.000Z")
+      }
+    ]);
+
+    const result = await jobProfileService.listReviewedJobProfiles();
+
+    expect(jobProfileRepository.findManyReviewed).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.reviewedAt).toBe("2026-01-03T00:00:00.000Z");
   });
 });

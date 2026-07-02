@@ -107,6 +107,7 @@ AI Recruiter starts at:
 The current V2 MVP connects the completed recruiter workflows into one workspace:
 
 ```text
+/feishu/candidates
 /feishu/job-profile/new
 /feishu/candidate-understanding/new
 /feishu/recruit-together
@@ -122,10 +123,17 @@ Job -> Resume -> Candidate -> Phone -> Interview -> Daily Review -> Next Action
 
 The workspace uses backend services only. AI keys remain server-side, AI outputs are editable before save, and no scoring, ranking, hire recommendation, rejection recommendation, automatic pipeline movement, or Learning Asset publication is implemented.
 
-Additional V2 placeholder routes remain available for future modules:
+Candidate CRM Foundation is available at:
 
 ```text
 /feishu/candidates
+```
+
+It supports manually maintained Candidate profiles, search, filtering, pagination, soft archive, restore, resume counts, and audit timelines. Candidate records remain separate from Resume records; the app does not automatically create Candidates from resumes or automatically link resumes to Candidates.
+
+Additional V2 placeholder routes remain available for future modules:
+
+```text
 /feishu/resumes
 /feishu/pipeline
 /feishu/interviews
@@ -146,14 +154,17 @@ See [docs/V2_FEISHU_PRODUCT_SPEC.md](docs/V2_FEISHU_PRODUCT_SPEC.md) and [docs/v
 4. Create a Job Understanding from a JD.
 5. Upload a TXT, PDF, or DOCX resume in Candidate Understanding. The current upload limit is 10MB.
 6. Continue into Recruit Together, Daily Workspace, and Task Center.
+7. Use `/feishu/candidates` to manually maintain Candidate CRM records when needed.
 
 Each AI output must be reviewed and saved by the recruiter. The app does not automatically persist AI output before review.
 
 Original resume binaries are stored in PostgreSQL for v0.1 small-scale use. See [docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md](docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md) for the storage boundary and future migration direction.
+Candidate CRM Foundation is documented in [docs/v2/28_CANDIDATE_CRM_FOUNDATION.md](docs/v2/28_CANDIDATE_CRM_FOUNDATION.md).
 
 ### Release Notes v0.1 Beta
 
 - Connected AI Recruiter workflows from Workspace to Task Center.
+- Added Candidate CRM Foundation with manual Candidate CRUD, search, filtering, soft archive, restore, resume counts, and audit timeline.
 - Added shared workflow progress and recommended next-action navigation.
 - Unified V2 AI calls through one AI service pipeline with prompt registry, prompt builder, schema validation, retry, and observability.
 - Verified Docker startup, database connectivity, and V2 route reachability.
@@ -161,7 +172,8 @@ Original resume binaries are stored in PostgreSQL for v0.1 small-scale use. See 
 ### Known Limitations v0.1 Beta
 
 - Feishu API integration is not connected.
-- ATS, CRM, Pipeline, Offer, Analytics, and Learning Assets are not implemented.
+- ATS, Pipeline, Offer, Analytics, and Learning Assets are not implemented.
+- Candidate CRM has no authentication, multi-user permission model, Feishu contact sync, automatic resume linking, or automatic Candidate creation from resumes.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
 - Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.

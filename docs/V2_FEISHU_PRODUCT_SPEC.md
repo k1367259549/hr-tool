@@ -98,10 +98,15 @@ Initial route:
 
 Current implementation scope:
 
-- page skeleton only
-- no real Candidate database model
-- no Candidate CRUD
+- Candidate database model
+- Candidate audit model
+- manual Candidate CRUD
+- search, filters, pagination, soft archive, restore, resume counts, and audit timeline
+- CandidateResume can optionally link to Candidate through nullable `candidateId`
 - no Feishu contact synchronization
+- no automatic Candidate creation from resumes
+- no automatic Candidate-Resume linking
+- no Pipeline, Interview, or Offer model
 
 ---
 
@@ -359,7 +364,7 @@ Included in MVP:
 
 - `/feishu` entry
 - V2 navigation
-- Candidate CRM skeleton
+- Candidate CRM Foundation
 - Resume skeleton
 - Pipeline skeleton
 - Interview skeleton
@@ -374,7 +379,7 @@ Deferred from MVP:
 - full Feishu API integration
 - Feishu OAuth
 - webhook processing
-- advanced Candidate CRM
+- advanced Candidate CRM automation
 - advanced ATS features
 - complex permission model
 - multi-user role system
@@ -393,7 +398,8 @@ Future versions may add:
 - Feishu contact or group integration
 - Feishu calendar integration for interviews
 - Feishu approval integration for offers
-- Candidate CRUD
+- advanced Candidate lifecycle workflows
+- explicit recruiter-reviewed Candidate-Resume linking
 - Resume parsing persistence
 - Pipeline board with stage movement
 - Interview feedback forms
@@ -431,7 +437,7 @@ src/modules/chat-summary
 src/modules/feishu
 ```
 
-Current V2 skeleton routes:
+Current V2 routes:
 
 ```text
 /feishu
@@ -488,10 +494,8 @@ Do not implement in this task:
 - real Feishu API calls
 - Feishu authentication
 - Feishu webhook endpoints
-- database schema changes
 - V1 route rewrites
 - V1 service rewrites
-- Candidate CRUD
 - Resume persistence
 - Pipeline board behavior
 - Interview scheduling logic
@@ -527,7 +531,7 @@ Completed UI structure:
 
 - V2 home page with module entry cards
 - V2 navigation for switching between Feishu pages
-- Candidate management placeholder page
+- Candidate CRM list, create, and detail pages
 - Resume parsing placeholder page
 - Candidate Understanding entry card
 - Recruiting Pipeline placeholder page
@@ -540,10 +544,12 @@ Completed UI structure:
 Current stage guarantees:
 
 - no real Feishu API calls
-- no database access from V2 pages
+- no direct database access from V2 pages
 - no V1 page or API rewrite
 - no V2 candidate score, ranking, hire recommendation, or reject recommendation
+- Candidate CRUD is manual and recruiter-controlled
+- Candidate and Resume remain separate unless a future explicit linking workflow is approved
 - Chinese HR recruiting scenario copy
-- route-level skeleton only
+- route-level skeletons remain for deferred non-Candidate modules
 
-The next implementation stage should introduce V2 data models only after a separate schema task is approved.
+Future implementation stages should extend V2 data models only through separate approved schema tasks.

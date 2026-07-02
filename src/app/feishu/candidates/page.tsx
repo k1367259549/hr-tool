@@ -1,6 +1,5 @@
-import { candidateModule } from "@/modules/candidate";
-import { FeishuModulePage } from "@/modules/feishu/components/FeishuModulePage";
+import { CandidateListPage } from "@/features/candidate-crm/components/CandidateListPage";
 
 export default function FeishuCandidatesPage(): JSX.Element {
-  return <FeishuModulePage module={candidateModule} />;
+  return <CandidateListPage />;
 }

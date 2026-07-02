@@ -10,6 +10,19 @@ export const jobProfileRepository = {
     });
   },
 
+  async findManyReviewed(): Promise<JobProfile[]> {
+    return prisma.jobProfile.findMany({
+      orderBy: {
+        createdAt: "desc"
+      },
+      where: {
+        reviewedAt: {
+          not: null
+        }
+      }
+    });
+  },
+
   async findManyCreatedBetween(startDate: Date, endDate: Date): Promise<JobProfile[]> {
     return prisma.jobProfile.findMany({
       orderBy: {

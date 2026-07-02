@@ -3,7 +3,7 @@ import type { JobProfile, JobProfileDto } from "@/types/jobProfile";
 
 export const jobProfileService = {
   async listReviewedJobProfiles(): Promise<JobProfileDto[]> {
-    const profiles = await jobProfileRepository.findMany();
+    const profiles = await jobProfileRepository.findManyReviewed();
 
     return profiles.map(toJobProfileDto);
   }

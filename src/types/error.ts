@@ -1,6 +1,7 @@
 export type StandardErrorCode =
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
+  | "CONFLICT"
   | "DATABASE_ERROR"
   | "AI_ERROR"
   | "CONFIG_ERROR"
