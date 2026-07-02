@@ -103,9 +103,13 @@ Current implementation scope:
 - manual Candidate CRUD
 - search, filters, pagination, soft archive, restore, resume counts, and audit timeline
 - CandidateResume can optionally link to Candidate through nullable `candidateId`
+- recruiter-confirmed manual Candidate-Resume linking and unlinking from Candidate detail pages
+- link and unlink operations are transaction-safe and write CandidateAudit records
+- Resume linking APIs return safe metadata only and do not expose original resume binaries or parsed full resume text
 - no Feishu contact synchronization
 - no automatic Candidate creation from resumes
 - no automatic Candidate-Resume linking
+- no automatic Resume matching or transfer
 - no Pipeline, Interview, or Offer model
 
 ---
@@ -400,6 +404,7 @@ Future versions may add:
 - Feishu approval integration for offers
 - advanced Candidate lifecycle workflows
 - explicit recruiter-reviewed Candidate-Resume linking
+- richer Resume Library management after manual linking is stable
 - Resume parsing persistence
 - Pipeline board with stage movement
 - Interview feedback forms
@@ -548,7 +553,7 @@ Current stage guarantees:
 - no V1 page or API rewrite
 - no V2 candidate score, ranking, hire recommendation, or reject recommendation
 - Candidate CRUD is manual and recruiter-controlled
-- Candidate and Resume remain separate unless a future explicit linking workflow is approved
+- Candidate and Resume remain separate; current linking is manual, recruiter-confirmed, audited, and never automatic
 - Chinese HR recruiting scenario copy
 - route-level skeletons remain for deferred non-Candidate modules
 

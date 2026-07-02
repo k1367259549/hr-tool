@@ -38,6 +38,8 @@ enum CandidateAuditAction {
   UPDATED
   ARCHIVED
   RESTORED
+  RESUME_LINKED
+  RESUME_UNLINKED
 }
 
 model RecruitLog {

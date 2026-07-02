@@ -4,6 +4,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { CandidateDetail } from "@/features/candidate-crm/components/CandidateDetail";
 import { useCandidateDetail } from "@/features/candidate-crm/hooks/useCandidateDetail";
+import { useCandidateResumes } from "@/features/candidate-crm/hooks/useCandidateResumes";
 
 type CandidateDetailPageProps = {
   candidateId: string;
@@ -16,9 +17,11 @@ export function CandidateDetailPage({ candidateId }: CandidateDetailPageProps): 
     error,
     isLoading,
     isSaving,
+    reloadCandidate,
     restoreCandidate,
     updateCandidate
   } = useCandidateDetail(candidateId);
+  const resumeLinkState = useCandidateResumes(candidateId, reloadCandidate);
 
   return (
     <div className="space-y-6">
@@ -40,6 +43,7 @@ export function CandidateDetailPage({ candidateId }: CandidateDetailPageProps): 
           onArchive={archiveCandidate}
           onRestore={restoreCandidate}
           onUpdate={updateCandidate}
+          resumeLinkState={resumeLinkState}
         />
       ) : null}
     </div>

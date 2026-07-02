@@ -73,6 +73,8 @@ V1 feature UI lives under `src/features`. V2 Feishu skeleton pages already use `
 
 Current V2 includes the AI Recruiter MVP workspace and Candidate CRM Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred non-Candidate modules remain placeholders and do not connect to Feishu APIs.
 
+Candidate CRM now also includes recruiter-confirmed manual Candidate-Resume linking. Candidate and Resume remain separate domain objects; linking and unlinking are explicit recruiter actions, transaction-safe, audited, and do not expose resume binaries or parsed full resume text through list/link APIs.
+
 ### 2.2 Backend And API Structure
 
 The current backend uses Next.js Route Handlers under:
@@ -146,6 +148,7 @@ Candidate CRM Foundation adds:
 - `Candidate`
 - `CandidateAudit`
 - nullable `CandidateResume.candidateId`
+- manual link audit actions `RESUME_LINKED` and `RESUME_UNLINKED`
 
 Candidate records remain separate from Resume records. CandidateStatus is not a Pipeline stage.
 
@@ -544,6 +547,7 @@ Foundation acceptance criteria:
 - Candidate can exist without Resume
 - CandidateResume can exist without Candidate
 - conversion and linking require explicit recruiter action and are not automated
+- manual Candidate-Resume linking uses recruiter confirmation, transaction-safe audit, and safe metadata DTOs only
 - V1 Candidate-free workflows remain unaffected
 
 ### Phase 6 - Evaluation Result

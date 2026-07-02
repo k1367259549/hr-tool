@@ -10,4 +10,11 @@ describe("Prisma schema safeguards", () => {
       "candidate  Candidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)"
     );
   });
+
+  it("keeps manual resume linking audit actions", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+
+    expect(schema).toContain("RESUME_LINKED");
+    expect(schema).toContain("RESUME_UNLINKED");
+  });
 });
