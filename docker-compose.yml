@@ -1,4 +1,5 @@
 services:
+
   db:
     image: postgres:16
     container_name: hr_daily_db
@@ -22,12 +23,27 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       args:
+        # Override with --build-arg NPM_REGISTRY=https://registry.npmjs.org/ if needed
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     container_name: hr_daily_app
+    env_file:
+      - .env
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/hr_daily
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_TEMPERATURE: ${OPENAI_TEMPERATURE:-0.2}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-2000}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-60000}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
@@ -37,6 +53,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   db_data:

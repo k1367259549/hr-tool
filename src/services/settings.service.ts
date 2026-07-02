@@ -15,7 +15,19 @@ export const settingsService = {
       checkDatabaseConnection(),
       checkPromptDirectory()
     ]);
+    const aiApiKeyConfigured = isConfigured(envConfig.aiApiKey);
+    const aiBaseUrlConfigured = isConfigured(envConfig.aiBaseUrl);
     const openAiApiKeyConfigured = isConfigured(envConfig.openAiApiKey);
+    const openAiBaseUrlConfigured = isConfigured(envConfig.openAiBaseUrl);
+    const activeApiKeyConfigured =
+      aiConfig.defaultProvider === "openai-compatible"
+        ? aiApiKeyConfigured || openAiApiKeyConfigured
+        : openAiApiKeyConfigured;
+    const activeBaseUrl = getActiveBaseUrl();
+    const activeBaseUrlConfigured =
+      aiConfig.defaultProvider === "openai-compatible"
+        ? aiBaseUrlConfigured || openAiBaseUrlConfigured
+        : openAiBaseUrlConfigured;
     const databaseUrlConfigured = isConfigured(envConfig.databaseUrl);
 
     return {
@@ -24,9 +36,10 @@ export const settingsService = {
       environment: appConfig.environment,
       ai: {
         provider: aiConfig.defaultProvider,
+        baseUrl: activeBaseUrl,
         model: aiConfig.defaultModel,
-        apiKeyConfigured: openAiApiKeyConfigured,
-        status: openAiApiKeyConfigured ? "ready" : "missing_api_key",
+        apiKeyConfigured: activeApiKeyConfigured,
+        status: getAIStatus(activeApiKeyConfigured, activeBaseUrlConfigured),
         promptDirectoryAvailable
       },
       database: {
@@ -36,6 +49,9 @@ export const settingsService = {
       environmentStatus: {
         nodeEnv: envConfig.nodeEnv,
         databaseUrlConfigured,
+        aiApiKeyConfigured,
+        aiBaseUrlConfigured,
+        openAiBaseUrlConfigured,
         openAiApiKeyConfigured
       },
       developer: {
@@ -46,6 +62,29 @@ export const settingsService = {
     };
   }
 };
+
+function getActiveBaseUrl(): string {
+  if (aiConfig.defaultProvider === "openai-compatible") {
+    return envConfig.aiBaseUrl ?? envConfig.openAiBaseUrl ?? "未配置";
+  }
+
+  return envConfig.openAiBaseUrl ?? "OpenAI 默认地址";
+}
+
+function getAIStatus(
+  apiKeyConfigured: boolean,
+  baseUrlConfigured: boolean
+): SettingsStatus["ai"]["status"] {
+  if (!apiKeyConfigured) {
+    return "missing_api_key";
+  }
+
+  if (aiConfig.defaultProvider === "openai-compatible" && !baseUrlConfigured) {
+    return "missing_base_url";
+  }
+
+  return "ready";
+}
 
 async function checkDatabaseConnection(): Promise<boolean> {
   try {

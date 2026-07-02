@@ -1,0 +1,2 @@
+ALTER TABLE "JobProfile" ALTER COLUMN "reviewedAt" DROP NOT NULL;
+ALTER TABLE "CandidateInsight" ALTER COLUMN "reviewedAt" DROP NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE "RecruitmentTask" ADD COLUMN "confidence" TEXT NOT NULL DEFAULT 'MEDIUM';

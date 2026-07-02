@@ -4,9 +4,10 @@ export type SettingsStatus = {
   environment: string;
   ai: {
     provider: string;
+    baseUrl: string;
     model: string;
     apiKeyConfigured: boolean;
-    status: "ready" | "missing_api_key";
+    status: "ready" | "missing_api_key" | "missing_base_url";
     promptDirectoryAvailable: boolean;
   };
   database: {
@@ -16,7 +17,10 @@ export type SettingsStatus = {
   environmentStatus: {
     nodeEnv: string;
     databaseUrlConfigured: boolean;
+    aiApiKeyConfigured: boolean;
+    aiBaseUrlConfigured: boolean;
     openAiApiKeyConfigured: boolean;
+    openAiBaseUrlConfigured: boolean;
   };
   developer: {
     runtime: string;

@@ -28,15 +28,15 @@ enum PlanPriority {
 }
 
 model RecruitLog {
-  id             String        @id @default(uuid())
-  date           DateTime      @unique
+  id             String   @id @default(uuid())
+  date           DateTime @unique
   position       String?
-  resumeCount    Int           @default(0)
-  screenCount    Int           @default(0)
-  phoneCount     Int           @default(0)
-  interviewCount Int           @default(0)
-  offerCount     Int           @default(0)
-  entryCount     Int           @default(0)
+  resumeCount    Int      @default(0)
+  screenCount    Int      @default(0)
+  phoneCount     Int      @default(0)
+  interviewCount Int      @default(0)
+  offerCount     Int      @default(0)
+  entryCount     Int      @default(0)
   source         String?
   channel        String?
   roleType       String?
@@ -44,18 +44,18 @@ model RecruitLog {
   summary        String?
   problems       String?
   reflection     String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  review         DailyReview?
-  plans          DailyPlan[]
+  review DailyReview?
+  plans  DailyPlan[]
 
   @@index([date])
 }
 
 model DailyReview {
-  id            String       @id @default(uuid())
-  logId         String       @unique
+  id            String   @id @default(uuid())
+  logId         String   @unique
   summary       String
   strengths     Json
   weaknesses    Json
@@ -68,11 +68,11 @@ model DailyReview {
   inputHash     String
   rawOutput     Json
   parsedOutput  Json
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime @default(now())
 
-  log           RecruitLog   @relation(fields: [logId], references: [id])
-  plans         DailyPlan[]
-  knowledge     Knowledge[]
+  log       RecruitLog  @relation(fields: [logId], references: [id])
+  plans     DailyPlan[]
+  knowledge Knowledge[]
 
   @@index([createdAt])
 }
@@ -113,9 +113,9 @@ model DailyPlan {
   parsedOutput     Json
   createdAt        DateTime     @default(now())
 
-  log              RecruitLog?  @relation(fields: [logId], references: [id])
-  review           DailyReview? @relation(fields: [reviewId], references: [id])
-  knowledge        Knowledge[]
+  log       RecruitLog?  @relation(fields: [logId], references: [id])
+  review    DailyReview? @relation(fields: [reviewId], references: [id])
+  knowledge Knowledge[]
 
   @@index([date])
   @@index([logId])
@@ -136,8 +136,8 @@ model Knowledge {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  sourceReview   DailyReview?    @relation(fields: [sourceReviewId], references: [id])
-  sourcePlan     DailyPlan?      @relation(fields: [sourcePlanId], references: [id])
+  sourceReview DailyReview? @relation(fields: [sourceReviewId], references: [id])
+  sourcePlan   DailyPlan?   @relation(fields: [sourcePlanId], references: [id])
 
   @@index([type])
   @@index([source])
@@ -145,31 +145,263 @@ model Knowledge {
 }
 
 model UploadedSpreadsheet {
-  id        String               @id @default(uuid())
+  id        String   @id @default(uuid())
   fileName  String
   fileType  String
   rowCount  Int?
   status    String
-  createdAt DateTime             @default(now())
+  createdAt DateTime @default(now())
 
-  analysis  SpreadsheetAnalysis?
+  analysis SpreadsheetAnalysis?
 
   @@index([createdAt])
   @@index([status])
 }
 
 model SpreadsheetAnalysis {
-  id          String              @id @default(uuid())
-  uploadId    String              @unique
+  id          String   @id @default(uuid())
+  uploadId    String   @unique
   summary     String
   insights    String
   problems    String
   suggestions String
-  rawJson      Json?
+  rawJson     Json?
   model       String
-  createdAt   DateTime            @default(now())
+  createdAt   DateTime @default(now())
 
-  upload      UploadedSpreadsheet @relation(fields: [uploadId], references: [id])
+  upload UploadedSpreadsheet @relation(fields: [uploadId], references: [id])
 
+  @@index([createdAt])
+}
+
+model JobProfile {
+  id                         String    @id @default(uuid())
+  workflowId                 String
+  jobTitle                   String
+  jd                         String
+  leaderRequirements         String?
+  teamBackground             String?
+  hiringGoal                 String?
+  notes                      String?
+  jobSummary                 String
+  coreResponsibilities       String[]
+  requiredCompetencies       String[]
+  preferredCompetencies      String[]
+  potentialRisks             String[]
+  hiringFocus                String[]
+  interviewFocus             String[]
+  missingInformation         String[]
+  suggestedFollowUpQuestions String[]
+  aiProvider                 String
+  aiModel                    String
+  promptFile                 String
+  promptVersion              String
+  generationTimeMs           Int?
+  reviewedAt                 DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  candidateResumes         CandidateResume[]
+  candidateInsights        CandidateInsight[]
+  recruitTogetherWorkflows RecruitTogetherWorkflow[]
+
+  @@index([workflowId])
+  @@index([createdAt])
+}
+
+model CandidateResume {
+  id              String   @id @default(uuid())
+  workflowId      String
+  jobProfileId    String
+  fileName        String
+  fileType        String
+  fileSize        Int
+  originalFile    Bytes
+  parsedText      String?
+  parsingStatus   String
+  parsingError    String?
+  structureChunks Json
+  semanticChunks  Json
+  resumeVersion   String
+  candidateSource String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  jobProfile JobProfile        @relation(fields: [jobProfileId], references: [id])
+  insight    CandidateInsight?
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([createdAt])
+}
+
+model CandidateInsight {
+  id                            String    @id @default(uuid())
+  workflowId                    String
+  jobProfileId                  String
+  resumeId                      String    @unique
+  candidateSource               String?
+  notes                         String?
+  summary                       Json
+  insights                      Json
+  strengths                     String[]
+  potentialRisks                String[]
+  missingInformation            String[]
+  suggestedPhoneScreenQuestions String[]
+  suggestedInterviewQuestions   String[]
+  suggestedNextActions          String[]
+  evidence                      Json
+  aiProvider                    String
+  aiModel                       String
+  promptFile                    String
+  promptVersion                 String
+  generationTimeMs              Int?
+  jobProfileVersion             String
+  resumeVersion                 String
+  reviewedAt                    DateTime?
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+
+  jobProfile               JobProfile                @relation(fields: [jobProfileId], references: [id])
+  resume                   CandidateResume           @relation(fields: [resumeId], references: [id])
+  recruitTogetherWorkflows RecruitTogetherWorkflow[]
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([createdAt])
+}
+
+model RecruitTogetherWorkflow {
+  id                   String   @id @default(uuid())
+  workflowId           String
+  jobProfileId         String
+  candidateInsightId   String
+  phonePreparation     Json
+  phoneNotes           Json
+  interviewPreparation Json
+  interviewNotes       Json
+  recruiterSummary     Json
+  aiProvider           String
+  aiModel              String
+  promptVersions       Json
+  generationTimes      Json
+  humanReview          Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  jobProfile       JobProfile       @relation(fields: [jobProfileId], references: [id])
+  candidateInsight CandidateInsight @relation(fields: [candidateInsightId], references: [id])
+
+  @@index([workflowId])
+  @@index([jobProfileId])
+  @@index([candidateInsightId])
+  @@index([createdAt])
+}
+
+model DailyRecruitingWorkspace {
+  id                     String   @id @default(uuid())
+  workflowId             String
+  date                   DateTime
+  activitySnapshot       Json
+  dailySummary           Json
+  recruitingInsights     Json
+  tomorrowPriorities     Json
+  improvementSuggestions Json
+  manualNotes            String?
+  aiProvider             String
+  aiModel                String
+  promptVersions         Json
+  generationTimes        Json
+  humanReview            Json
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([date])
+  @@index([createdAt])
+}
+
+model RecruiterWorkspaceNote {
+  id             String   @id @default(uuid())
+  date           DateTime
+  content        String
+  category       String?
+  source         String   @default("MANUAL")
+  searchableText String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([date])
+  @@index([createdAt])
+}
+
+model RecruiterWorkspaceScheduleItem {
+  id          String   @id @default(uuid())
+  date        DateTime
+  itemType    String
+  title       String
+  startTime   String?
+  relatedName String?
+  notes       String?
+  completed   Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([itemType])
+  @@index([createdAt])
+}
+
+model RecruitmentTask {
+  id                    String    @id @default(uuid())
+  sourceKey             String    @unique
+  sourceType            String
+  category              String
+  title                 String
+  priority              String
+  priorityReason        String
+  reason                String
+  evidence              String[]
+  relatedWorkflow       String?
+  relatedCandidate      String?
+  relatedJob            String?
+  dueTime               DateTime?
+  confidence            String    @default("MEDIUM")
+  recommendedNextAction String
+  status                String    @default("TODO")
+  quickStartHref        String?
+  createdBy             String    @default("AI_RECRUITER")
+  reviewedByRecruiter   Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  audits RecruitmentTaskAudit[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([sourceType])
+  @@index([dueTime])
+  @@index([createdAt])
+}
+
+model RecruitmentTaskAudit {
+  id           String   @id @default(uuid())
+  taskId       String
+  action       String
+  actor        String
+  beforeStatus String?
+  afterStatus  String?
+  beforeValue  Json?
+  afterValue   Json?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  task RecruitmentTask @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+  @@index([action])
   @@index([createdAt])
 }

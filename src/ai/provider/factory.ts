@@ -1,4 +1,5 @@
 import { openAiProvider } from "@/ai/provider/openai";
+import { openAiCompatibleProvider } from "@/ai/provider/openai-compatible";
 import type { AIProvider } from "@/ai/provider/types";
 import type { AiErrorCode } from "@/types/ai";
 import { isSupportedAIProvider } from "@/utils/configValidation";
@@ -18,6 +19,13 @@ export function getAIProvider(providerName: string): AIProvider {
 
   if (isSupportedAIProvider(normalizedProviderName) && normalizedProviderName === "openai") {
     return openAiProvider;
+  }
+
+  if (
+    isSupportedAIProvider(normalizedProviderName) &&
+    normalizedProviderName === "openai-compatible"
+  ) {
+    return openAiCompatibleProvider;
   }
 
   throw new AIProviderFactoryError(`Unsupported AI provider: ${providerName}.`);

@@ -10,15 +10,22 @@ export type AppConfig = {
 };
 
 export type EnvConfig = {
+  aiApiKey: string | undefined;
+  aiBaseUrl: string | undefined;
+  aiModel: string | undefined;
+  aiProvider: string | undefined;
   databaseUrl: string | undefined;
+  openAiBaseUrl: string | undefined;
   openAiApiKey: string | undefined;
   openAiModel: string | undefined;
   openAiTemperature: string | undefined;
   openAiMaxTokens: string | undefined;
+  aiTimeoutMs: string | undefined;
+  aiMaxRetries: string | undefined;
   nodeEnv: AppEnvironment;
 };
 
-export type AIProviderName = "openai";
+export type AIProviderName = "openai" | "openai-compatible";
 
 export type AIConfig = {
   defaultProvider: AIProviderName;
