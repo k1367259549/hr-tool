@@ -5,6 +5,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { CandidateDetail } from "@/features/candidate-crm/components/CandidateDetail";
 import { useCandidateDetail } from "@/features/candidate-crm/hooks/useCandidateDetail";
 import { useCandidateResumes } from "@/features/candidate-crm/hooks/useCandidateResumes";
+import { useCandidateApplications } from "@/features/pipeline/hooks/useCandidateApplications";
 
 type CandidateDetailPageProps = {
   candidateId: string;
@@ -22,6 +23,7 @@ export function CandidateDetailPage({ candidateId }: CandidateDetailPageProps): 
     updateCandidate
   } = useCandidateDetail(candidateId);
   const resumeLinkState = useCandidateResumes(candidateId, reloadCandidate);
+  const applicationState = useCandidateApplications(candidateId);
 
   return (
     <div className="space-y-6">
@@ -43,6 +45,7 @@ export function CandidateDetailPage({ candidateId }: CandidateDetailPageProps): 
           onArchive={archiveCandidate}
           onRestore={restoreCandidate}
           onUpdate={updateCandidate}
+          applicationState={applicationState}
           resumeLinkState={resumeLinkState}
         />
       ) : null}

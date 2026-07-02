@@ -42,6 +42,23 @@ enum CandidateAuditAction {
   RESUME_UNLINKED
 }
 
+enum ApplicationStage {
+  NEW
+  RESUME_SCREEN
+  PHONE_SCREEN
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ApplicationEventType {
+  CREATED
+  STAGE_CHANGED
+  NOTE_ADDED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -219,6 +236,7 @@ model JobProfile {
   candidateResumes         CandidateResume[]
   candidateInsights        CandidateInsight[]
   recruitTogetherWorkflows RecruitTogetherWorkflow[]
+  applications             CandidateApplication[]
 
   @@index([workflowId])
   @@index([createdAt])
@@ -272,8 +290,9 @@ model Candidate {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  resumes CandidateResume[]
-  audits  CandidateAudit[]
+  resumes      CandidateResume[]
+  audits       CandidateAudit[]
+  applications CandidateApplication[]
 
   @@index([fullName])
   @@index([status])
@@ -298,6 +317,47 @@ model CandidateAudit {
   @@index([candidateId])
   @@index([action])
   @@index([createdAt])
+}
+
+model CandidateApplication {
+  id               String           @id @default(cuid())
+  candidateId      String
+  jobProfileId     String
+  currentStage     ApplicationStage @default(NEW)
+  owner            String?
+  sourceChannel    String?
+  notes            String?
+  latestActivityAt DateTime         @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  candidate  Candidate          @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  jobProfile JobProfile         @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
+  events     ApplicationEvent[]
+
+  @@index([candidateId])
+  @@index([jobProfileId])
+  @@index([currentStage])
+  @@index([owner])
+  @@index([latestActivityAt])
+  @@index([closedAt])
+}
+
+model ApplicationEvent {
+  id            String               @id @default(cuid())
+  applicationId String
+  eventType     ApplicationEventType
+  actor         String?
+  fromStage     ApplicationStage?
+  toStage       ApplicationStage?
+  note          String?
+  createdAt     DateTime             @default(now())
+
+  application CandidateApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@index([eventType])
 }
 
 model CandidateInsight {

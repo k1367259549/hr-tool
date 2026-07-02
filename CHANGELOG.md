@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Recruiting Pipeline Foundation with CandidateApplication, ApplicationEvent history, manual stage transitions, Pipeline board, Application create/detail pages, Candidate detail application entry, and guarded PostgreSQL concurrency tests
+- Recruiting Pipeline Foundation architecture document
 - Manual Candidate-Resume linking with recruiter confirmation, safe Resume metadata APIs, transactional link/unlink audit, available Resume search, conflict handling, and Candidate detail UI
 - Candidate-Resume Manual Linking architecture document
 - Candidate CRM Foundation with Candidate model, audit model, nullable CandidateResume link, manual CRUD APIs, search, filters, pagination, soft archive, restore, and `/feishu/candidates` UI
@@ -17,6 +19,8 @@
 - V2 product specification document
 
 ### Changed
+- Candidate detail now shows role-specific Candidate Applications without writing a global current Pipeline stage to Candidate
+- `/feishu/pipeline` now shows a real manual Pipeline board instead of a static placeholder
 - Candidate-Resume link now uses an atomic `candidateId IS NULL` conditional update and classifies zero-count updates as idempotent, conflict, or not found before writing audit
 - Candidate-Resume unlink now uses an atomic `candidateId = current Candidate` conditional update so stale unlink requests cannot clear newer associations
 - CandidateAuditAction now includes `RESUME_LINKED` and `RESUME_UNLINKED` for explicit manual Resume linking history
@@ -35,6 +39,7 @@
 - OpenAI-compatible Base URL normalization appends `/v1` when a root relay URL is configured
 
 ### Validation
+- CandidateApplication validation, service, API, UI helper, schema guard, and guarded real PostgreSQL transaction/concurrency tests
 - Candidate-Resume concurrency regression tests for atomic link, stale unlink, and real PostgreSQL concurrent linking
 - Candidate-Resume linking validation, repository, service, API, UI utility, schema guard, and guarded real PostgreSQL transaction rollback tests
 - Candidate transaction, changed-field audit, no-op PATCH, conflict response, and Prisma schema guard tests

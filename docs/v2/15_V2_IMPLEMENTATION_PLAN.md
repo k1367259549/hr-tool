@@ -75,6 +75,8 @@ Current V2 includes the AI Recruiter MVP workspace and Candidate CRM Foundation.
 
 Candidate CRM now also includes recruiter-confirmed manual Candidate-Resume linking. Candidate and Resume remain separate domain objects; linking and unlinking are explicit recruiter actions, transaction-safe, audited, and do not expose resume binaries or parsed full resume text through list/link APIs.
 
+Recruiting Pipeline Foundation now adds CandidateApplication and ApplicationEvent as the role-specific Pipeline owner. Candidate does not store a global current stage. Stage movement is manual, transaction-safe, audited, and protected by a PostgreSQL partial unique index that allows only one active Candidate + JobProfile application at a time.
+
 ### 2.2 Backend And API Structure
 
 The current backend uses Next.js Route Handlers under:
@@ -139,7 +141,7 @@ Prisma schema currently supports V1 and spreadsheet analysis:
 - UploadedSpreadsheet
 - SpreadsheetAnalysis
 
-V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, and Candidate CRM Foundation records.
+V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, Candidate CRM Foundation records, and Recruiting Pipeline Foundation records.
 
 Candidate CRM Foundation adds:
 
@@ -151,6 +153,16 @@ Candidate CRM Foundation adds:
 - manual link audit actions `RESUME_LINKED` and `RESUME_UNLINKED`
 
 Candidate records remain separate from Resume records. CandidateStatus is not a Pipeline stage.
+
+Recruiting Pipeline Foundation adds:
+
+- `ApplicationStage`
+- `ApplicationEventType`
+- `CandidateApplication`
+- `ApplicationEvent`
+- a PostgreSQL partial unique index for active Candidate + JobProfile applications
+
+Pipeline stage belongs to CandidateApplication, not Candidate.
 
 ### 2.5 AI Provider Abstraction
 
@@ -777,6 +789,14 @@ Acceptance criteria:
 - stage history is auditable
 - Offer decisions remain human decisions
 - no autonomous offer approval or rejection
+
+Current Pipeline Foundation delivered:
+
+- CandidateApplication links Candidate and reviewed JobProfile
+- one active Candidate + JobProfile application enforced by partial unique index
+- manual stage transition API and UI
+- ApplicationEvent stage history
+- no Interview records, Offer entity, drag-and-drop board, scoring, ranking, hire recommendation, reject recommendation, or Feishu sync
 
 ### Phase 11 - Talent Map
 
