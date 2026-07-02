@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Manual Candidate-Resume linking with recruiter confirmation, safe Resume metadata APIs, transactional link/unlink audit, available Resume search, conflict handling, and Candidate detail UI
+- Candidate-Resume Manual Linking architecture document
 - Candidate CRM Foundation with Candidate model, audit model, nullable CandidateResume link, manual CRUD APIs, search, filters, pagination, soft archive, restore, and `/feishu/candidates` UI
 - Candidate CRM Foundation architecture document
 - Documented v0.1 resume binary storage decision for PostgreSQL BYTEA and future object storage migration
@@ -15,6 +17,10 @@
 - V2 product specification document
 
 ### Changed
+- Candidate-Resume link now uses an atomic `candidateId IS NULL` conditional update and classifies zero-count updates as idempotent, conflict, or not found before writing audit
+- Candidate-Resume unlink now uses an atomic `candidateId = current Candidate` conditional update so stale unlink requests cannot clear newer associations
+- CandidateAuditAction now includes `RESUME_LINKED` and `RESUME_UNLINKED` for explicit manual Resume linking history
+- Candidate detail now refreshes Resume count and audit timeline after manual link or unlink
 - Candidate writes and CandidateAudit writes now run in one Prisma interactive transaction
 - Candidate UPDATED audit now stores only changed fields, including notes when notes change, without repeating unrelated email, phone, or notes data
 - Candidate archive and restore audit now store only status-related fields
@@ -29,6 +35,8 @@
 - OpenAI-compatible Base URL normalization appends `/v1` when a root relay URL is configured
 
 ### Validation
+- Candidate-Resume concurrency regression tests for atomic link, stale unlink, and real PostgreSQL concurrent linking
+- Candidate-Resume linking validation, repository, service, API, UI utility, schema guard, and guarded real PostgreSQL transaction rollback tests
 - Candidate transaction, changed-field audit, no-op PATCH, conflict response, and Prisma schema guard tests
 - Candidate CRM validation, service, API, reviewed Job Profile, Candidate Understanding, and resume boundary regression tests
 - Final PR #1 review validation completed after blocker fixes

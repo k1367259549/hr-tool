@@ -131,6 +131,8 @@ Candidate CRM Foundation is available at:
 
 It supports manually maintained Candidate profiles, search, filtering, pagination, soft archive, restore, resume counts, and audit timelines. Candidate records remain separate from Resume records; the app does not automatically create Candidates from resumes or automatically link resumes to Candidates.
 
+Candidate detail pages also support recruiter-confirmed manual Candidate-Resume linking. Recruiters can search unlinked resumes, confirm a link, confirm unlinking, and review audit history. Linking and unlinking are transactional and audited; unlinking does not delete the Candidate or Resume. The API returns safe resume metadata only and does not expose original resume binaries or parsed full resume text.
+
 Additional V2 placeholder routes remain available for future modules:
 
 ```text
@@ -160,11 +162,13 @@ Each AI output must be reviewed and saved by the recruiter. The app does not aut
 
 Original resume binaries are stored in PostgreSQL for v0.1 small-scale use. See [docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md](docs/v2/27_RESUME_BINARY_STORAGE_DECISION.md) for the storage boundary and future migration direction.
 Candidate CRM Foundation is documented in [docs/v2/28_CANDIDATE_CRM_FOUNDATION.md](docs/v2/28_CANDIDATE_CRM_FOUNDATION.md).
+Manual Candidate-Resume linking is documented in [docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md](docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md).
 
 ### Release Notes v0.1 Beta
 
 - Connected AI Recruiter workflows from Workspace to Task Center.
 - Added Candidate CRM Foundation with manual Candidate CRUD, search, filtering, soft archive, restore, resume counts, and audit timeline.
+- Added manual Candidate-Resume linking with recruiter confirmation, transaction-safe audit, available Resume search, and unlink support.
 - Added shared workflow progress and recommended next-action navigation.
 - Unified V2 AI calls through one AI service pipeline with prompt registry, prompt builder, schema validation, retry, and observability.
 - Verified Docker startup, database connectivity, and V2 route reachability.
@@ -173,7 +177,7 @@ Candidate CRM Foundation is documented in [docs/v2/28_CANDIDATE_CRM_FOUNDATION.m
 
 - Feishu API integration is not connected.
 - ATS, Pipeline, Offer, Analytics, and Learning Assets are not implemented.
-- Candidate CRM has no authentication, multi-user permission model, Feishu contact sync, automatic resume linking, or automatic Candidate creation from resumes.
+- Candidate CRM has no authentication, multi-user permission model, Feishu contact sync, automatic resume matching, automatic resume linking, automatic resume transfer, or automatic Candidate creation from resumes.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
 - Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.

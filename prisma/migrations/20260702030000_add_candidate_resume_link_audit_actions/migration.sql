@@ -1,0 +1,2 @@
+ALTER TYPE "CandidateAuditAction" ADD VALUE 'RESUME_LINKED';
+ALTER TYPE "CandidateAuditAction" ADD VALUE 'RESUME_UNLINKED';

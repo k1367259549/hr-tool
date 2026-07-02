@@ -10,6 +10,7 @@ export function useCandidateDetail(candidateId: string): {
   error: string | null;
   isLoading: boolean;
   isSaving: boolean;
+  reloadCandidate: () => Promise<void>;
   restoreCandidate: () => Promise<void>;
   updateCandidate: (input: CandidateUpdateInput) => Promise<void>;
 } {
@@ -79,6 +80,7 @@ export function useCandidateDetail(candidateId: string): {
     error,
     isLoading,
     isSaving,
+    reloadCandidate: loadCandidate,
     restoreCandidate: async () =>
       mutateCandidate(
         () =>

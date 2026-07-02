@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CandidateForm } from "@/features/candidate-crm/components/CandidateForm";
+import { CandidateResumeLinkPanel } from "@/features/candidate-crm/components/CandidateResumeLinkPanel";
 import { CandidateStatusBadge } from "@/features/candidate-crm/components/CandidateStatusBadge";
+import type { useCandidateResumes } from "@/features/candidate-crm/hooks/useCandidateResumes";
 import type { CandidateDto, CandidateUpdateInput } from "@/types/candidate";
 
 type CandidateDetailProps = {
@@ -9,6 +11,7 @@ type CandidateDetailProps = {
   onArchive: () => Promise<void>;
   onRestore: () => Promise<void>;
   onUpdate: (input: CandidateUpdateInput) => Promise<void>;
+  resumeLinkState: ReturnType<typeof useCandidateResumes>;
 };
 
 export function CandidateDetail({
@@ -16,7 +19,8 @@ export function CandidateDetail({
   isSaving,
   onArchive,
   onRestore,
-  onUpdate
+  onUpdate,
+  resumeLinkState
 }: CandidateDetailProps): JSX.Element {
   return (
     <div className="space-y-6">
@@ -74,6 +78,22 @@ export function CandidateDetail({
           onSubmit={(input) => onUpdate(input as CandidateUpdateInput)}
         />
       </section>
+
+      <CandidateResumeLinkPanel
+        availableError={resumeLinkState.availableError}
+        availableFilters={resumeLinkState.availableFilters}
+        availableResult={resumeLinkState.availableResult}
+        candidateStatus={candidate.status}
+        conflictMessage={resumeLinkState.conflictMessage}
+        isLoadingAvailable={resumeLinkState.isLoadingAvailable}
+        isLoadingLinked={resumeLinkState.isLoadingLinked}
+        isMutating={resumeLinkState.isMutating}
+        linkedError={resumeLinkState.linkedError}
+        linkedResumes={resumeLinkState.candidateResumes}
+        onFilterChange={resumeLinkState.setAvailableFilters}
+        onLink={resumeLinkState.linkResume}
+        onUnlink={resumeLinkState.unlinkResume}
+      />
 
       <section className="rounded-md border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-950">审计时间线</h2>
