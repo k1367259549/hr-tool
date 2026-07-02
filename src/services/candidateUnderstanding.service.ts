@@ -152,6 +152,10 @@ async function findRequiredJobProfile(jobProfileId: string): Promise<JobProfile>
     throw new CandidateUnderstandingServiceError("NOT_FOUND", "未找到已确认的岗位画像。");
   }
 
+  if (!jobProfile.reviewedAt) {
+    throw new CandidateUnderstandingServiceError("VALIDATION_ERROR", "该岗位画像尚未完成人工确认。");
+  }
+
   return jobProfile;
 }
 

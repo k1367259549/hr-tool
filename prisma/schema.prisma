@@ -27,6 +27,19 @@ enum PlanPriority {
   HIGH
 }
 
+enum CandidateStatus {
+  ACTIVE
+  TALENT_POOL
+  ARCHIVED
+}
+
+enum CandidateAuditAction {
+  CREATED
+  UPDATED
+  ARCHIVED
+  RESTORED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -213,6 +226,7 @@ model CandidateResume {
   id              String   @id @default(uuid())
   workflowId      String
   jobProfileId    String
+  candidateId     String?
   fileName        String
   fileType        String
   fileSize        Int
@@ -228,11 +242,59 @@ model CandidateResume {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  candidate  Candidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   jobProfile JobProfile        @relation(fields: [jobProfileId], references: [id])
   insight    CandidateInsight?
 
   @@index([workflowId])
   @@index([jobProfileId])
+  @@index([candidateId])
+  @@index([createdAt])
+}
+
+model Candidate {
+  id               String          @id @default(uuid())
+  fullName         String
+  email            String?
+  phone            String?
+  currentCompany   String?
+  currentTitle     String?
+  targetRoles      String[]
+  sourceChannel    String?
+  owner            String?
+  tags             String[]
+  notes            String?
+  status           CandidateStatus @default(ACTIVE)
+  latestActivityAt DateTime        @default(now())
+  archivedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  resumes CandidateResume[]
+  audits  CandidateAudit[]
+
+  @@index([fullName])
+  @@index([status])
+  @@index([sourceChannel])
+  @@index([owner])
+  @@index([latestActivityAt])
+  @@index([createdAt])
+}
+
+model CandidateAudit {
+  id          String               @id @default(uuid())
+  candidateId String
+  action      CandidateAuditAction
+  actor       String
+  beforeValue Json?
+  afterValue  Json?
+  note        String?
+  createdAt   DateTime             @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@index([candidateId])
+  @@index([action])
   @@index([createdAt])
 }
 

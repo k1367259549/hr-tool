@@ -10,6 +10,7 @@ import type {
 const fallbackMessages: Record<StandardErrorCode, string> = {
   AI_ERROR: "AI 生成失败。",
   CONFIG_ERROR: "系统配置无效。",
+  CONFLICT: "资源冲突。",
   DATABASE_ERROR: "数据库请求失败。",
   NOT_FOUND: "资源不存在。",
   UNKNOWN_ERROR: "请求失败。",
@@ -19,6 +20,7 @@ const fallbackMessages: Record<StandardErrorCode, string> = {
 const statusByCode: Record<StandardErrorCode, number> = {
   AI_ERROR: 502,
   CONFIG_ERROR: 500,
+  CONFLICT: 409,
   DATABASE_ERROR: 500,
   NOT_FOUND: 404,
   UNKNOWN_ERROR: 500,
@@ -28,6 +30,7 @@ const statusByCode: Record<StandardErrorCode, number> = {
 const categoryByCode: Record<StandardErrorCode, ErrorCategory> = {
   AI_ERROR: "ai",
   CONFIG_ERROR: "config",
+  CONFLICT: "validation",
   DATABASE_ERROR: "database",
   NOT_FOUND: "not_found",
   UNKNOWN_ERROR: "unknown",
@@ -65,6 +68,10 @@ export function formatValidationIssues(issues: ValidationIssue[]): string {
 export function normalizeErrorCode(code: AppErrorCode | string): StandardErrorCode {
   if (code === "VALIDATION_ERROR") {
     return "VALIDATION_ERROR";
+  }
+
+  if (code === "CONFLICT" || code === "CONFLICT_ERROR") {
+    return "CONFLICT";
   }
 
   if (

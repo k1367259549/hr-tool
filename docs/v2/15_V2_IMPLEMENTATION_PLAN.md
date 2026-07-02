@@ -71,7 +71,7 @@ src/modules
 
 V1 feature UI lives under `src/features`. V2 Feishu skeleton pages already use `src/app/feishu` and `src/modules/feishu`.
 
-Current V2 page skeleton is static. It does not connect to database, AI, or Feishu APIs.
+Current V2 includes the AI Recruiter MVP workspace and Candidate CRM Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred non-Candidate modules remain placeholders and do not connect to Feishu APIs.
 
 ### 2.2 Backend And API Structure
 
@@ -137,7 +137,17 @@ Prisma schema currently supports V1 and spreadsheet analysis:
 - UploadedSpreadsheet
 - SpreadsheetAnalysis
 
-There are no V2 recruitment domain tables yet. That is intentional. V2 data modeling must be introduced only after an approved schema task.
+V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, and Candidate CRM Foundation records.
+
+Candidate CRM Foundation adds:
+
+- `CandidateStatus`
+- `CandidateAuditAction`
+- `Candidate`
+- `CandidateAudit`
+- nullable `CandidateResume.candidateId`
+
+Candidate records remain separate from Resume records. CandidateStatus is not a Pipeline stage.
 
 ### 2.5 AI Provider Abstraction
 
@@ -486,12 +496,22 @@ Goal:
 
 - Implement person-level candidate records separately from resumes.
 
-Deliverables:
+Delivered foundation:
 
-- Candidate model implementation
-- Candidate Library list/detail UI
+- Candidate model
+- Candidate audit model
+- nullable CandidateResume link
+- Candidate Library list, create, detail, edit, archive, and restore UI
+- Candidate API with search, filters, pagination, soft archive, restore, and standard errors
+- audit timeline
+- contact masking on list page
+- no automatic resume-to-candidate conversion
+- no automatic resume linking
+
+Remaining future deliverables:
+
 - link Resume to Candidate with recruiter confirmation
-- tags, notes, owner, target Job Profile references
+- target Job Profile references
 - candidate pipeline status placeholder per Job Profile
 
 Dependencies:
@@ -502,9 +522,9 @@ Dependencies:
 Affected files/directories:
 
 ```text
-src/modules/candidate-library
 src/app/feishu/candidates
-src/app/api/v2/candidates
+src/app/api/candidates
+src/features/candidate-crm
 src/services
 src/repositories
 src/types
@@ -517,11 +537,13 @@ Risks:
 - creating universal candidate status instead of role-contextual status
 - automatic duplicate merge
 
-Acceptance criteria:
+Foundation acceptance criteria:
 
 - Candidate and Resume remain separate
 - Candidate can link multiple Resumes
-- conversion and linking require explicit recruiter action
+- Candidate can exist without Resume
+- CandidateResume can exist without Candidate
+- conversion and linking require explicit recruiter action and are not automated
 - V1 Candidate-free workflows remain unaffected
 
 ### Phase 6 - Evaluation Result
@@ -1209,7 +1231,7 @@ Current codebase note:
 - Job Profile CRUD
 - Evaluation Template version foundation
 - Resume Library without AI parsing
-- Candidate Library without AI automation
+- Candidate Library explicit resume linking without automation
 - Evaluation Result review lifecycle
 
 ### P1
