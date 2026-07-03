@@ -14,3 +14,21 @@ export function isSupportedResumeFileName(fileName: string): boolean {
     getResumeFileExtension(fileName) as (typeof SUPPORTED_RESUME_FILE_EXTENSIONS)[number]
   );
 }
+
+export function getNormalizedResumeFileType(fileName: string): "PDF" | "DOCX" | "TXT" | null {
+  const extension = getResumeFileExtension(fileName);
+
+  if (extension === ".pdf") {
+    return "PDF";
+  }
+
+  if (extension === ".docx") {
+    return "DOCX";
+  }
+
+  if (extension === ".txt") {
+    return "TXT";
+  }
+
+  return null;
+}

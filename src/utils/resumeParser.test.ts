@@ -30,7 +30,7 @@ describe("parseResumeFile", () => {
     await expect(parseResumeFile(file as unknown as File)).resolves.toMatchObject({
       fileName: "resume.txt",
       fileSize: MAX_RESUME_FILE_SIZE_BYTES,
-      fileType: "text/plain"
+      fileType: "TXT"
     });
   });
 

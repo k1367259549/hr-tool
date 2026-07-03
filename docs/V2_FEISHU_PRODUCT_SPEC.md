@@ -115,24 +115,27 @@ Current implementation scope:
 
 ---
 
-## 4. Resume Upload And Parsing
+## 4. Resume Library And Parsing
 
-The Resume module manages resume intake and structured parsing.
+The Resume module manages independent Resume Library records and structured parsing.
 
 Purpose:
 
-- upload candidate resumes
-- extract structured resume information
-- link parsed resume data to Candidate CRM
-- prepare normalized data for AI evaluation and recruiter review
+- upload independent resume files
+- extract resume text without AI
+- keep parsing status, source, notes, and duplicate signals
+- display safe Candidate and initial Job Profile summaries when they exist
+- prepare normalized data for future AI evaluation and recruiter review
 
-Future resume parsing should support:
+Current Resume Library supports:
 
 - file upload validation
 - supported file type checks
 - resume text extraction
-- structured fields such as skills, experience, education, projects, and work history
-- candidate matching or candidate creation suggestions
+- PDF, DOCX, and TXT up to 10MB
+- search, filters, pagination, and linked/unlinked views
+- exact-file duplicate signals through non-unique SHA-256 `contentHash`
+- editable candidate source and notes
 
 Initial route:
 
@@ -142,10 +145,16 @@ Initial route:
 
 Current implementation scope:
 
-- page skeleton only
-- no file storage changes
-- no database schema changes
-- no real parsing pipeline
+- real Resume Library list, upload, and detail pages
+- `CandidateResume` remains the compatibility model name but now represents an independent Resume Library record
+- `jobProfileId` is nullable and only stores initial processing context when present
+- `intakeSource` distinguishes Resume Library uploads from Candidate Understanding uploads
+- original files remain in PostgreSQL BYTEA for the beta
+- no download or delete
+- no automatic Candidate creation
+- no automatic Candidate-Resume linking
+- no automatic duplicate merge
+- no AI evaluation or multi-job evaluation result in this milestone
 
 ---
 
@@ -376,7 +385,7 @@ Included in MVP:
 - `/feishu` entry
 - V2 navigation
 - Candidate CRM Foundation
-- Resume skeleton
+- Resume Library Foundation
 - Pipeline Foundation
 - Interview skeleton
 - Offer skeleton
@@ -410,9 +419,8 @@ Future versions may add:
 - Feishu calendar integration for interviews
 - Feishu approval integration for offers
 - advanced Candidate lifecycle workflows
-- explicit recruiter-reviewed Candidate-Resume linking
-- richer Resume Library management after manual linking is stable
-- Resume parsing persistence
+- richer Resume Library management after independent upload and manual linking are stable
+- Resume x Job Profile evaluation result
 - configurable Pipeline stages after the manual foundation is stable
 - Interview feedback forms
 - Offer approval and onboarding handoff
@@ -544,7 +552,7 @@ Completed UI structure:
 - V2 home page with module entry cards
 - V2 navigation for switching between Feishu pages
 - Candidate CRM list, create, and detail pages
-- Resume parsing placeholder page
+- Resume Library list, upload, and detail pages
 - Candidate Understanding entry card
 - Recruiting Pipeline board, Application create page, and Application detail page
 - Interview records placeholder page

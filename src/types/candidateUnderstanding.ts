@@ -108,7 +108,8 @@ export type CandidateInsightCreateInput = CandidateInsightOutput & {
 export type CandidateResume = {
   id: string;
   workflowId: string;
-  jobProfileId: string;
+  jobProfileId: string | null;
+  candidateId: string | null;
   fileName: string;
   fileType: string;
   fileSize: number;
@@ -121,6 +122,8 @@ export type CandidateResume = {
   resumeVersion: string;
   candidateSource: string | null;
   notes: string | null;
+  intakeSource: "RESUME_LIBRARY" | "CANDIDATE_UNDERSTANDING";
+  contentHash: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

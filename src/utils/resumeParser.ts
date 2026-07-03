@@ -2,6 +2,7 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import {
   getResumeFileExtension,
+  getNormalizedResumeFileType,
   isSupportedResumeFileName,
   MAX_RESUME_FILE_SIZE_BYTES,
   RESUME_FILE_SIZE_LIMIT_LABEL
@@ -43,16 +44,15 @@ export async function parseResumeFile(file: File | null): Promise<ParsedResumeFi
 
   const fileName = file.name;
   const extension = getResumeFileExtension(fileName);
+  const fileType = getNormalizedResumeFileType(fileName);
 
-  if (!isSupportedResumeFileName(fileName)) {
+  if (!isSupportedResumeFileName(fileName) || !fileType) {
     throw new ResumeParserError("UNSUPPORTED_FILE_TYPE", "仅支持 PDF、DOCX、TXT 简历。");
   }
 
   const arrayBuffer = await file.arrayBuffer();
   const originalFile = new Uint8Array(arrayBuffer);
-  const parsedText = normalizeParsedText(
-    await parseBufferByExtension(Buffer.from(arrayBuffer), extension)
-  );
+  const parsedText = normalizeParsedText(await safelyParseBuffer(Buffer.from(arrayBuffer), extension));
 
   if (parsedText.length === 0) {
     throw new ResumeParserError("RESUME_PARSE_ERROR", "未能从简历中解析出文本。");
@@ -61,10 +61,22 @@ export async function parseResumeFile(file: File | null): Promise<ParsedResumeFi
   return {
     fileName,
     fileSize: file.size,
-    fileType: file.type || extension.replace(".", ""),
+    fileType,
     originalFile,
     parsedText
   };
+}
+
+async function safelyParseBuffer(buffer: Buffer, extension: string): Promise<string> {
+  try {
+    return await parseBufferByExtension(buffer, extension);
+  } catch (error) {
+    if (error instanceof ResumeParserError) {
+      throw error;
+    }
+
+    throw new ResumeParserError("RESUME_PARSE_ERROR", "未能从简历中解析出文本。");
+  }
 }
 
 async function parseBufferByExtension(buffer: Buffer, extension: string): Promise<string> {

@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Resume Library Foundation with independent CandidateResume-based Resume records, standalone uploads, non-AI TXT/PDF/DOCX parsing, Resume list/detail pages, duplicate-file signals, safe APIs, and guarded PostgreSQL tests
+- Resume Library Foundation architecture document
 - Recruiting Pipeline Foundation with CandidateApplication, ApplicationEvent history, manual stage transitions, Pipeline board, Application create/detail pages, Candidate detail application entry, and guarded PostgreSQL concurrency tests
 - Recruiting Pipeline Foundation architecture document
 - Manual Candidate-Resume linking with recruiter confirmation, safe Resume metadata APIs, transactional link/unlink audit, available Resume search, conflict handling, and Candidate detail UI
@@ -19,6 +21,9 @@
 - V2 product specification document
 
 ### Changed
+- CandidateResume now supports independent Resume Library records through nullable `jobProfileId`, `ResumeIntakeSource`, and optional `contentHash`
+- Candidate Understanding now tags created Resume records with `CANDIDATE_UNDERSTANDING` and keeps reviewed Job Profile context
+- `/feishu/resumes` now shows a real Resume Library instead of a static placeholder
 - Candidate detail now shows role-specific Candidate Applications without writing a global current Pipeline stage to Candidate
 - `/feishu/pipeline` now shows a real manual Pipeline board instead of a static placeholder
 - Candidate-Resume link now uses an atomic `candidateId IS NULL` conditional update and classifies zero-count updates as idempotent, conflict, or not found before writing audit
@@ -39,6 +44,7 @@
 - OpenAI-compatible Base URL normalization appends `/v1` when a root relay URL is configured
 
 ### Validation
+- Resume Library validation, repository, service, API, UI helper, schema guard, and guarded real PostgreSQL tests
 - CandidateApplication validation, service, API, UI helper, schema guard, and guarded real PostgreSQL transaction/concurrency tests
 - Candidate-Resume concurrency regression tests for atomic link, stale unlink, and real PostgreSQL concurrent linking
 - Candidate-Resume linking validation, repository, service, API, UI utility, schema guard, and guarded real PostgreSQL transaction rollback tests
