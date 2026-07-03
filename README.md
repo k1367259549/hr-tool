@@ -155,7 +155,15 @@ Evaluation Template Foundation is available at:
 /feishu/evaluation-templates
 ```
 
-It supports configurable, versioned recruiting evaluation standards, Draft and Published versions, structured criteria, version history, and manual assignment to reviewed Job Profiles. Criteria do not contain scores, weights, thresholds, rankings, automatic rejection, or hiring recommendations. The module does not evaluate resumes or call AI; Resume Evaluation Result is deferred to a later milestone.
+It supports configurable, versioned recruiting evaluation standards, Draft and Published versions, structured criteria, version history, and manual assignment to reviewed Job Profiles. Criteria do not contain scores, weights, thresholds, rankings, automatic rejection, or hiring recommendations.
+
+Resume Evaluation Result Foundation is available at:
+
+```text
+/feishu/evaluations
+```
+
+It supports creating per-criterion evidence assessments for a Resume × JobProfile × EvaluationTemplateVersion context, DRAFT/REVIEWED lifecycle, optimistic concurrency via revision, event history, and evaluation entry points from the Resume detail page. Evaluations do not produce scores, rankings, weights, thresholds, or automatic pipeline movement.
 
 Additional V2 placeholder routes remain available for future modules:
 
@@ -188,6 +196,7 @@ Manual Candidate-Resume linking is documented in [docs/v2/29_CANDIDATE_RESUME_MA
 Recruiting Pipeline Foundation is documented in [docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md](docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md).
 Resume Library Foundation is documented in [docs/v2/31_RESUME_LIBRARY_FOUNDATION.md](docs/v2/31_RESUME_LIBRARY_FOUNDATION.md).
 Evaluation Template Foundation is documented in [docs/v2/32_EVALUATION_TEMPLATE_FOUNDATION.md](docs/v2/32_EVALUATION_TEMPLATE_FOUNDATION.md).
+Resume Evaluation Result Foundation is documented in [docs/v2/33_RESUME_EVALUATION_RESULT_FOUNDATION.md](docs/v2/33_RESUME_EVALUATION_RESULT_FOUNDATION.md).
 
 ### Release Notes v0.1 Beta
 
@@ -196,6 +205,7 @@ Evaluation Template Foundation is documented in [docs/v2/32_EVALUATION_TEMPLATE_
 - Added manual Candidate-Resume linking with recruiter confirmation, transaction-safe audit, available Resume search, and unlink support.
 - Added Recruiting Pipeline Foundation with Candidate Applications, manual stage transitions, stage history, and `/feishu/pipeline` pages.
 - Added Resume Library Foundation with independent uploads, non-AI parsing, safe detail views, duplicate signals, and `/feishu/resumes` pages.
+- Added Resume Evaluation Result Foundation with per-criterion evidence assessments, DRAFT/REVIEWED lifecycle, optimistic concurrency, event history, and `/feishu/evaluations` pages.
 - Added Evaluation Template Foundation with versioned criteria, Draft/Published lifecycle, reviewed Job Profile assignment, and `/feishu/evaluation-templates` pages.
 - Added shared workflow progress and recommended next-action navigation.
 - Unified V2 AI calls through one AI service pipeline with prompt registry, prompt builder, schema validation, retry, and observability.
@@ -206,7 +216,7 @@ Evaluation Template Foundation is documented in [docs/v2/32_EVALUATION_TEMPLATE_
 - Feishu API integration is not connected.
 - ATS, Offer, Analytics, and Learning Assets are not implemented.
 - Candidate CRM and Resume Library have no authentication, multi-user permission model, Feishu contact sync, automatic resume matching, automatic resume linking, automatic resume transfer, automatic duplicate merge, download, delete, or automatic Candidate creation from resumes.
-- Evaluation Template Foundation does not implement Resume Evaluation Result, AI evaluation, scoring, ranking, thresholds, automatic rejection, automatic hiring recommendations, or automatic Pipeline movement.
+- Evaluation Template Foundation does not implement AI evaluation, scoring, ranking, thresholds, automatic rejection, automatic hiring recommendations, or automatic Pipeline movement. Resume Evaluation Result records human evidence assessments only.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
 - Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.

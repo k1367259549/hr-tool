@@ -7,7 +7,7 @@ describe("Prisma schema safeguards", () => {
     const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
 
     expect(schema).toContain(
-      "candidate  Candidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)"
+      "candidate         Candidate?               @relation(fields: [candidateId], references: [id], onDelete: SetNull)"
     );
   });
 
@@ -59,7 +59,7 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain("enum ResumeIntakeSource");
     expect(schema).toContain("jobProfileId    String?");
     expect(schema).toContain(
-      "jobProfile JobProfile?       @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)"
+      "jobProfile        JobProfile?              @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)"
     );
     expect(schema).toContain("intakeSource    ResumeIntakeSource @default(CANDIDATE_UNDERSTANDING)");
     expect(schema).toContain("contentHash     String?");

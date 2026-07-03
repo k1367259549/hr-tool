@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Resume Evaluation Result Foundation with ResumeEvaluationResult, ResumeEvaluationEvent, DRAFT/REVIEWED lifecycle, per-criterion evidence assessments, optimistic concurrency via revision, evaluation entry points on Resume detail page, UI pages, APIs, and guarded PostgreSQL concurrency tests
+- Resume Evaluation Result Foundation architecture document
 - Evaluation Template Foundation with EvaluationTemplate, EvaluationTemplateVersion, JobProfileEvaluationAssignment, Draft/Published lifecycle, structured criteria, reviewed Job Profile assignment, UI, APIs, and guarded PostgreSQL concurrency tests
 - Evaluation Template Foundation architecture document
 - Resume Library Foundation with independent CandidateResume-based Resume records, standalone uploads, non-AI TXT/PDF/DOCX parsing, Resume list/detail pages, duplicate-file signals, safe APIs, and guarded PostgreSQL tests
