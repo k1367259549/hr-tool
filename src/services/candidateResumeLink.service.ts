@@ -254,6 +254,7 @@ function toSafeCandidateResumeDto(resume: SafeCandidateResume): SafeCandidateRes
     fileSize: resume.fileSize,
     fileType: resume.fileType,
     id: resume.id,
+    intakeSource: resume.intakeSource,
     originalName: resume.originalName,
     parsingStatus: resume.parsingStatus
   };

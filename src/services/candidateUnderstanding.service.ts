@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { validateCandidateUnderstandingAiOutput } from "@/ai/schemas/candidateUnderstanding.schema";
 import { aiService } from "@/ai/ai.service";
 import { candidateInsightRepository } from "@/repositories/candidateInsight.repository";
@@ -16,6 +16,7 @@ import type {
 } from "@/types/candidateUnderstanding";
 import type { JobProfile } from "@/types/jobProfile";
 import type { JsonValue } from "@/types/ai";
+import { getNormalizedResumeFileType } from "@/config/resume.config";
 import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { AppError } from "@/utils/errors";
 import { normalizeCandidateInsightOutput } from "@/utils/candidateUnderstandingValidation";
@@ -50,11 +51,14 @@ export const candidateUnderstandingService = {
       const parsedResume = await parseResumeFile(input.file);
       const structureChunks = createStructureChunks(parsedResume.parsedText);
       const semanticChunks = createSemanticChunks(structureChunks);
+      const contentHash = createContentHash(parsedResume.originalFile);
       const savedResume = await candidateResumeRepository.create({
         candidateSource: input.candidateSource,
+        contentHash,
         fileName: parsedResume.fileName,
         fileSize: parsedResume.fileSize,
         fileType: parsedResume.fileType,
+        intakeSource: "CANDIDATE_UNDERSTANDING",
         jobProfileId: jobProfile.id,
         notes: input.notes,
         originalFile: parsedResume.originalFile,
@@ -211,9 +215,11 @@ async function persistFailedResumeIfPossible({
 
     await candidateResumeRepository.create({
       candidateSource: input.candidateSource,
+      contentHash: createContentHash(originalFile),
       fileName: file.name,
       fileSize: file.size,
-      fileType: file.type || "unknown",
+      fileType: getNormalizedResumeFileType(file.name) ?? "unknown",
+      intakeSource: "CANDIDATE_UNDERSTANDING",
       jobProfileId,
       notes: input.notes,
       originalFile,
@@ -243,4 +249,8 @@ export function toCandidateInsightDto(insight: CandidateInsight): CandidateInsig
 
 function truncateText(value: string, maxLength: number): string {
   return value.length > maxLength ? `${value.slice(0, maxLength).trim()}...` : value;
+}
+
+function createContentHash(bytes: Uint8Array<ArrayBuffer>): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }

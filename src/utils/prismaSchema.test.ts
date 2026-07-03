@@ -42,4 +42,35 @@ describe("Prisma schema safeguards", () => {
     expect(migration).toContain("CandidateApplication_active_candidate_job_unique");
     expect(migration).toContain('WHERE "closedAt" IS NULL');
   });
+
+  it("keeps CandidateResume usable as an independent Resume Library record", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260702050000_add_resume_library_foundation",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum ResumeIntakeSource");
+    expect(schema).toContain("jobProfileId    String?");
+    expect(schema).toContain(
+      "jobProfile JobProfile?       @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)"
+    );
+    expect(schema).toContain("intakeSource    ResumeIntakeSource @default(CANDIDATE_UNDERSTANDING)");
+    expect(schema).toContain("contentHash     String?");
+    expect(schema).toContain("@@index([contentHash])");
+    expect(schema).toContain("@@index([parsingStatus])");
+    expect(schema).toContain("@@index([fileType])");
+    expect(schema).toContain("@@index([intakeSource])");
+    expect(schema).not.toContain("@@unique([contentHash])");
+    expect(migration).toContain("CREATE TYPE \"ResumeIntakeSource\"");
+    expect(migration).toContain('ALTER COLUMN "jobProfileId" DROP NOT NULL');
+    expect(migration).toContain("ON DELETE SET NULL");
+    expect(migration).toContain("CandidateResume_contentHash_idx");
+  });
 });

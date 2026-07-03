@@ -133,6 +133,14 @@ It supports manually maintained Candidate profiles, search, filtering, paginatio
 
 Candidate detail pages also support recruiter-confirmed manual Candidate-Resume linking. Recruiters can search unlinked resumes, confirm a link, confirm unlinking, and review audit history. Linking and unlinking are transactional and audited; unlinking does not delete the Candidate or Resume. The API returns safe resume metadata only and does not expose original resume binaries or parsed full resume text.
 
+Resume Library Foundation is available at:
+
+```text
+/feishu/resumes
+```
+
+It supports independent Resume records using the historical `CandidateResume` compatibility model, standalone uploads without Job Profiles, non-AI parsing for TXT/PDF/DOCX up to 10MB, parsed/failed states, search, filters, pagination, duplicate-file signals, Candidate association display, and metadata edits. Resume Library uploads do not create Candidates, link Candidates, evaluate against Job Profiles, score, rank, download, delete, or call Feishu.
+
 Recruiting Pipeline Foundation is available at:
 
 ```text
@@ -144,7 +152,6 @@ It supports manual Candidate Applications that connect one Candidate to one revi
 Additional V2 placeholder routes remain available for future modules:
 
 ```text
-/feishu/resumes
 /feishu/interviews
 /feishu/offers
 /feishu/report
@@ -171,6 +178,7 @@ Original resume binaries are stored in PostgreSQL for v0.1 small-scale use. See 
 Candidate CRM Foundation is documented in [docs/v2/28_CANDIDATE_CRM_FOUNDATION.md](docs/v2/28_CANDIDATE_CRM_FOUNDATION.md).
 Manual Candidate-Resume linking is documented in [docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md](docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md).
 Recruiting Pipeline Foundation is documented in [docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md](docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md).
+Resume Library Foundation is documented in [docs/v2/31_RESUME_LIBRARY_FOUNDATION.md](docs/v2/31_RESUME_LIBRARY_FOUNDATION.md).
 
 ### Release Notes v0.1 Beta
 
@@ -178,6 +186,7 @@ Recruiting Pipeline Foundation is documented in [docs/v2/30_RECRUITING_PIPELINE_
 - Added Candidate CRM Foundation with manual Candidate CRUD, search, filtering, soft archive, restore, resume counts, and audit timeline.
 - Added manual Candidate-Resume linking with recruiter confirmation, transaction-safe audit, available Resume search, and unlink support.
 - Added Recruiting Pipeline Foundation with Candidate Applications, manual stage transitions, stage history, and `/feishu/pipeline` pages.
+- Added Resume Library Foundation with independent uploads, non-AI parsing, safe detail views, duplicate signals, and `/feishu/resumes` pages.
 - Added shared workflow progress and recommended next-action navigation.
 - Unified V2 AI calls through one AI service pipeline with prompt registry, prompt builder, schema validation, retry, and observability.
 - Verified Docker startup, database connectivity, and V2 route reachability.
@@ -186,7 +195,7 @@ Recruiting Pipeline Foundation is documented in [docs/v2/30_RECRUITING_PIPELINE_
 
 - Feishu API integration is not connected.
 - ATS, Offer, Analytics, and Learning Assets are not implemented.
-- Candidate CRM has no authentication, multi-user permission model, Feishu contact sync, automatic resume matching, automatic resume linking, automatic resume transfer, or automatic Candidate creation from resumes.
+- Candidate CRM and Resume Library have no authentication, multi-user permission model, Feishu contact sync, automatic resume matching, automatic resume linking, automatic resume transfer, automatic duplicate merge, download, delete, or automatic Candidate creation from resumes.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
 - Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.

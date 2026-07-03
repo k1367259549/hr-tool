@@ -71,11 +71,13 @@ src/modules
 
 V1 feature UI lives under `src/features`. V2 Feishu skeleton pages already use `src/app/feishu` and `src/modules/feishu`.
 
-Current V2 includes the AI Recruiter MVP workspace and Candidate CRM Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred non-Candidate modules remain placeholders and do not connect to Feishu APIs.
+Current V2 includes the AI Recruiter MVP workspace, Candidate CRM Foundation, Recruiting Pipeline Foundation, and Resume Library Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred modules such as Interview, Offer, Report, Chat Summary, and Feishu Settings remain placeholders and do not connect to Feishu APIs.
 
 Candidate CRM now also includes recruiter-confirmed manual Candidate-Resume linking. Candidate and Resume remain separate domain objects; linking and unlinking are explicit recruiter actions, transaction-safe, audited, and do not expose resume binaries or parsed full resume text through list/link APIs.
 
 Recruiting Pipeline Foundation now adds CandidateApplication and ApplicationEvent as the role-specific Pipeline owner. Candidate does not store a global current stage. Stage movement is manual, transaction-safe, audited, and protected by a PostgreSQL partial unique index that allows only one active Candidate + JobProfile application at a time.
+
+Resume Library Foundation now keeps the historical `CandidateResume` table name while upgrading its business meaning to an independent Resume Library record. Resume records can exist without Candidate or Job Profile, store `intakeSource` and `contentHash`, support non-AI parsing, and expose `/feishu/resumes`, `/feishu/resumes/new`, and `/feishu/resumes/[id]`.
 
 ### 2.2 Backend And API Structure
 
@@ -163,6 +165,15 @@ Recruiting Pipeline Foundation adds:
 - a PostgreSQL partial unique index for active Candidate + JobProfile applications
 
 Pipeline stage belongs to CandidateApplication, not Candidate.
+
+Resume Library Foundation adds:
+
+- `ResumeIntakeSource`
+- nullable `CandidateResume.jobProfileId`
+- optional `CandidateResume.contentHash`
+- indexes for content hash, parsing status, file type, and intake source
+
+`CandidateResume` is retained as a compatibility model name. It now represents a Resume Library record and does not require Candidate or Job Profile ownership.
 
 ### 2.5 AI Provider Abstraction
 
@@ -464,15 +475,24 @@ Goal:
 
 - Implement resume intake as a library separate from Candidate.
 
-Deliverables:
+Delivered foundation:
 
-- Resume model implementation
-- original resume metadata
-- parsing status placeholders
-- source metadata
-- duplicate signal placeholders
-- Resume Library UI and APIs
-- no AI parsing yet
+- CandidateResume compatibility model upgraded to independent Resume Library semantics
+- nullable `jobProfileId`
+- `ResumeIntakeSource`
+- `contentHash` duplicate signal
+- original resume metadata and PostgreSQL BYTEA storage
+- non-AI parsing for TXT, PDF, and DOCX
+- parsing status and safe parsing errors
+- source metadata and notes
+- Resume Library list, upload, and detail UI
+- Resume Library APIs with search, filters, pagination, metadata update, and safe DTO boundaries
+
+Remaining future deliverables:
+
+- Resume x Job Profile evaluation result
+- existing Resume selection for AI evaluation
+- object storage migration after policy approval
 
 Dependencies:
 
@@ -498,12 +518,14 @@ Risks:
 - storing sensitive raw resume data in unsafe logs
 - overbuilding file storage before requirements are approved
 
-Acceptance criteria:
+Foundation acceptance criteria:
 
 - resumes can remain in Resume Library without Candidate conversion
 - original metadata and status are preserved
-- duplicate signals are reviewable placeholders only
-- no AI or Feishu integration required
+- duplicate signals are reviewable and do not block upload
+- Resume Library upload does not call AI
+- no Feishu integration required
+- no download, delete, automatic Candidate creation, automatic Candidate linking, scoring, ranking, or matching
 
 ### Phase 5 - Candidate Library
 
