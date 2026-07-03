@@ -64,6 +64,16 @@ enum ResumeIntakeSource {
   CANDIDATE_UNDERSTANDING
 }
 
+enum EvaluationTemplateStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum EvaluationTemplateVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -238,10 +248,11 @@ model JobProfile {
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
-  candidateResumes         CandidateResume[]
-  candidateInsights        CandidateInsight[]
-  recruitTogetherWorkflows RecruitTogetherWorkflow[]
-  applications             CandidateApplication[]
+  candidateResumes              CandidateResume[]
+  candidateInsights             CandidateInsight[]
+  recruitTogetherWorkflows      RecruitTogetherWorkflow[]
+  applications                  CandidateApplication[]
+  evaluationTemplateAssignments JobProfileEvaluationAssignment[]
 
   @@index([workflowId])
   @@index([createdAt])
@@ -369,6 +380,62 @@ model ApplicationEvent {
 
   @@index([applicationId, createdAt])
   @@index([eventType])
+}
+
+model EvaluationTemplate {
+  id                  String                   @id @default(cuid())
+  name                String
+  description         String?
+  status              EvaluationTemplateStatus @default(ACTIVE)
+  latestVersionNumber Int                      @default(0)
+  archivedAt          DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  versions EvaluationTemplateVersion[]
+
+  @@index([name])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model EvaluationTemplateVersion {
+  id            String                          @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  status        EvaluationTemplateVersionStatus @default(DRAFT)
+  criteria      Json
+  instructions  String?
+  changeNote    String?
+  createdBy     String?
+  publishedAt   DateTime?
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @updatedAt
+
+  template    EvaluationTemplate               @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  assignments JobProfileEvaluationAssignment[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId, status])
+  @@index([publishedAt])
+  @@index([createdAt])
+}
+
+model JobProfileEvaluationAssignment {
+  id                String    @id @default(cuid())
+  jobProfileId      String
+  templateVersionId String
+  assignedBy        String?
+  assignedAt        DateTime  @default(now())
+  endedAt           DateTime?
+
+  jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
+  templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+
+  @@index([jobProfileId])
+  @@index([templateVersionId])
+  @@index([endedAt])
+  @@index([assignedAt])
 }
 
 model CandidateInsight {

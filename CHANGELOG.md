@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Evaluation Template Foundation with EvaluationTemplate, EvaluationTemplateVersion, JobProfileEvaluationAssignment, Draft/Published lifecycle, structured criteria, reviewed Job Profile assignment, UI, APIs, and guarded PostgreSQL concurrency tests
+- Evaluation Template Foundation architecture document
 - Resume Library Foundation with independent CandidateResume-based Resume records, standalone uploads, non-AI TXT/PDF/DOCX parsing, Resume list/detail pages, duplicate-file signals, safe APIs, and guarded PostgreSQL tests
 - Resume Library Foundation architecture document
 - Recruiting Pipeline Foundation with CandidateApplication, ApplicationEvent history, manual stage transitions, Pipeline board, Application create/detail pages, Candidate detail application entry, and guarded PostgreSQL concurrency tests
@@ -21,6 +23,8 @@
 - V2 product specification document
 
 ### Changed
+- `/feishu/evaluation-templates` now provides configurable, versioned evaluation standards without AI scoring, weights, thresholds, ranking, or automatic decisions
+- Product Spec now reflects implemented Candidate Understanding behavior and separates historical V2 architecture boundaries from current product scope
 - CandidateResume now supports independent Resume Library records through nullable `jobProfileId`, `ResumeIntakeSource`, and optional `contentHash`
 - Candidate Understanding now tags created Resume records with `CANDIDATE_UNDERSTANDING` and keeps reviewed Job Profile context
 - `/feishu/resumes` now shows a real Resume Library instead of a static placeholder
@@ -44,6 +48,7 @@
 - OpenAI-compatible Base URL normalization appends `/v1` when a root relay URL is configured
 
 ### Validation
+- Evaluation Template validation, service, API, UI helper, schema guard, and guarded real PostgreSQL transaction/concurrency tests
 - Resume Library validation, repository, service, API, UI helper, schema guard, and guarded real PostgreSQL tests
 - CandidateApplication validation, service, API, UI helper, schema guard, and guarded real PostgreSQL transaction/concurrency tests
 - Candidate-Resume concurrency regression tests for atomic link, stale unlink, and real PostgreSQL concurrent linking

@@ -73,4 +73,42 @@ describe("Prisma schema safeguards", () => {
     expect(migration).toContain("ON DELETE SET NULL");
     expect(migration).toContain("CandidateResume_contentHash_idx");
   });
+
+  it("keeps CandidateInsight as the legacy Candidate Understanding compatibility object", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+
+    expect(schema).toContain("model CandidateInsight");
+    expect(schema).toContain("resumeId                      String    @unique");
+  });
+
+  it("keeps Evaluation Template versioning and assignment constraints in the migration", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260703050000_add_evaluation_template_foundation",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum EvaluationTemplateStatus");
+    expect(schema).toContain("enum EvaluationTemplateVersionStatus");
+    expect(schema).toContain("model EvaluationTemplate");
+    expect(schema).toContain("model EvaluationTemplateVersion");
+    expect(schema).toContain("model JobProfileEvaluationAssignment");
+    expect(schema).toContain("evaluationTemplateAssignments JobProfileEvaluationAssignment[]");
+    expect(schema).toContain("@@unique([templateId, versionNumber])");
+    expect(migration).toContain("EvaluationTemplateVersion_one_draft_per_template");
+    expect(migration).toContain('WHERE "status" = \'DRAFT\'');
+    expect(migration).toContain("JobProfileEvaluationAssignment_one_active_per_job_profile");
+    expect(migration).toContain('WHERE "endedAt" IS NULL');
+    expect(migration).toContain("ON DELETE RESTRICT");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("CandidateInsight");
+    expect(migration).not.toContain("CandidateResume");
+    expect(migration).not.toContain("CandidateApplication");
+  });
 });
