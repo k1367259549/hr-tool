@@ -194,9 +194,44 @@ Rules:
 
 Current implementation scope:
 
-- architecture specification only
+- implemented Candidate Understanding workflow entry and backend AI decision-support flow
+- requires reviewed Job Profile context
+- persists CandidateResume and CandidateInsight compatibility records
+- keeps `CandidateInsight.resumeId @unique` for current Candidate Understanding compatibility
+- Candidate Understanding uploads are marked with `intakeSource = CANDIDATE_UNDERSTANDING`
 - no Feishu API integration
-- no persistence model change
+- no score, ranking, hire recommendation, reject recommendation, or automatic Pipeline movement
+
+---
+
+## 5A. Evaluation Templates
+
+Evaluation Templates define reusable, versioned recruiting evaluation standards.
+
+Purpose:
+
+- configure role-specific evaluation dimensions
+- preserve immutable historical standards through Template Versions
+- assign a Published Version to a reviewed Job Profile
+- prepare for future Resume x Job Profile Evaluation Results
+
+Current implementation scope:
+
+- Evaluation Template list, create, and detail pages
+- Template status lifecycle: ACTIVE and ARCHIVED
+- Version lifecycle: DRAFT and PUBLISHED
+- structured criteria with key, label, description, importance, and evidence guidance
+- manual assignment to reviewed Job Profiles
+- assignment history
+- PostgreSQL partial unique index for one Draft per Template
+- PostgreSQL partial unique index for one active assignment per Job Profile
+
+Explicit boundaries:
+
+- no Resume Evaluation Result yet
+- no AI evaluation
+- no score, weight, threshold, ranking, automatic rejection, hire recommendation, or automatic Pipeline movement
+- Published versions are immutable; changes require a new Draft
 
 ---
 
@@ -387,6 +422,7 @@ Included in MVP:
 - Candidate CRM Foundation
 - Resume Library Foundation
 - Pipeline Foundation
+- Evaluation Template Foundation
 - Interview skeleton
 - Offer skeleton
 - Feishu Settings skeleton
@@ -421,6 +457,7 @@ Future versions may add:
 - advanced Candidate lifecycle workflows
 - richer Resume Library management after independent upload and manual linking are stable
 - Resume x Job Profile evaluation result
+- AI evaluation that references a specific Evaluation Template Version
 - configurable Pipeline stages after the manual foundation is stable
 - Interview feedback forms
 - Offer approval and onboarding handoff
@@ -505,9 +542,9 @@ V2 Service
 
 ---
 
-## 13. Current Task Boundaries
+## 13. Historical Architecture Task Boundaries
 
-This architecture task only defines V2 direction and route/module boundaries.
+This section records the original V2 architecture-only task boundary. It is historical context, not the current product implementation status.
 
 Do not implement in this task:
 
@@ -539,6 +576,7 @@ Completed routes:
 /feishu
 /feishu/candidates
 /feishu/resumes
+/feishu/evaluation-templates
 /feishu/pipeline
 /feishu/interviews
 /feishu/offers
@@ -553,6 +591,7 @@ Completed UI structure:
 - V2 navigation for switching between Feishu pages
 - Candidate CRM list, create, and detail pages
 - Resume Library list, upload, and detail pages
+- Evaluation Template list, create, detail, version, and assignment pages
 - Candidate Understanding entry card
 - Recruiting Pipeline board, Application create page, and Application detail page
 - Interview records placeholder page
@@ -569,6 +608,7 @@ Current stage guarantees:
 - no V2 candidate score, ranking, hire recommendation, or reject recommendation
 - Candidate CRUD is manual and recruiter-controlled
 - Candidate and Resume remain separate; current linking is manual, recruiter-confirmed, audited, and never automatic
+- Evaluation Template criteria are versioned and never contain scoring, thresholds, ranking, automatic rejection, or hiring recommendations
 - Chinese HR recruiting scenario copy
 - route-level skeletons remain for deferred non-Candidate modules
 

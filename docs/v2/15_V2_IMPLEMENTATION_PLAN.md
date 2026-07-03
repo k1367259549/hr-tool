@@ -71,13 +71,15 @@ src/modules
 
 V1 feature UI lives under `src/features`. V2 Feishu skeleton pages already use `src/app/feishu` and `src/modules/feishu`.
 
-Current V2 includes the AI Recruiter MVP workspace, Candidate CRM Foundation, Recruiting Pipeline Foundation, and Resume Library Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred modules such as Interview, Offer, Report, Chat Summary, and Feishu Settings remain placeholders and do not connect to Feishu APIs.
+Current V2 includes the AI Recruiter MVP workspace, Candidate CRM Foundation, Recruiting Pipeline Foundation, Resume Library Foundation, and Evaluation Template Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred modules such as Interview, Offer, Report, Chat Summary, and Feishu Settings remain placeholders and do not connect to Feishu APIs.
 
 Candidate CRM now also includes recruiter-confirmed manual Candidate-Resume linking. Candidate and Resume remain separate domain objects; linking and unlinking are explicit recruiter actions, transaction-safe, audited, and do not expose resume binaries or parsed full resume text through list/link APIs.
 
 Recruiting Pipeline Foundation now adds CandidateApplication and ApplicationEvent as the role-specific Pipeline owner. Candidate does not store a global current stage. Stage movement is manual, transaction-safe, audited, and protected by a PostgreSQL partial unique index that allows only one active Candidate + JobProfile application at a time.
 
 Resume Library Foundation now keeps the historical `CandidateResume` table name while upgrading its business meaning to an independent Resume Library record. Resume records can exist without Candidate or Job Profile, store `intakeSource` and `contentHash`, support non-AI parsing, and expose `/feishu/resumes`, `/feishu/resumes/new`, and `/feishu/resumes/[id]`.
+
+Evaluation Template Foundation now adds configurable, versioned recruiting standards through `EvaluationTemplate`, `EvaluationTemplateVersion`, and `JobProfileEvaluationAssignment`. Templates support Draft and Published versions, reviewed Job Profile assignment, immutable Published history, and structured criteria without scores, weights, thresholds, rankings, automatic rejection, or hiring recommendations.
 
 ### 2.2 Backend And API Structure
 
@@ -143,7 +145,7 @@ Prisma schema currently supports V1 and spreadsheet analysis:
 - UploadedSpreadsheet
 - SpreadsheetAnalysis
 
-V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, Candidate CRM Foundation records, and Recruiting Pipeline Foundation records.
+V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, Candidate CRM Foundation records, Recruiting Pipeline Foundation records, and Evaluation Template Foundation records.
 
 Candidate CRM Foundation adds:
 
@@ -174,6 +176,18 @@ Resume Library Foundation adds:
 - indexes for content hash, parsing status, file type, and intake source
 
 `CandidateResume` is retained as a compatibility model name. It now represents a Resume Library record and does not require Candidate or Job Profile ownership.
+
+Evaluation Template Foundation adds:
+
+- `EvaluationTemplateStatus`
+- `EvaluationTemplateVersionStatus`
+- `EvaluationTemplate`
+- `EvaluationTemplateVersion`
+- `JobProfileEvaluationAssignment`
+- one Draft per Template enforced by a PostgreSQL partial unique index
+- one active assignment per Job Profile enforced by a PostgreSQL partial unique index
+
+Evaluation Template content is stored in versions and assigned to reviewed Job Profiles. It is not written into JobProfile, CandidateResume, Candidate, CandidateApplication, or CandidateInsight.
 
 ### 2.5 AI Provider Abstraction
 
@@ -436,11 +450,12 @@ Goal:
 
 Deliverables:
 
-- Evaluation Template and Template Version implementation
-- template lifecycle states
-- repository, service, API, validation
-- UI for template drafts and versions
-- template references to Job Profile where applicable
+- delivered Evaluation Template, Template Version, and Job Profile Assignment implementation
+- delivered ACTIVE/ARCHIVED Template lifecycle and DRAFT/PUBLISHED Version lifecycle
+- delivered repository, service, API, validation, and UI
+- delivered reviewed Job Profile assignment and assignment history
+- delivered partial unique indexes for one Draft per Template and one active assignment per Job Profile
+- deferred Resume Evaluation Result and AI evaluation to later milestones
 
 Dependencies:
 
@@ -449,8 +464,11 @@ Dependencies:
 Affected files/directories:
 
 ```text
-src/modules/evaluation-template
-src/app/api/v2/evaluation-templates
+src/features/evaluation-template
+src/app/feishu/evaluation-templates
+src/app/api/evaluation-templates
+src/app/api/evaluation-template-versions
+src/app/api/job-profiles/[id]/evaluation-template-assignment
 src/services
 src/repositories
 src/types
@@ -468,6 +486,8 @@ Acceptance criteria:
 - templates can remain empty
 - historical version references are possible
 - no scoring criteria or thresholds exist
+- Published versions are immutable
+- assignment only targets reviewed Job Profiles and Published Versions
 
 ### Phase 4 - Resume Library
 

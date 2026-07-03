@@ -149,6 +149,14 @@ Recruiting Pipeline Foundation is available at:
 
 It supports manual Candidate Applications that connect one Candidate to one reviewed Job Profile, stage board visibility, explicit stage transitions, and event timelines. Pipeline stage belongs to Candidate Application, not Candidate. The app does not automatically move stages, score candidates, rank candidates, recommend hire, recommend rejection, create Interview records, or create Offer records.
 
+Evaluation Template Foundation is available at:
+
+```text
+/feishu/evaluation-templates
+```
+
+It supports configurable, versioned recruiting evaluation standards, Draft and Published versions, structured criteria, version history, and manual assignment to reviewed Job Profiles. Criteria do not contain scores, weights, thresholds, rankings, automatic rejection, or hiring recommendations. The module does not evaluate resumes or call AI; Resume Evaluation Result is deferred to a later milestone.
+
 Additional V2 placeholder routes remain available for future modules:
 
 ```text
@@ -179,6 +187,7 @@ Candidate CRM Foundation is documented in [docs/v2/28_CANDIDATE_CRM_FOUNDATION.m
 Manual Candidate-Resume linking is documented in [docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md](docs/v2/29_CANDIDATE_RESUME_MANUAL_LINKING.md).
 Recruiting Pipeline Foundation is documented in [docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md](docs/v2/30_RECRUITING_PIPELINE_FOUNDATION.md).
 Resume Library Foundation is documented in [docs/v2/31_RESUME_LIBRARY_FOUNDATION.md](docs/v2/31_RESUME_LIBRARY_FOUNDATION.md).
+Evaluation Template Foundation is documented in [docs/v2/32_EVALUATION_TEMPLATE_FOUNDATION.md](docs/v2/32_EVALUATION_TEMPLATE_FOUNDATION.md).
 
 ### Release Notes v0.1 Beta
 
@@ -187,6 +196,7 @@ Resume Library Foundation is documented in [docs/v2/31_RESUME_LIBRARY_FOUNDATION
 - Added manual Candidate-Resume linking with recruiter confirmation, transaction-safe audit, available Resume search, and unlink support.
 - Added Recruiting Pipeline Foundation with Candidate Applications, manual stage transitions, stage history, and `/feishu/pipeline` pages.
 - Added Resume Library Foundation with independent uploads, non-AI parsing, safe detail views, duplicate signals, and `/feishu/resumes` pages.
+- Added Evaluation Template Foundation with versioned criteria, Draft/Published lifecycle, reviewed Job Profile assignment, and `/feishu/evaluation-templates` pages.
 - Added shared workflow progress and recommended next-action navigation.
 - Unified V2 AI calls through one AI service pipeline with prompt registry, prompt builder, schema validation, retry, and observability.
 - Verified Docker startup, database connectivity, and V2 route reachability.
@@ -196,6 +206,7 @@ Resume Library Foundation is documented in [docs/v2/31_RESUME_LIBRARY_FOUNDATION
 - Feishu API integration is not connected.
 - ATS, Offer, Analytics, and Learning Assets are not implemented.
 - Candidate CRM and Resume Library have no authentication, multi-user permission model, Feishu contact sync, automatic resume matching, automatic resume linking, automatic resume transfer, automatic duplicate merge, download, delete, or automatic Candidate creation from resumes.
+- Evaluation Template Foundation does not implement Resume Evaluation Result, AI evaluation, scoring, ranking, thresholds, automatic rejection, automatic hiring recommendations, or automatic Pipeline movement.
 - AI generation depends on the configured provider and network availability.
 - Resume parsing supports TXT, PDF, and DOCX only.
 - Original resume binaries currently use PostgreSQL BYTEA storage and are limited to small-scale v0.1 usage.

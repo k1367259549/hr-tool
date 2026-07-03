@@ -41,11 +41,26 @@ export const resumeEvaluationModule: FeishuModuleDefinition = {
   nextSteps: ["评估结果展示区", "岗位描述输入", "面试问题推荐"]
 };
 
+export const evaluationTemplateModule: FeishuModuleDefinition = {
+  title: "评价标准",
+  href: "/feishu/evaluation-templates",
+  marker: "ET",
+  description: "管理可配置、可版本化并可分配给已确认岗位画像的招聘评价标准。",
+  placeholder: "评价标准已接入模板、版本和岗位分配基础，不自动执行简历评估。",
+  metrics: [
+    { label: "标准内容", value: "Versioned" },
+    { label: "岗位分配", value: "人工确认" },
+    { label: "自动决策", value: "不支持" }
+  ],
+  nextSteps: ["维护评价维度", "发布不可变版本", "分配给已确认岗位画像"]
+};
+
 export const feishuModules: FeishuModuleDefinition[] = [
   recruiterWorkspaceModule,
   recruitmentTaskCenterModule,
   dailyWorkspaceModule,
   jobProfileModule,
+  evaluationTemplateModule,
   candidateUnderstandingModule,
   recruitTogetherModule,
   candidateModule,
@@ -63,6 +78,7 @@ export const feishuHomeModules: FeishuModuleDefinition[] = [
   recruitmentTaskCenterModule,
   dailyWorkspaceModule,
   jobProfileModule,
+  evaluationTemplateModule,
   candidateUnderstandingModule,
   recruitTogetherModule,
   candidateModule,
