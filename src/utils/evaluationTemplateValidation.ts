@@ -108,16 +108,7 @@ export function parseAssignmentPayload(payload: unknown): EvaluationTemplateAssi
   };
 }
 
-function readOptionalCriteria(
-  body: Record<string, unknown>,
-  field: string
-): EvaluationCriterion[] | undefined {
-  if (!(field in body)) {
-    return undefined;
-  }
-
-  const value = body[field];
-
+export function parseEvaluationCriteriaJson(value: unknown): EvaluationCriterion[] {
   if (!Array.isArray(value)) {
     throw new EvaluationTemplateValidationError("criteria 必须是数组。");
   }
@@ -134,6 +125,23 @@ function readOptionalCriteria(
     seenKeys.add(criterion.key);
     return criterion;
   });
+}
+
+function readOptionalCriteria(
+  body: Record<string, unknown>,
+  field: string
+): EvaluationCriterion[] | undefined {
+  if (!(field in body)) {
+    return undefined;
+  }
+
+  const value = body[field];
+
+  if (!Array.isArray(value)) {
+    throw new EvaluationTemplateValidationError("criteria 必须是数组。");
+  }
+
+  return parseEvaluationCriteriaJson(value);
 }
 
 function parseCriterion(value: unknown, index: number): EvaluationCriterion {

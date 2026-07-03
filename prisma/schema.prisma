@@ -74,6 +74,18 @@ enum EvaluationTemplateVersionStatus {
   PUBLISHED
 }
 
+enum ResumeEvaluationStatus {
+  DRAFT
+  REVIEWED
+}
+
+enum ResumeEvaluationEventType {
+  CREATED
+  UPDATED
+  REVIEWED
+  REOPENED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -253,6 +265,7 @@ model JobProfile {
   recruitTogetherWorkflows      RecruitTogetherWorkflow[]
   applications                  CandidateApplication[]
   evaluationTemplateAssignments JobProfileEvaluationAssignment[]
+  resumeEvaluations             ResumeEvaluationResult[]
 
   @@index([workflowId])
   @@index([createdAt])
@@ -280,9 +293,10 @@ model CandidateResume {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  candidate  Candidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)
-  jobProfile JobProfile?       @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
-  insight    CandidateInsight?
+  candidate         Candidate?               @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  jobProfile        JobProfile?              @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  insight           CandidateInsight?
+  resumeEvaluations ResumeEvaluationResult[]
 
   @@index([workflowId])
   @@index([jobProfileId])
@@ -412,8 +426,9 @@ model EvaluationTemplateVersion {
   createdAt     DateTime                        @default(now())
   updatedAt     DateTime                        @updatedAt
 
-  template    EvaluationTemplate               @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  assignments JobProfileEvaluationAssignment[]
+  template          EvaluationTemplate               @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  assignments       JobProfileEvaluationAssignment[]
+  resumeEvaluations ResumeEvaluationResult[]
 
   @@unique([templateId, versionNumber])
   @@index([templateId, status])
@@ -606,4 +621,49 @@ model RecruitmentTaskAudit {
   @@index([taskId])
   @@index([action])
   @@index([createdAt])
+}
+
+model ResumeEvaluationResult {
+  id                String                 @id @default(cuid())
+  resumeId          String
+  jobProfileId      String
+  templateVersionId String
+  jobProfileVersion String
+  status            ResumeEvaluationStatus @default(DRAFT)
+  revision          Int                    @default(0)
+  criterionResults  Json
+  overallNote       String?
+  evaluatedBy       String?
+  reviewedAt        DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
+  jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
+  templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  events          ResumeEvaluationEvent[]
+
+  @@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")
+  @@index([resumeId])
+  @@index([jobProfileId])
+  @@index([templateVersionId])
+  @@index([status])
+  @@index([evaluatedBy])
+  @@index([updatedAt])
+  @@index([createdAt])
+}
+
+model ResumeEvaluationEvent {
+  id            String                    @id @default(cuid())
+  evaluationId  String
+  eventType     ResumeEvaluationEventType
+  actor         String?
+  changedFields String[]                  @default([])
+  note          String?
+  createdAt     DateTime                  @default(now())
+
+  evaluation ResumeEvaluationResult @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+
+  @@index([evaluationId, createdAt])
+  @@index([eventType])
 }

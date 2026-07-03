@@ -71,7 +71,7 @@ src/modules
 
 V1 feature UI lives under `src/features`. V2 Feishu skeleton pages already use `src/app/feishu` and `src/modules/feishu`.
 
-Current V2 includes the AI Recruiter MVP workspace, Candidate CRM Foundation, Recruiting Pipeline Foundation, Resume Library Foundation, and Evaluation Template Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred modules such as Interview, Offer, Report, Chat Summary, and Feishu Settings remain placeholders and do not connect to Feishu APIs.
+Current V2 includes the AI Recruiter MVP workspace, Candidate CRM Foundation, Recruiting Pipeline Foundation, Resume Library Foundation, Evaluation Template Foundation, and Resume Evaluation Result Foundation. Candidate CRM now connects through API routes, services, repositories, Prisma, and PostgreSQL. Deferred modules such as Interview, Offer, Report, Chat Summary, and Feishu Settings remain placeholders and do not connect to Feishu APIs.
 
 Candidate CRM now also includes recruiter-confirmed manual Candidate-Resume linking. Candidate and Resume remain separate domain objects; linking and unlinking are explicit recruiter actions, transaction-safe, audited, and do not expose resume binaries or parsed full resume text through list/link APIs.
 
@@ -145,7 +145,7 @@ Prisma schema currently supports V1 and spreadsheet analysis:
 - UploadedSpreadsheet
 - SpreadsheetAnalysis
 
-V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, Candidate CRM Foundation records, Recruiting Pipeline Foundation records, and Evaluation Template Foundation records.
+V2 recruitment domain tables now include Job Profile, Candidate Resume, Candidate Insight, Recruit Together workflow records, Daily Recruiting Workspace records, Recruitment Tasks, Candidate CRM Foundation records, Recruiting Pipeline Foundation records, Evaluation Template Foundation records, and Resume Evaluation Result Foundation records.
 
 Candidate CRM Foundation adds:
 
@@ -456,6 +456,16 @@ Deliverables:
 - delivered reviewed Job Profile assignment and assignment history
 - delivered partial unique indexes for one Draft per Template and one active assignment per Job Profile
 - deferred Resume Evaluation Result and AI evaluation to later milestones
+
+Resume Evaluation Result Foundation adds:
+
+- `ResumeEvaluationStatus`
+- `ResumeEvaluationEventType`
+- `ResumeEvaluationResult`
+- `ResumeEvaluationEvent`
+- composite unique context key `(resumeId, jobProfileId, templateVersionId, jobProfileVersion)`
+- optimistic concurrency via `revision` field
+- DRAFT/REVIEWED lifecycle with event history
 
 Dependencies:
 

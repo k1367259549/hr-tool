@@ -40,9 +40,23 @@ export function ResumeDetailPage({ resumeId }: { resumeId: string }): JSX.Elemen
             Resume 与 Candidate、Job Profile 分离维护。多岗位人工评估结果将在 MILESTONE-07 接入。
           </p>
         </div>
-        <Link href="/feishu/resumes" className="rounded-md border border-slate-300 px-4 py-2 text-sm">
-          返回简历库
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/feishu/evaluations/new?resumeId=${resumeId}`}
+            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+          >
+            新建评估
+          </Link>
+          <Link
+            href={`/feishu/evaluations?resumeId=${resumeId}`}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+          >
+            查看评估记录
+          </Link>
+          <Link href="/feishu/resumes" className="rounded-md border border-slate-300 px-4 py-2 text-sm">
+            返回简历库
+          </Link>
+        </div>
       </header>
 
       {error ? <ErrorState message={error} /> : null}
