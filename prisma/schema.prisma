@@ -81,6 +81,18 @@ enum ResumeEvaluationEventType {
   REOPENED
 }
 
+enum ResumeEvaluationRunType {
+  MOCK
+  RULE_BASED
+  AI
+}
+
+enum ResumeEvaluationRunStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
 enum ResumeParsingStatus {
   PARSED
   FAILED
@@ -266,6 +278,7 @@ model JobProfile {
   applications                  CandidateApplication[]
   evaluationTemplateAssignments JobProfileEvaluationAssignment[]
   resumeEvaluations             ResumeEvaluationResult[]
+  evaluationRuns                ResumeEvaluationRun[]
 
   @@index([workflowId])
   @@index([createdAt])
@@ -300,6 +313,7 @@ model CandidateResume {
   insight           CandidateInsight?
   revisions         ResumeRevision[]
   resumeEvaluations ResumeEvaluationResult[]
+  evaluationRuns    ResumeEvaluationRun[]
 
   @@index([workflowId])
   @@index([jobProfileId])
@@ -325,6 +339,7 @@ model ResumeRevision {
   resume            CandidateResume          @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   parsedSnapshot    ParsedSnapshot?
   resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationResumeRevision")
+  evaluationRuns    ResumeEvaluationRun[]
 
   @@unique([resumeId, revisionNumber])
   @@index([resumeId])
@@ -342,6 +357,7 @@ model ParsedSnapshot {
 
   revision          ResumeRevision           @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationParsedSnapshot")
+  evaluationRuns    ResumeEvaluationRun[]
 
   @@index([createdAt])
 }
@@ -467,6 +483,7 @@ model EvaluationTemplateVersion {
   template          EvaluationTemplate               @relation(fields: [templateId], references: [id], onDelete: Restrict)
   assignments       JobProfileEvaluationAssignment[]
   resumeEvaluations ResumeEvaluationResult[]
+  evaluationRuns    ResumeEvaluationRun[]
 
   @@unique([templateId, versionNumber])
   @@index([templateId, status])
@@ -684,6 +701,7 @@ model ResumeEvaluationResult {
   jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
   templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   events          ResumeEvaluationEvent[]
+  runs            ResumeEvaluationRun[]
 
   @@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")
   @@index([resumeId])
@@ -695,6 +713,58 @@ model ResumeEvaluationResult {
   @@index([evaluatedBy])
   @@index([updatedAt])
   @@index([createdAt])
+}
+
+model ResumeEvaluationRun {
+  id                       String                    @id @default(cuid())
+  evaluationId             String
+  resumeId                 String
+  resumeRevisionId         String
+  parsedSnapshotId         String
+  jobProfileId             String
+  templateVersionId        String
+  jobProfileVersion        String
+  runType                  ResumeEvaluationRunType
+  status                   ResumeEvaluationRunStatus
+  score                    Int?
+  rating                   String?
+  summary                  String?
+  strengthsJson            Json?
+  weaknessesJson           Json?
+  riskFlagsJson            Json?
+  evidenceJson             Json?
+  phoneScreenQuestionsJson Json?
+  interviewQuestionsJson   Json?
+  modelProvider            String?
+  modelName                String?
+  promptVersion            String?
+  inputHash                String?
+  outputHash               String?
+  rawOutputJson            Json?
+  parsedOutputJson         Json?
+  errorCode                String?
+  errorMessage             String?
+  latencyMs                Int?
+  createdAt                DateTime                  @default(now())
+  completedAt              DateTime?
+
+  evaluation      ResumeEvaluationResult    @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
+  resumeRevision  ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)
+  parsedSnapshot  ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)
+  jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
+  templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+
+  @@index([evaluationId])
+  @@index([resumeId])
+  @@index([resumeRevisionId])
+  @@index([parsedSnapshotId])
+  @@index([jobProfileId])
+  @@index([templateVersionId])
+  @@index([status])
+  @@index([runType])
+  @@index([createdAt])
+  @@index([evaluationId, status, createdAt])
 }
 
 model ResumeEvaluationEvent {

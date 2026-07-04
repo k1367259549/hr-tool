@@ -121,6 +121,7 @@ describe("Prisma schema safeguards", () => {
 
   it("adds ResumeEvaluationResult revision and snapshot refs without changing context uniqueness", () => {
     const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const evaluationResultModel = extractPrismaBlock(schema, "model ResumeEvaluationResult");
     const migration = readFileSync(
       join(
         process.cwd(),
@@ -147,12 +148,12 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain(
       '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
     );
-    expect(schema).not.toContain("model EvaluationRun");
-    expect(schema).not.toContain("model EvaluationPromptRun");
-    expect(schema).not.toContain("score             Int?");
-    expect(schema).not.toContain("rating            String?");
-    expect(schema).not.toContain("modelProvider");
-    expect(schema).not.toContain("promptVersion     String?");
+    expect(evaluationResultModel).not.toContain("selectedRunId");
+    expect(evaluationResultModel).not.toContain("latestRunId");
+    expect(evaluationResultModel).not.toContain("score");
+    expect(evaluationResultModel).not.toContain("rating");
+    expect(evaluationResultModel).not.toContain("modelProvider");
+    expect(evaluationResultModel).not.toContain("promptVersion");
 
     expect(migration).toContain('ADD COLUMN "resumeRevisionId" TEXT');
     expect(migration).toContain('ADD COLUMN "parsedSnapshotId" TEXT');
@@ -162,6 +163,83 @@ describe("Prisma schema safeguards", () => {
     expect(migration).toContain('REFERENCES "ParsedSnapshot"("id")');
     expect(migration).toContain("ON DELETE SET NULL");
     expect(migration).not.toContain("ResumeEvaluationResult_context_key");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toContain("SET NOT NULL");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
+  it("adds EvaluationRun foundation without changing the evaluation master context key", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const evaluationResultModel = extractPrismaBlock(schema, "model ResumeEvaluationResult");
+    const evaluationRunModel = extractPrismaBlock(schema, "model ResumeEvaluationRun");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260704130000_m07_b2_b_evaluation_run_foundation",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum ResumeEvaluationRunType");
+    expect(schema).toContain("enum ResumeEvaluationRunStatus");
+    expect(schema).toContain("MOCK");
+    expect(schema).toContain("RULE_BASED");
+    expect(schema).toContain("AI");
+    expect(schema).toContain("PENDING");
+    expect(schema).toContain("SUCCEEDED");
+    expect(schema).toContain("FAILED");
+    expect(schema).toContain("model ResumeEvaluationRun");
+    expect(schema).toContain("runs            ResumeEvaluationRun[]");
+    expect(schema).toContain("evaluationRuns                ResumeEvaluationRun[]");
+    expect(evaluationRunModel).toContain("evaluationId");
+    expect(evaluationRunModel).toContain("resumeRevisionId");
+    expect(evaluationRunModel).toContain("parsedSnapshotId");
+    expect(evaluationRunModel).toContain("rawOutputJson");
+    expect(evaluationRunModel).toContain(
+      "evaluation      ResumeEvaluationResult    @relation(fields: [evaluationId], references: [id], onDelete: Restrict)"
+    );
+    expect(evaluationRunModel).toContain(
+      "resumeRevision  ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)"
+    );
+    expect(evaluationRunModel).toContain(
+      "parsedSnapshot  ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)"
+    );
+    expect(evaluationRunModel).toContain("@@index([evaluationId])");
+    expect(evaluationRunModel).toContain("@@index([resumeId])");
+    expect(evaluationRunModel).toContain("@@index([resumeRevisionId])");
+    expect(evaluationRunModel).toContain("@@index([parsedSnapshotId])");
+    expect(evaluationRunModel).toContain("@@index([jobProfileId])");
+    expect(evaluationRunModel).toContain("@@index([templateVersionId])");
+    expect(evaluationRunModel).toContain("@@index([status])");
+    expect(evaluationRunModel).toContain("@@index([runType])");
+    expect(evaluationRunModel).toContain("@@index([createdAt])");
+    expect(evaluationRunModel).toContain("@@index([evaluationId, status, createdAt])");
+    expect(evaluationRunModel).not.toContain("@@unique");
+    expect(evaluationResultModel).not.toContain("selectedRunId");
+    expect(evaluationResultModel).not.toContain("latestRunId");
+    expect(evaluationResultModel).not.toContain("modelProvider");
+    expect(evaluationResultModel).not.toContain("modelName");
+    expect(evaluationResultModel).not.toContain("promptVersion");
+    expect(evaluationResultModel).toContain(
+      '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
+    );
+
+    expect(migration).toContain('CREATE TYPE "ResumeEvaluationRunType"');
+    expect(migration).toContain('CREATE TYPE "ResumeEvaluationRunStatus"');
+    expect(migration).toContain('CREATE TABLE "ResumeEvaluationRun"');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationRun_evaluationId_idx"');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationRun_evaluationId_status_createdAt_idx"');
+    expect(migration).toContain('REFERENCES "ResumeEvaluationResult"("id")');
+    expect(migration).toContain('REFERENCES "ResumeRevision"("id")');
+    expect(migration).toContain('REFERENCES "ParsedSnapshot"("id")');
+    expect(migration).toContain("ON DELETE RESTRICT");
+    expect(migration).not.toContain("ResumeEvaluationResult_context_key");
+    expect(migration).not.toContain("selectedRunId");
+    expect(migration).not.toContain("latestRunId");
     expect(migration).not.toContain("DROP TABLE");
     expect(migration).not.toContain("DROP COLUMN");
     expect(migration).not.toContain("SET NOT NULL");
@@ -199,3 +277,18 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toContain("CandidateApplication");
   });
 });
+
+function extractPrismaBlock(schema: string, blockStart: string): string {
+  const start = schema.indexOf(blockStart);
+
+  if (start === -1) {
+    return "";
+  }
+
+  const nextBlock = schema.indexOf("\nmodel ", start + blockStart.length);
+  const nextEnum = schema.indexOf("\nenum ", start + blockStart.length);
+  const candidates = [nextBlock, nextEnum].filter((index) => index > start);
+  const end = candidates.length > 0 ? Math.min(...candidates) : schema.length;
+
+  return schema.slice(start, end);
+}

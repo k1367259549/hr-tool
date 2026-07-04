@@ -3,8 +3,31 @@
 Version: V2.0 Draft
 System: hr-tool V2 / AI Recruiter
 Scope: MILESTONE-07B2-A - EvaluationRun / Rerun Semantics Architecture Decision
+Implementation Status: M07-B2-B EvaluationRun schema foundation implemented
 
 ---
+
+## Implementation Status
+
+M07-B2-B implements the first EvaluationRun foundation:
+
+- `ResumeEvaluationRun` schema, enum, indexes, and foreign-key relations
+- append-only repository methods for creating and listing runs
+- MOCK run service foundation for verifying the persistence boundary
+- safe run DTOs that omit `rawOutputJson`
+
+The existing `ResumeEvaluationResult_context_key` remains unchanged.
+
+Still not implemented:
+
+- `selectedRunId` / `latestRunId` on `ResumeEvaluationResult`
+- AI provider integration
+- prompt files for evaluation runs
+- real scoring, ranking, or matching
+- automatic rejection, hiring, or Candidate Pipeline movement
+- raw model output persistence by default
+
+Run records are append-only. M07-B2-B does not overwrite older runs and does not write run output back to `CandidateResume`.
 
 ## 1. Background
 
