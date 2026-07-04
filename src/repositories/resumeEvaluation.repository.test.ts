@@ -144,6 +144,41 @@ describe("resumeEvaluationRepository", () => {
     });
   });
 
+  it("finds evaluation context for reviewer decision binding", async () => {
+    vi.mocked(prisma.resumeEvaluationResult.findUnique).mockResolvedValueOnce({
+      id: "eval-1",
+      jobProfileId: "job-1",
+      jobProfileVersion: "2026-07-04T00:00:00.000Z",
+      resumeId: "resume-1",
+      reviewedAt: null,
+      reviewedBy: null,
+      reviewedRunId: null,
+      reviewerDecision: null,
+      reviewerNotes: null,
+      selectedRunId: "run-1",
+      templateVersionId: "template-version-1"
+    } as never);
+
+    await resumeEvaluationRepository.findEvaluationForReview("eval-1");
+
+    expect(prisma.resumeEvaluationResult.findUnique).toHaveBeenCalledWith({
+      select: {
+        id: true,
+        jobProfileId: true,
+        jobProfileVersion: true,
+        resumeId: true,
+        reviewedAt: true,
+        reviewedBy: true,
+        reviewedRunId: true,
+        reviewerDecision: true,
+        reviewerNotes: true,
+        selectedRunId: true,
+        templateVersionId: true
+      },
+      where: { id: "eval-1" }
+    });
+  });
+
   it("updates only selectedRunId on the evaluation master", async () => {
     vi.mocked(prisma.resumeEvaluationResult.update).mockResolvedValueOnce({
       id: "eval-1",
@@ -158,5 +193,37 @@ describe("resumeEvaluationRepository", () => {
       },
       where: { id: "eval-1" }
     });
+  });
+
+  it("updates only reviewer decision binding fields on the evaluation master", async () => {
+    const reviewedAt = new Date("2026-07-04T17:00:00.000Z");
+    vi.mocked(prisma.resumeEvaluationResult.update).mockResolvedValueOnce({
+      id: "eval-1",
+      reviewerDecision: "PASS"
+    } as never);
+
+    await resumeEvaluationRepository.updateReview("eval-1", {
+      reviewedAt,
+      reviewedBy: "kgj",
+      reviewedRunId: "run-1",
+      reviewerDecision: "PASS",
+      reviewerNotes: "Looks good"
+    });
+
+    expect(prisma.resumeEvaluationResult.update).toHaveBeenCalledWith({
+      data: {
+        reviewedAt,
+        reviewedBy: "kgj",
+        reviewedRunId: "run-1",
+        reviewerDecision: "PASS",
+        reviewerNotes: "Looks good"
+      },
+      where: { id: "eval-1" }
+    });
+    const updateCall = vi.mocked(prisma.resumeEvaluationResult.update).mock.calls[0]?.[0];
+
+    expect(updateCall?.data).not.toHaveProperty("selectedRunId");
+    expect(updateCall?.data).not.toHaveProperty("status");
+    expect(updateCall?.data).not.toHaveProperty("latestRunId");
   });
 });

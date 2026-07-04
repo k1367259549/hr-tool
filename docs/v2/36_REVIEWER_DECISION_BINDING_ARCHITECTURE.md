@@ -6,6 +6,37 @@ Scope: MILESTONE-07B2-F-A - Reviewer Decision / Review Binding Architecture Deci
 
 ---
 
+## Implementation Status
+
+M07-B2-F-B implements the reviewer decision binding foundation:
+
+- `ResumeEvaluationResult.reviewedRunId`
+- `ResumeEvaluationResult.reviewerDecision`
+- `ResumeEvaluationResult.reviewerNotes`
+- existing `ResumeEvaluationResult.reviewedAt` reused as review decision timestamp
+- `ResumeEvaluationResult.reviewedBy`
+- `PATCH /api/evaluations/[id]/review`
+
+Implemented behavior:
+
+- `manualReviewWithoutRunBasis` defaults to `false`
+- manual review without run basis requires `reviewerNotes`
+- `selectedRunId` remains mutable and separate from `reviewedRunId`
+- `reviewedRunId` is fixed at review submit time
+- later `selectedRunId` changes do not automatically update `reviewedRunId`
+- review submit does not update `selectedRunId`
+
+Still not implemented:
+
+- `latestRunId`
+- ReviewEvent append-only audit
+- AI provider integration
+- prompt files
+- ranking, matching, or Candidate Pipeline movement
+- automatic rejection or hiring
+
+---
+
 ## 1. Background
 
 M07-B2-E-B implements the selected-run foundation:
@@ -17,7 +48,7 @@ M07-B2-E-B implements the selected-run foundation:
 
 `selectedRunId` is the current review-basis pointer. HR can change it or clear it.
 
-`reviewerDecision`, `reviewerNotes`, `reviewedAt`, and `reviewedBy` are not implemented yet.
+`reviewerDecision`, `reviewerNotes`, `reviewedAt`, and `reviewedBy` are implemented by M07-B2-F-B.
 
 The latest successful run remains query-derived. Run creation does not automatically update `selectedRunId`.
 

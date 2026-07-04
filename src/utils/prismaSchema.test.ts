@@ -266,9 +266,6 @@ describe("Prisma schema safeguards", () => {
     expect(evaluationResultModel).toContain('runs            ResumeEvaluationRun[]     @relation("EvaluationRuns")');
     expect(evaluationResultModel).toContain("@@index([selectedRunId])");
     expect(evaluationResultModel).not.toContain("latestRunId");
-    expect(evaluationResultModel).not.toContain("reviewerDecision");
-    expect(evaluationResultModel).not.toContain("reviewerNotes");
-    expect(evaluationResultModel).not.toContain("reviewedBy");
     expect(evaluationResultModel).toContain(
       '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
     );
@@ -288,6 +285,62 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toContain("reviewerDecision");
     expect(migration).not.toContain("reviewerNotes");
     expect(migration).not.toContain("reviewedBy");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toContain("SET NOT NULL");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
+  it("adds reviewer decision binding with reviewedAt reuse and SetNull reviewedRunId", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const evaluationResultModel = extractPrismaBlock(schema, "model ResumeEvaluationResult");
+    const evaluationRunModel = extractPrismaBlock(schema, "model ResumeEvaluationRun");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260704170000_m07_b2_f_b_reviewer_decision_binding",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum ResumeReviewerDecision");
+    expect(schema).toContain("PASS");
+    expect(schema).toContain("REJECT");
+    expect(schema).toContain("HOLD");
+    expect(schema).toContain("NEEDS_MORE_INFO");
+    expect(evaluationResultModel).toContain("reviewedRunId     String?");
+    expect(evaluationResultModel).toContain("reviewerDecision  ResumeReviewerDecision?");
+    expect(evaluationResultModel).toContain("reviewerNotes     String?");
+    expect(evaluationResultModel).toContain("reviewedAt        DateTime?");
+    expect(evaluationResultModel).toContain("reviewedBy        String?");
+    expect(evaluationResultModel).toContain(
+      'reviewedRun     ResumeEvaluationRun?      @relation("ReviewedEvaluationRun", fields: [reviewedRunId], references: [id], onDelete: SetNull)'
+    );
+    expect(evaluationResultModel).toContain("@@index([reviewedRunId])");
+    expect(evaluationResultModel).toContain(
+      '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
+    );
+    expect(evaluationResultModel).not.toContain("latestRunId");
+    expect(evaluationRunModel).toContain(
+      'reviewedByEvaluations ResumeEvaluationResult[]  @relation("ReviewedEvaluationRun")'
+    );
+    expect(schema).not.toContain("model ReviewEvent");
+
+    expect(migration).toContain('CREATE TYPE "ResumeReviewerDecision"');
+    expect(migration).toContain('ADD COLUMN "reviewedRunId" TEXT');
+    expect(migration).toContain('ADD COLUMN "reviewerDecision" "ResumeReviewerDecision"');
+    expect(migration).toContain('ADD COLUMN "reviewerNotes" TEXT');
+    expect(migration).toContain('ADD COLUMN "reviewedBy" TEXT');
+    expect(migration).not.toContain('ADD COLUMN "reviewedAt"');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationResult_reviewedRunId_idx"');
+    expect(migration).toContain('REFERENCES "ResumeEvaluationRun"("id")');
+    expect(migration).toContain("ON DELETE SET NULL");
+    expect(migration).not.toContain("ResumeEvaluationResult_context_key");
+    expect(migration).not.toContain("latestRunId");
+    expect(migration).not.toContain("ReviewEvent");
     expect(migration).not.toContain("DROP TABLE");
     expect(migration).not.toContain("DROP COLUMN");
     expect(migration).not.toContain("SET NOT NULL");

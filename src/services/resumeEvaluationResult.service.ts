@@ -20,6 +20,7 @@ import type {
   ResumeEvaluationReopenInput,
   ResumeEvaluationResultDetailRecord,
   ResumeEvaluationReviewInput,
+  ResumeEvaluationSubmitReviewInput,
   ResumeEvaluationSummaryDto,
   ResumeEvaluationUpdateInput,
   ResumeCriterionResult,
@@ -36,6 +37,7 @@ const resumeEvaluationContextFields = [
   "templateVersionId",
   "jobProfileVersion"
 ] as const;
+const reviewerDecisions = ["PASS", "REJECT", "HOLD", "NEEDS_MORE_INFO"] as const;
 
 export class ResumeEvaluationResultServiceError extends Error {
   readonly code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND" | "CONFLICT";
@@ -409,6 +411,91 @@ export const resumeEvaluationResultService = {
     }
   },
 
+  async submitReview(
+    evaluationId: string,
+    input: ResumeEvaluationSubmitReviewInput
+  ): Promise<ResumeEvaluationDetailDto> {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const evaluation = await resumeEvaluationRepository.findEvaluationForReview(
+          evaluationId,
+          tx
+        );
+
+        if (!evaluation) {
+          throw new ResumeEvaluationResultServiceError("NOT_FOUND", "评估记录不存在。");
+        }
+
+        const manualReviewWithoutRunBasis = input.manualReviewWithoutRunBasis ?? false;
+        const reviewerNotes = input.reviewerNotes ?? null;
+        let reviewedRunId: string | null = null;
+
+        if (!reviewerDecisions.includes(input.reviewerDecision)) {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "reviewerDecision 参数无效。"
+          );
+        }
+
+        if (evaluation.selectedRunId) {
+          const selectedRun = await resumeEvaluationRunRepository.findRunForSelection(
+            evaluation.selectedRunId,
+            tx
+          );
+
+          if (!selectedRun) {
+            throw new ResumeEvaluationResultServiceError(
+              "NOT_FOUND",
+              "当前 selectedRunId 指向的评估 run 不存在。"
+            );
+          }
+
+          assertRunSelectableForEvaluation(evaluation, selectedRun);
+          reviewedRunId = evaluation.selectedRunId;
+        } else {
+          if (!manualReviewWithoutRunBasis) {
+            throw new ResumeEvaluationResultServiceError(
+              "VALIDATION_ERROR",
+              "提交 HR review 前必须先选择一个 SUCCEEDED run，或显式启用 manualReviewWithoutRunBasis。"
+            );
+          }
+
+          if (!reviewerNotes?.trim()) {
+            throw new ResumeEvaluationResultServiceError(
+              "VALIDATION_ERROR",
+              "manualReviewWithoutRunBasis = true 时 reviewerNotes 为必填项。"
+            );
+          }
+        }
+
+        await resumeEvaluationRepository.updateReview(
+          evaluationId,
+          {
+            reviewedAt: new Date(),
+            reviewedBy: input.actor ?? null,
+            reviewedRunId,
+            reviewerDecision: input.reviewerDecision,
+            reviewerNotes
+          },
+          tx
+        );
+
+        const updated = await resumeEvaluationRepository.findDetailById(evaluationId, tx);
+
+        if (!updated) {
+          throw new ResumeEvaluationResultServiceError(
+            "DATABASE_ERROR",
+            "提交 HR review 后读取失败。"
+          );
+        }
+
+        return toDetailDto(updated);
+      });
+    } catch (error) {
+      throw normalizeError(error, "提交 HR review 失败。");
+    }
+  },
+
   async getEvaluationOptions(resumeId: string): Promise<ResumeEvaluationOptionsDto> {
     try {
       const options = await resumeEvaluationRepository.listEvaluationOptions(resumeId);
@@ -446,7 +533,11 @@ function toSummaryDto(
     revision: number;
     overallNote: string | null;
     evaluatedBy: string | null;
+    reviewedRunId?: string | null;
+    reviewerDecision?: ResumeEvaluationSummaryDto["reviewerDecision"];
+    reviewerNotes?: string | null;
     reviewedAt: Date | null;
+    reviewedBy?: string | null;
     selectedRunId?: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -463,6 +554,10 @@ function toSummaryDto(
     resumeId: evaluation.resumeId,
     resumeRevisionId: evaluation.resumeRevisionId ?? null,
     reviewedAt: evaluation.reviewedAt?.toISOString() ?? null,
+    reviewedBy: evaluation.reviewedBy ?? null,
+    reviewedRunId: evaluation.reviewedRunId ?? null,
+    reviewerDecision: evaluation.reviewerDecision ?? null,
+    reviewerNotes: evaluation.reviewerNotes ?? null,
     revision: evaluation.revision,
     selectedRunId: evaluation.selectedRunId ?? null,
     status: evaluation.status,

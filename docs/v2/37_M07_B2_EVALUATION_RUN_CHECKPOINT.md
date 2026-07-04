@@ -6,6 +6,30 @@ Scope: MILESTONE-07B2 - EvaluationRun Foundation Checkpoint
 
 ---
 
+## Implementation Status
+
+M07-B2-F-B implements reviewer decision binding:
+
+- `reviewedRunId`
+- `reviewerDecision`
+- `reviewerNotes`
+- existing `reviewedAt` reused for review decision timestamp
+- `reviewedBy`
+- `PATCH /api/evaluations/[id]/review`
+
+Still deferred:
+
+- ReviewEvent append-only audit
+- `latestRunId`
+- AI provider integration
+- prompt files
+- real scoring
+- ranking or matching
+- automatic rejection or hiring
+- Candidate Pipeline movement
+
+---
+
 ## 1. Checkpoint Summary
 
 M07-B2 is building the auditable run foundation for Resume x JobProfile evaluation.
@@ -135,14 +159,17 @@ Implemented foundation:
 
 ### G. Reviewer Decision Architecture
 
-Designed but not implemented:
+Implemented in M07-B2-F-B:
 
-- future `reviewedRunId`
-- future `reviewerDecision`
-- future `reviewerNotes`
-- future `reviewedAt`
-- future `reviewedBy`
+- `reviewedRunId`
+- `reviewerDecision`
+- `reviewerNotes`
+- existing `reviewedAt` reused as review decision timestamp
+- `reviewedBy`
 - explicit `manualReviewWithoutRunBasis`
+
+Still deferred:
+
 - ReviewEvent as a deferred append-only audit enhancement
 
 The design separates current run selection from the historical run basis used for an HR decision.
@@ -160,15 +187,15 @@ CandidateResume
   -> ResumeEvaluationResult
   -> ResumeEvaluationRun[]
   -> selectedRunId
-  -> future reviewedRunId / reviewerDecision
+  -> reviewedRunId / reviewerDecision
 ```
 
 Meaning:
 
 - `latestSuccessfulRun` is query-derived from `ResumeEvaluationRun[]`.
 - `selectedRunId` is the current review-basis pointer.
-- `reviewedRunId` is the future evidence pointer captured when HR submits a decision.
-- `reviewerDecision` is the future HR decision on the evaluation master.
+- `reviewedRunId` is the evidence pointer captured when HR submits a decision.
+- `reviewerDecision` is the HR decision on the evaluation master.
 
 This keeps immutable run evidence separate from mutable human review state.
 
@@ -183,12 +210,12 @@ POST  /api/evaluations/[id]/runs
 GET   /api/evaluations/[id]/runs
 GET   /api/evaluations/[id]/runs/latest-successful
 PATCH /api/evaluations/[id]/selected-run
+PATCH /api/evaluations/[id]/review
 ```
 
 Not implemented:
 
 ```text
-PATCH /api/evaluations/[id]/review
 GET   /api/evaluations/[id] selected/latest/review combined detail
 AI run execution API
 RULE_BASED run execution API
@@ -202,11 +229,6 @@ review UI
 
 The following remain out of the current implementation:
 
-- `reviewerDecision`
-- `reviewerNotes`
-- `reviewedAt`
-- `reviewedBy`
-- `reviewedRunId`
 - ReviewEvent
 - `latestRunId`
 - AI provider integration
@@ -238,35 +260,36 @@ The following remain out of the current implementation:
 
 ## 8. Current Risks And Technical Debt
 
-- `reviewerDecision` is not implemented, so the human review loop is not complete.
-- `reviewedRunId` is not implemented, so HR decision evidence capture is not complete.
+- ReviewEvent append-only audit is deferred, so review history is still stored as current master state rather than an immutable event timeline.
+- overwrite of existing `reviewerDecision` is allowed in the first version and should be revisited when audit requirements harden.
 - `latestSuccessfulRun` is query-derived; large list-page displays may eventually need denormalized `latestRunId` or an aggregate read model.
 - `rawOutputJson` defaults to not being saved, but AI integration still needs dedicated privacy guard tests.
 - AI provider `errorMessage` values must be safely sanitized before persistence or API return.
 - PostgreSQL and Docker environment validation still needs to be rerun where local services are available.
-- ReviewEvent append-only audit is deferred.
 - permissions, actor identity, and multi-tenant ownership validation are deferred.
 
 ---
 
 ## 9. Recommended Next Routes
 
-### Route A: Finish Human Review Loop
+### Route A: Stabilize Human Review Loop
 
 Tasks:
 
-- M07-B2-F-B reviewedRunId + reviewerDecision schema/API
+- review detail read model
+- review UI contract
+- optional ReviewEvent architecture
 
 Pros:
 
-- completes the evaluation review loop
-- makes HR decisions traceable to a stable run basis
-- keeps AI output clearly separated from human decision
+- improves usability and audit readiness
+- keeps AI output separated from HR decision
+- prepares review state for future recruiter-facing UI
 
 Cons:
 
-- adds more fields to the evaluation master
-- increases review validation and workflow complexity
+- delays rule-based or AI run work
+- ReviewEvent architecture may add audit model complexity
 
 ### Route B: Enter Rule-Based Run
 
@@ -282,8 +305,8 @@ Pros:
 
 Cons:
 
-- HR review still remains incomplete
 - rule output can only stay at suggestion level until review lands
+- deterministic output may not fully exercise AI prompt and provider failure modes
 
 ### Route C: Prepare AI Run
 
@@ -300,24 +323,39 @@ Pros:
 
 Cons:
 
-- without `reviewerDecision`, AI output remains suggestion-only
 - privacy, sanitization, prompt governance, and error handling risks increase
+- AI provider work before rule-based output may make debugging harder
 
 Recommendation:
 
-Prioritize Route A. Finish the human review loop first, then proceed to rule-based or AI runs.
+Prioritize Route B next. `reviewerDecision` and `reviewedRunId` are now in place, so a deterministic rule-based output schema is the safer next step before AI provider work.
 
 ---
 
 ## 10. Next Step Recommendation
 
-Recommended next task:
+Recommended next task options:
 
 ```text
-M07-B2-F-B | reviewedRunId + reviewerDecision Schema/API
+M07-B3-A | rule-based output schema
+M07-B4-A | AI provider boundary
+ReviewEvent architecture, if stronger audit is required
 ```
 
-Boundaries for that task should remain strict:
+Current recommendation:
+
+```text
+M07-B3-A | rule-based output schema
+```
+
+Rationale:
+
+- `reviewerDecision` is implemented.
+- `reviewedRunId` is implemented.
+- deterministic rule-based runs can validate structured output before AI provider risk.
+- keeping AI out of the next step preserves a smaller debugging surface.
+
+Boundaries for the next task should remain strict:
 
 - still do not connect an AI provider
 - still do not implement Candidate Pipeline movement

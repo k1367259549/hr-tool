@@ -93,6 +93,13 @@ enum ResumeEvaluationRunStatus {
   FAILED
 }
 
+enum ResumeReviewerDecision {
+  PASS
+  REJECT
+  HOLD
+  NEEDS_MORE_INFO
+}
+
 enum ResumeParsingStatus {
   PARSED
   FAILED
@@ -679,27 +686,32 @@ model RecruitmentTaskAudit {
 }
 
 model ResumeEvaluationResult {
-  id                String                 @id @default(cuid())
+  id                String                  @id @default(cuid())
   resumeId          String
   resumeRevisionId  String?
   parsedSnapshotId  String?
   selectedRunId     String?
+  reviewedRunId     String?
   jobProfileId      String
   templateVersionId String
   jobProfileVersion String
-  status            ResumeEvaluationStatus @default(DRAFT)
-  revision          Int                    @default(0)
+  status            ResumeEvaluationStatus  @default(DRAFT)
+  revision          Int                     @default(0)
   criterionResults  Json
   overallNote       String?
   evaluatedBy       String?
+  reviewerDecision  ResumeReviewerDecision?
+  reviewerNotes     String?
   reviewedAt        DateTime?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  reviewedBy        String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
   resumeRevision  ResumeRevision?           @relation("EvaluationResumeRevision", fields: [resumeRevisionId], references: [id], onDelete: SetNull)
   parsedSnapshot  ParsedSnapshot?           @relation("EvaluationParsedSnapshot", fields: [parsedSnapshotId], references: [id], onDelete: SetNull)
   selectedRun     ResumeEvaluationRun?      @relation("SelectedEvaluationRun", fields: [selectedRunId], references: [id], onDelete: SetNull)
+  reviewedRun     ResumeEvaluationRun?      @relation("ReviewedEvaluationRun", fields: [reviewedRunId], references: [id], onDelete: SetNull)
   jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
   templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   events          ResumeEvaluationEvent[]
@@ -710,6 +722,7 @@ model ResumeEvaluationResult {
   @@index([resumeRevisionId])
   @@index([parsedSnapshotId])
   @@index([selectedRunId])
+  @@index([reviewedRunId])
   @@index([jobProfileId])
   @@index([templateVersionId])
   @@index([status])
@@ -758,6 +771,7 @@ model ResumeEvaluationRun {
   jobProfile            JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
   templateVersion       EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   selectedByEvaluations ResumeEvaluationResult[]  @relation("SelectedEvaluationRun")
+  reviewedByEvaluations ResumeEvaluationResult[]  @relation("ReviewedEvaluationRun")
 
   @@index([evaluationId])
   @@index([resumeId])

@@ -5,10 +5,12 @@ import type {
   ResumeEvaluationListQuery,
   ResumeEvaluationReopenInput,
   ResumeEvaluationReviewInput,
+  ResumeEvaluationSubmitReviewInput,
   ResumeEvaluationUpdateInput
 } from "@/types/resumeEvaluationResult";
 
 const evaluationStatuses = ["DRAFT", "REVIEWED"] as const;
+const reviewerDecisions = ["PASS", "REJECT", "HOLD", "NEEDS_MORE_INFO"] as const;
 const criterionAssessments = [
   "NOT_ASSESSED",
   "SUPPORTED",
@@ -26,6 +28,12 @@ const createFields = [
 ] as const;
 const updateFields = ["criterionResults", "overallNote", "evaluatedBy", "expectedRevision"] as const;
 const reviewFields = ["expectedRevision", "actor"] as const;
+const submitReviewFields = [
+  "reviewerDecision",
+  "reviewerNotes",
+  "manualReviewWithoutRunBasis",
+  "actor"
+] as const;
 const reopenFields = ["expectedRevision", "actor", "note"] as const;
 const criterionResultFields = [
   "criterionKey",
@@ -108,6 +116,37 @@ export function parseResumeEvaluationReviewPayload(
   return {
     actor: readNullableText(body, "actor", 120),
     expectedRevision: readRequiredInteger(body, "expectedRevision")
+  };
+}
+
+export function parseResumeEvaluationSubmitReviewPayload(
+  payload: unknown
+): ResumeEvaluationSubmitReviewInput {
+  const body = assertRecord(payload);
+  assertAllowedFields(body, submitReviewFields);
+
+  const manualReviewWithoutRunBasis = readOptionalBoolean(
+    body,
+    "manualReviewWithoutRunBasis",
+    false
+  );
+  const reviewerNotes = readNullableText(body, "reviewerNotes", 2000);
+
+  if (manualReviewWithoutRunBasis && !reviewerNotes) {
+    throw new ResumeEvaluationValidationError(
+      "manualReviewWithoutRunBasis = true 时 reviewerNotes 为必填项。"
+    );
+  }
+
+  return {
+    actor: readNullableText(body, "actor", 120),
+    manualReviewWithoutRunBasis,
+    reviewerDecision: readRequiredEnum(
+      body,
+      "reviewerDecision",
+      reviewerDecisions
+    ),
+    reviewerNotes
   };
 }
 
@@ -388,6 +427,44 @@ function readOptionalEnum<TValue extends string>(
   }
 
   return normalized as TValue;
+}
+
+function readRequiredEnum<TValue extends string>(
+  body: Record<string, unknown>,
+  field: string,
+  allowedValues: readonly TValue[]
+): TValue {
+  const value = body[field];
+
+  if (typeof value !== "string") {
+    throw new ResumeEvaluationValidationError(`${field} 为必填项。`);
+  }
+
+  const normalized = value.trim();
+
+  if (!allowedValues.includes(normalized as TValue)) {
+    throw new ResumeEvaluationValidationError(`${field} 参数无效。`);
+  }
+
+  return normalized as TValue;
+}
+
+function readOptionalBoolean(
+  body: Record<string, unknown>,
+  field: string,
+  fallback: boolean
+): boolean {
+  if (!(field in body)) {
+    return fallback;
+  }
+
+  const value = body[field];
+
+  if (typeof value !== "boolean") {
+    throw new ResumeEvaluationValidationError(`${field} 必须是布尔值。`);
+  }
+
+  return value;
 }
 
 function normalizeBoundedText(value: string, field: string, maxLength: number): string {

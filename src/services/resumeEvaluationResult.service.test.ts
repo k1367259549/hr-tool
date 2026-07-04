@@ -22,6 +22,9 @@ const transactionClient = {
   candidateResume: {
     update: vi.fn()
   },
+  resumeEvaluationResult: {
+    update: vi.fn()
+  },
   resumeEvaluationRun: {
     delete: vi.fn(),
     update: vi.fn()
@@ -65,11 +68,13 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
   resumeEvaluationRepository: {
     createWithEvent: vi.fn(),
     findDetailById: vi.fn(),
+    findEvaluationForReview: vi.fn(),
     findEvaluationForSelectedRunUpdate: vi.fn(),
     list: vi.fn(),
     listEvaluationOptions: vi.fn(),
     reopenWithEvent: vi.fn(),
     reviewWithEvent: vi.fn(),
+    updateReview: vi.fn(),
     updateSelectedRun: vi.fn(),
     updateDraftWithEvent: vi.fn()
   }
@@ -148,6 +153,10 @@ function makeEvaluation(overrides?: object): ResumeEvaluationResultDetailRecord 
     resumeId: "resume-1",
     resumeRevisionId: null,
     reviewedAt: null,
+    reviewedBy: null,
+    reviewedRunId: null,
+    reviewerDecision: null,
+    reviewerNotes: null,
     revision: 0,
     selectedRunId: null,
     status: "DRAFT",
@@ -177,6 +186,23 @@ function makeSelectionEvaluation(overrides?: object) {
     jobProfileVersion: "2026-07-01T00:00:00.000Z",
     resumeId: "resume-1",
     selectedRunId: null,
+    templateVersionId: "tv-1",
+    ...overrides
+  };
+}
+
+function makeReviewEvaluation(overrides?: object) {
+  return {
+    id: "eval-1",
+    jobProfileId: "jp-1",
+    jobProfileVersion: "2026-07-01T00:00:00.000Z",
+    resumeId: "resume-1",
+    reviewedAt: null,
+    reviewedBy: null,
+    reviewedRunId: null,
+    reviewerDecision: null,
+    reviewerNotes: null,
+    selectedRunId: "run-1",
     templateVersionId: "tv-1",
     ...overrides
   };
@@ -687,6 +713,252 @@ describe("resumeEvaluationResultService.selectRunForReview", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("resumeEvaluationResultService.submitReview", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionClient.candidateResume.update.mockClear();
+    transactionClient.resumeEvaluationResult.update.mockClear();
+    transactionClient.resumeEvaluationRun.delete.mockClear();
+    transactionClient.resumeEvaluationRun.update.mockClear();
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValue(
+      makeReviewEvaluation() as never
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValue(
+      makeSelectableRun() as never
+    );
+    vi.mocked(resumeEvaluationRepository.updateReview).mockResolvedValue(
+      undefined as never
+    );
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValue(
+      makeEvaluation({
+        reviewedAt: new Date("2026-07-04T17:00:00.000Z"),
+        reviewedBy: "kgj",
+        reviewedRunId: "run-1",
+        reviewerDecision: "PASS",
+        reviewerNotes: "Looks good",
+        selectedRunId: "run-1"
+      })
+    );
+  });
+
+  it("writes reviewedRunId from selectedRunId for run-backed review", async () => {
+    const result = await resumeEvaluationResultService.submitReview("eval-1", {
+      actor: "kgj",
+      reviewerDecision: "PASS",
+      reviewerNotes: "Looks good"
+    });
+
+    expect(result).toMatchObject({
+      reviewedBy: "kgj",
+      reviewedRunId: "run-1",
+      reviewerDecision: "PASS",
+      reviewerNotes: "Looks good",
+      selectedRunId: "run-1"
+    });
+    expect(resumeEvaluationRepository.findEvaluationForReview).toHaveBeenCalledWith(
+      "eval-1",
+      transactionClient
+    );
+    expect(resumeEvaluationRunRepository.findRunForSelection).toHaveBeenCalledWith(
+      "run-1",
+      transactionClient
+    );
+    expect(resumeEvaluationRepository.updateReview).toHaveBeenCalledWith(
+      "eval-1",
+      expect.objectContaining({
+        reviewedBy: "kgj",
+        reviewedRunId: "run-1",
+        reviewerDecision: "PASS",
+        reviewerNotes: "Looks good"
+      }),
+      transactionClient
+    );
+  });
+
+  it("defaults manualReviewWithoutRunBasis to false and rejects review without selectedRunId", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValueOnce(
+      makeReviewEvaluation({ selectedRunId: null }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        reviewerDecision: "HOLD"
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
+  });
+
+  it("allows explicit manual review without run basis when notes are provided", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValueOnce(
+      makeReviewEvaluation({ selectedRunId: null }) as never
+    );
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+      makeEvaluation({
+        reviewedAt: new Date("2026-07-04T17:00:00.000Z"),
+        reviewedBy: "kgj",
+        reviewedRunId: null,
+        reviewerDecision: "NEEDS_MORE_INFO",
+        reviewerNotes: "Manual offline review",
+        selectedRunId: null
+      })
+    );
+
+    const result = await resumeEvaluationResultService.submitReview("eval-1", {
+      actor: "kgj",
+      manualReviewWithoutRunBasis: true,
+      reviewerDecision: "NEEDS_MORE_INFO",
+      reviewerNotes: "Manual offline review"
+    });
+
+    expect(result.reviewedRunId).toBeNull();
+    expect(resumeEvaluationRunRepository.findRunForSelection).not.toHaveBeenCalled();
+    expect(resumeEvaluationRepository.updateReview).toHaveBeenCalledWith(
+      "eval-1",
+      expect.objectContaining({
+        reviewedRunId: null,
+        reviewerDecision: "NEEDS_MORE_INFO",
+        reviewerNotes: "Manual offline review"
+      }),
+      transactionClient
+    );
+  });
+
+  it("rejects manual review without notes", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValueOnce(
+      makeReviewEvaluation({ selectedRunId: null }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        manualReviewWithoutRunBasis: true,
+        reviewerDecision: "PASS",
+        reviewerNotes: " "
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid reviewerDecision", async () => {
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        reviewerDecision: "INVALID" as never
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(resumeEvaluationRunRepository.findRunForSelection).not.toHaveBeenCalled();
+    expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing, non-succeeded, and mismatched selected runs", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(null);
+
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        reviewerDecision: "PASS"
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun({ status: "FAILED" }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        reviewerDecision: "PASS"
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun({ status: "PENDING" }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.submitReview("eval-1", {
+        reviewerDecision: "PASS"
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    const mismatchCases = [
+      { evaluationId: "other-eval" },
+      { resumeId: "other-resume" },
+      { jobProfileId: "other-job" },
+      { templateVersionId: "other-template" },
+      { jobProfileVersion: "other-version" }
+    ];
+
+    for (const mismatch of mismatchCases) {
+      vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+        makeSelectableRun(mismatch) as never
+      );
+
+      await expect(
+        resumeEvaluationResultService.submitReview("eval-1", {
+          reviewerDecision: "PASS"
+        })
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    }
+
+    expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
+  });
+
+  it("allows overwriting reviewerDecision and updates reviewedAt and reviewedBy", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValueOnce(
+      makeReviewEvaluation({
+        reviewedAt: new Date("2026-07-04T16:00:00.000Z"),
+        reviewedBy: "old-reviewer",
+        reviewedRunId: "old-run",
+        reviewerDecision: "HOLD",
+        reviewerNotes: "Old notes"
+      }) as never
+    );
+
+    await resumeEvaluationResultService.submitReview("eval-1", {
+      actor: "new-reviewer",
+      reviewerDecision: "REJECT",
+      reviewerNotes: "Updated notes"
+    });
+
+    expect(resumeEvaluationRepository.updateReview).toHaveBeenCalledWith(
+      "eval-1",
+      expect.objectContaining({
+        reviewedAt: expect.any(Date),
+        reviewedBy: "new-reviewer",
+        reviewedRunId: "run-1",
+        reviewerDecision: "REJECT",
+        reviewerNotes: "Updated notes"
+      }),
+      transactionClient
+    );
+  });
+
+  it("does not update selectedRunId, ResumeEvaluationRun, CandidateResume, or AI/provider state", async () => {
+    await resumeEvaluationResultService.submitReview("eval-1", {
+      actor: "kgj",
+      reviewerDecision: "PASS"
+    });
+
+    expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
+    expect(transactionClient.resumeEvaluationRun.update).not.toHaveBeenCalled();
+    expect(transactionClient.resumeEvaluationRun.delete).not.toHaveBeenCalled();
+    expect(transactionClient.candidateResume.update).not.toHaveBeenCalled();
+    expect(resumeEvaluationRunRepository.findLatestSuccessfulRun).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND when evaluation master does not exist", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForReview).mockResolvedValueOnce(null);
+
+    await expect(
+      resumeEvaluationResultService.submitReview("missing-eval", {
+        reviewerDecision: "PASS"
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
   });
 });
 

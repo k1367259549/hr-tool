@@ -4,6 +4,7 @@ import {
   parseResumeEvaluationListQuery,
   parseResumeEvaluationReopenPayload,
   parseResumeEvaluationReviewPayload,
+  parseResumeEvaluationSubmitReviewPayload,
   parseResumeEvaluationUpdatePayload,
   ResumeEvaluationValidationError
 } from "@/utils/resumeEvaluationValidation";
@@ -198,6 +199,61 @@ describe("parseResumeEvaluationReviewPayload", () => {
   it("rejects unknown fields", () => {
     expect(() =>
       parseResumeEvaluationReviewPayload({ expectedRevision: 0, x: "y" })
+    ).toThrow(ResumeEvaluationValidationError);
+  });
+});
+
+describe("parseResumeEvaluationSubmitReviewPayload", () => {
+  it("parses run-backed review and defaults manualReviewWithoutRunBasis to false", () => {
+    const result = parseResumeEvaluationSubmitReviewPayload({
+      actor: "kgj",
+      reviewerDecision: "PASS",
+      reviewerNotes: "Looks good"
+    });
+
+    expect(result).toEqual({
+      actor: "kgj",
+      manualReviewWithoutRunBasis: false,
+      reviewerDecision: "PASS",
+      reviewerNotes: "Looks good"
+    });
+  });
+
+  it("parses explicit manual review with notes", () => {
+    const result = parseResumeEvaluationSubmitReviewPayload({
+      actor: null,
+      manualReviewWithoutRunBasis: true,
+      reviewerDecision: "NEEDS_MORE_INFO",
+      reviewerNotes: "Manual offline review"
+    });
+
+    expect(result).toEqual({
+      actor: null,
+      manualReviewWithoutRunBasis: true,
+      reviewerDecision: "NEEDS_MORE_INFO",
+      reviewerNotes: "Manual offline review"
+    });
+  });
+
+  it("rejects invalid decision, extra fields, invalid actor, and manual review without notes", () => {
+    expect(() =>
+      parseResumeEvaluationSubmitReviewPayload({ reviewerDecision: "AI_PASS" })
+    ).toThrow(ResumeEvaluationValidationError);
+    expect(() =>
+      parseResumeEvaluationSubmitReviewPayload({ reviewerDecision: "PASS", x: "y" })
+    ).toThrow(ResumeEvaluationValidationError);
+    expect(() =>
+      parseResumeEvaluationSubmitReviewPayload({
+        actor: 123,
+        reviewerDecision: "PASS"
+      })
+    ).toThrow(ResumeEvaluationValidationError);
+    expect(() =>
+      parseResumeEvaluationSubmitReviewPayload({
+        manualReviewWithoutRunBasis: true,
+        reviewerDecision: "PASS",
+        reviewerNotes: " "
+      })
     ).toThrow(ResumeEvaluationValidationError);
   });
 });

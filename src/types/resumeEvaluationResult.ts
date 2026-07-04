@@ -1,6 +1,15 @@
-import type { Prisma, ResumeEvaluationEventType, ResumeEvaluationStatus } from "@prisma/client";
+import type {
+  Prisma,
+  ResumeEvaluationEventType,
+  ResumeEvaluationStatus,
+  ResumeReviewerDecision
+} from "@prisma/client";
 
-export type { ResumeEvaluationStatus, ResumeEvaluationEventType };
+export type {
+  ResumeEvaluationStatus,
+  ResumeEvaluationEventType,
+  ResumeReviewerDecision
+};
 
 export type CriterionEvidenceAssessment =
   | "NOT_ASSESSED"
@@ -37,6 +46,13 @@ export type ResumeEvaluationReviewInput = {
   actor?: string | null;
 };
 
+export type ResumeEvaluationSubmitReviewInput = {
+  reviewerDecision: ResumeReviewerDecision;
+  reviewerNotes?: string | null;
+  manualReviewWithoutRunBasis?: boolean;
+  actor?: string | null;
+};
+
 export type ResumeEvaluationReopenInput = {
   expectedRevision: number;
   actor?: string | null;
@@ -58,6 +74,7 @@ export type ResumeEvaluationSummaryDto = {
   resumeRevisionId: string | null;
   parsedSnapshotId: string | null;
   selectedRunId: string | null;
+  reviewedRunId: string | null;
   jobProfileId: string;
   templateVersionId: string;
   jobProfileVersion: string;
@@ -65,7 +82,10 @@ export type ResumeEvaluationSummaryDto = {
   revision: number;
   overallNote: string | null;
   evaluatedBy: string | null;
+  reviewerDecision: ResumeReviewerDecision | null;
+  reviewerNotes: string | null;
   reviewedAt: string | null;
+  reviewedBy: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, ResumeReviewerDecision } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { CandidateDbClient } from "@/repositories/candidate.repository";
 import type {
@@ -20,7 +20,11 @@ const evaluationListSelect = {
   parsedSnapshotId: true,
   resumeId: true,
   resumeRevisionId: true,
+  reviewedBy: true,
   reviewedAt: true,
+  reviewedRunId: true,
+  reviewerDecision: true,
+  reviewerNotes: true,
   revision: true,
   selectedRunId: true,
   status: true,
@@ -46,9 +50,28 @@ const selectedRunUpdateSelect = {
   templateVersionId: true
 } satisfies Prisma.ResumeEvaluationResultSelect;
 
+const reviewSelect = {
+  id: true,
+  jobProfileId: true,
+  jobProfileVersion: true,
+  resumeId: true,
+  reviewedAt: true,
+  reviewedBy: true,
+  reviewedRunId: true,
+  reviewerDecision: true,
+  reviewerNotes: true,
+  selectedRunId: true,
+  templateVersionId: true
+} satisfies Prisma.ResumeEvaluationResultSelect;
+
 export type ResumeEvaluationSelectedRunUpdateRecord =
   Prisma.ResumeEvaluationResultGetPayload<{
     select: typeof selectedRunUpdateSelect;
+  }>;
+
+export type ResumeEvaluationReviewRecord =
+  Prisma.ResumeEvaluationResultGetPayload<{
+    select: typeof reviewSelect;
   }>;
 
 export const resumeEvaluationRepository = {
@@ -149,6 +172,16 @@ export const resumeEvaluationRepository = {
     });
   },
 
+  async findEvaluationForReview(
+    evaluationId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<ResumeEvaluationReviewRecord | null> {
+    return client.resumeEvaluationResult.findUnique({
+      select: reviewSelect,
+      where: { id: evaluationId }
+    });
+  },
+
   async updateSelectedRun(
     evaluationId: string,
     selectedRunId: string | null,
@@ -157,6 +190,29 @@ export const resumeEvaluationRepository = {
     await client.resumeEvaluationResult.update({
       data: {
         selectedRunId
+      },
+      where: { id: evaluationId }
+    });
+  },
+
+  async updateReview(
+    evaluationId: string,
+    input: {
+      reviewedRunId: string | null;
+      reviewerDecision: ResumeReviewerDecision;
+      reviewerNotes: string | null;
+      reviewedAt: Date;
+      reviewedBy: string | null;
+    },
+    client: CandidateDbClient = prisma
+  ): Promise<void> {
+    await client.resumeEvaluationResult.update({
+      data: {
+        reviewedAt: input.reviewedAt,
+        reviewedBy: input.reviewedBy,
+        reviewedRunId: input.reviewedRunId,
+        reviewerDecision: input.reviewerDecision,
+        reviewerNotes: input.reviewerNotes
       },
       where: { id: evaluationId }
     });
