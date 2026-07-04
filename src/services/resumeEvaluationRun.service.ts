@@ -91,7 +91,9 @@ export const resumeEvaluationRunService = {
     }
   },
 
-  async getLatestSuccessfulRun(evaluationId: string): Promise<ResumeEvaluationRunDto | null> {
+  async getLatestSuccessfulRunByEvaluationId(
+    evaluationId: string
+  ): Promise<ResumeEvaluationRunDto | null> {
     try {
       const run = await resumeEvaluationRunRepository.findLatestSuccessfulRun(evaluationId);
 
@@ -99,6 +101,10 @@ export const resumeEvaluationRunService = {
     } catch (error) {
       throw normalizeError(error, "查询最新成功评估 run 失败。");
     }
+  },
+
+  async getLatestSuccessfulRun(evaluationId: string): Promise<ResumeEvaluationRunDto | null> {
+    return this.getLatestSuccessfulRunByEvaluationId(evaluationId);
   }
 };
 

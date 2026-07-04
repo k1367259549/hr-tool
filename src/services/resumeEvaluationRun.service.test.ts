@@ -266,6 +266,60 @@ describe("resumeEvaluationRunService query helpers", () => {
     );
 
     await expect(
+      resumeEvaluationRunService.getLatestSuccessfulRunByEvaluationId("eval-1")
+    ).resolves.toMatchObject({
+      id: "run-latest",
+      status: "SUCCEEDED"
+    });
+    expect(resumeEvaluationRunRepository.findLatestSuccessfulRun).toHaveBeenCalledWith("eval-1");
+  });
+
+  it("returns null when no successful run exists", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findLatestSuccessfulRun).mockResolvedValueOnce(null);
+
+    await expect(
+      resumeEvaluationRunService.getLatestSuccessfulRunByEvaluationId("eval-1")
+    ).resolves.toBeNull();
+  });
+
+  it("uses repository successful-run query even when a newer FAILED run may exist", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findLatestSuccessfulRun).mockResolvedValueOnce(
+      makeRun({
+        createdAt: new Date("2026-07-04T13:00:00.000Z"),
+        id: "older-success",
+        status: "SUCCEEDED"
+      })
+    );
+
+    const result = await resumeEvaluationRunService.getLatestSuccessfulRunByEvaluationId("eval-1");
+
+    expect(result).toMatchObject({
+      id: "older-success",
+      status: "SUCCEEDED"
+    });
+    expect(resumeEvaluationRunRepository.findLatestSuccessfulRun).toHaveBeenCalledWith("eval-1");
+  });
+
+  it("does not write evaluation master or CandidateResume when reading latest successful run", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findLatestSuccessfulRun).mockResolvedValueOnce(
+      makeRun({ id: "run-latest" })
+    );
+
+    await resumeEvaluationRunService.getLatestSuccessfulRunByEvaluationId("eval-1");
+
+    expect(resumeEvaluationRepository.updateDraftWithEvent).not.toHaveBeenCalled();
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+    expect(transactionClient.resumeEvaluationResult.update).not.toHaveBeenCalled();
+    expect(transactionClient.candidateResume.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("keeps the previous latest successful helper as a compatibility alias", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findLatestSuccessfulRun).mockResolvedValueOnce(
+      makeRun({ id: "run-latest" })
+    );
+
+    await expect(
       resumeEvaluationRunService.getLatestSuccessfulRun("eval-1")
     ).resolves.toMatchObject({
       id: "run-latest",

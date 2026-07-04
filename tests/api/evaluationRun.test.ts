@@ -7,6 +7,7 @@ import type { ResumeEvaluationRunDto } from "@/types/resumeEvaluationRun";
 
 const serviceMock = vi.hoisted(() => ({
   createMockEvaluationRun: vi.fn(),
+  getLatestSuccessfulRunByEvaluationId: vi.fn(),
   listRunsByEvaluationId: vi.fn()
 }));
 
@@ -43,6 +44,10 @@ const baseRun: ResumeEvaluationRunDto = {
   score: null,
   status: "SUCCEEDED",
   summary: null
+};
+
+type LatestSuccessfulRunResponse = {
+  run: ResumeEvaluationRunDto | null;
 };
 
 describe("GET /api/evaluations/[id]/runs", () => {
@@ -211,23 +216,86 @@ describe("POST /api/evaluations/[id]/runs", () => {
   });
 });
 
+describe("GET /api/evaluations/[id]/runs/latest-successful", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns the latest successful run in a safe wrapper", async () => {
+    vi.mocked(serviceMock.getLatestSuccessfulRunByEvaluationId).mockResolvedValueOnce(baseRun);
+
+    const { GET } = await import(
+      "@/app/api/evaluations/[id]/runs/latest-successful/route"
+    );
+    const request = createGetRequest(
+      "http://localhost/api/evaluations/eval-1/runs/latest-successful"
+    );
+    const response = await GET(request, { params: Promise.resolve({ id: "eval-1" }) });
+    const json = await readApiJson<LatestSuccessfulRunResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(serviceMock.getLatestSuccessfulRunByEvaluationId).toHaveBeenCalledWith("eval-1");
+    expect(json.data?.run).toMatchObject({
+      id: "run-1",
+      runType: "MOCK",
+      status: "SUCCEEDED"
+    });
+    expect(JSON.stringify(json.data)).not.toContain("rawOutputJson");
+    expect(JSON.stringify(json.data)).not.toContain("parsedText");
+    expect(JSON.stringify(json.data)).not.toContain("promptBody");
+    expect(JSON.stringify(json.data)).not.toContain("secret");
+  });
+
+  it("returns null when there is no successful run", async () => {
+    vi.mocked(serviceMock.getLatestSuccessfulRunByEvaluationId).mockResolvedValueOnce(null);
+
+    const { GET } = await import(
+      "@/app/api/evaluations/[id]/runs/latest-successful/route"
+    );
+    const response = await GET(
+      createGetRequest("http://localhost/api/evaluations/eval-1/runs/latest-successful"),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<LatestSuccessfulRunResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(json.data).toEqual({ run: null });
+  });
+});
+
 describe("EvaluationRun API route boundaries", () => {
   it("does not import Prisma, AI providers, prompts, or selected/latest run writes", () => {
     const routeSource = readFileSync(
       join(process.cwd(), "src", "app", "api", "evaluations", "[id]", "runs", "route.ts"),
       "utf8"
     );
+    const latestRouteSource = readFileSync(
+      join(
+        process.cwd(),
+        "src",
+        "app",
+        "api",
+        "evaluations",
+        "[id]",
+        "runs",
+        "latest-successful",
+        "route.ts"
+      ),
+      "utf8"
+    );
+    const combinedSource = `${routeSource}\n${latestRouteSource}`;
 
-    expect(routeSource).not.toContain("@/lib/prisma");
-    expect(routeSource).not.toContain("@/ai");
-    expect(routeSource).not.toContain("openai");
-    expect(routeSource).not.toContain("/prompts");
-    expect(routeSource).not.toContain("selectedRunId");
-    expect(routeSource).not.toContain("latestRunId");
-    expect(routeSource).not.toContain("ranking");
-    expect(routeSource).not.toContain("matching");
-    expect(routeSource).not.toContain("pipeline");
-    expect(routeSource).not.toContain("autoReject");
-    expect(routeSource).not.toContain("autoHire");
+    expect(combinedSource).not.toContain("@/lib/prisma");
+    expect(combinedSource).not.toContain("@/ai");
+    expect(combinedSource).not.toContain("openai");
+    expect(combinedSource).not.toContain("/prompts");
+    expect(combinedSource).not.toContain("selectedRunId");
+    expect(combinedSource).not.toContain("latestRunId");
+    expect(combinedSource).not.toContain("ranking");
+    expect(combinedSource).not.toContain("matching");
+    expect(combinedSource).not.toContain("pipeline");
+    expect(combinedSource).not.toContain("autoReject");
+    expect(combinedSource).not.toContain("autoHire");
   });
 });
