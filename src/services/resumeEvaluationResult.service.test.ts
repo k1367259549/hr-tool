@@ -6,6 +6,7 @@ import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.
 import { jobProfileEvaluationAssignmentRepository } from "@/repositories/jobProfileEvaluationAssignment.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
+import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import {
   isResumeEvaluationContextUniqueViolation,
@@ -17,7 +18,16 @@ import type {
   ResumeEvaluationResultDetailRecord
 } from "@/types/resumeEvaluationResult";
 
-const transactionClient = { tx: "resume-evaluation-transaction-client" };
+const transactionClient = {
+  candidateResume: {
+    update: vi.fn()
+  },
+  resumeEvaluationRun: {
+    delete: vi.fn(),
+    update: vi.fn()
+  },
+  tx: "resume-evaluation-transaction-client"
+};
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -55,11 +65,20 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
   resumeEvaluationRepository: {
     createWithEvent: vi.fn(),
     findDetailById: vi.fn(),
+    findEvaluationForSelectedRunUpdate: vi.fn(),
     list: vi.fn(),
     listEvaluationOptions: vi.fn(),
     reopenWithEvent: vi.fn(),
     reviewWithEvent: vi.fn(),
+    updateSelectedRun: vi.fn(),
     updateDraftWithEvent: vi.fn()
+  }
+}));
+
+vi.mock("@/repositories/resumeEvaluationRun.repository", () => ({
+  resumeEvaluationRunRepository: {
+    findLatestSuccessfulRun: vi.fn(),
+    findRunForSelection: vi.fn()
   }
 }));
 
@@ -130,6 +149,7 @@ function makeEvaluation(overrides?: object): ResumeEvaluationResultDetailRecord 
     resumeRevisionId: null,
     reviewedAt: null,
     revision: 0,
+    selectedRunId: null,
     status: "DRAFT",
     templateVersionId: "tv-1",
     updatedAt: new Date("2026-07-01T00:00:00Z"),
@@ -148,6 +168,31 @@ function makeCriterionResults(
       ...overrides
     }
   ];
+}
+
+function makeSelectionEvaluation(overrides?: object) {
+  return {
+    id: "eval-1",
+    jobProfileId: "jp-1",
+    jobProfileVersion: "2026-07-01T00:00:00.000Z",
+    resumeId: "resume-1",
+    selectedRunId: null,
+    templateVersionId: "tv-1",
+    ...overrides
+  };
+}
+
+function makeSelectableRun(overrides?: object) {
+  return {
+    evaluationId: "eval-1",
+    id: "run-1",
+    jobProfileId: "jp-1",
+    jobProfileVersion: "2026-07-01T00:00:00.000Z",
+    resumeId: "resume-1",
+    status: "SUCCEEDED",
+    templateVersionId: "tv-1",
+    ...overrides
+  };
 }
 
 function makeP2002(target: unknown) {
@@ -505,6 +550,143 @@ describe("resumeEvaluationResultService.createEvaluation", () => {
         templateVersionId: "tv-1"
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("resumeEvaluationResultService.selectRunForReview", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(resumeEvaluationRepository.findEvaluationForSelectedRunUpdate).mockResolvedValue(
+      makeSelectionEvaluation() as never
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValue(
+      makeSelectableRun() as never
+    );
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValue(
+      makeEvaluation({ selectedRunId: "run-1" })
+    );
+    vi.mocked(resumeEvaluationRepository.updateSelectedRun).mockResolvedValue(
+      undefined as never
+    );
+  });
+
+  it("sets selectedRunId to a SUCCEEDED run under the same evaluation", async () => {
+    const result = await resumeEvaluationResultService.selectRunForReview("eval-1", "run-1");
+
+    expect(result.selectedRunId).toBe("run-1");
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(resumeEvaluationRepository.findEvaluationForSelectedRunUpdate).toHaveBeenCalledWith(
+      "eval-1",
+      transactionClient
+    );
+    expect(resumeEvaluationRunRepository.findRunForSelection).toHaveBeenCalledWith(
+      "run-1",
+      transactionClient
+    );
+    expect(resumeEvaluationRepository.updateSelectedRun).toHaveBeenCalledWith(
+      "eval-1",
+      "run-1",
+      transactionClient
+    );
+  });
+
+  it("clears selectedRunId without reading or deleting run history", async () => {
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+      makeEvaluation({ selectedRunId: null })
+    );
+
+    const result = await resumeEvaluationResultService.selectRunForReview("eval-1", null);
+
+    expect(result.selectedRunId).toBeNull();
+    expect(resumeEvaluationRunRepository.findRunForSelection).not.toHaveBeenCalled();
+    expect(resumeEvaluationRepository.updateSelectedRun).toHaveBeenCalledWith(
+      "eval-1",
+      null,
+      transactionClient
+    );
+    expect(transactionClient.resumeEvaluationRun.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing selected run", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(null);
+
+    await expect(
+      resumeEvaluationResultService.selectRunForReview("eval-1", "missing-run")
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects a run from a different evaluation", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun({ evaluationId: "other-eval" }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.selectRunForReview("eval-1", "run-1")
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects FAILED and PENDING runs", async () => {
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun({ status: "FAILED" }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.selectRunForReview("eval-1", "failed-run")
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun({ status: "PENDING" }) as never
+    );
+
+    await expect(
+      resumeEvaluationResultService.selectRunForReview("eval-1", "pending-run")
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects context mismatches", async () => {
+    const mismatchCases = [
+      { resumeId: "other-resume" },
+      { jobProfileId: "other-job" },
+      { templateVersionId: "other-template" },
+      { jobProfileVersion: "other-version" }
+    ];
+
+    for (const mismatch of mismatchCases) {
+      vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+        makeSelectableRun(mismatch) as never
+      );
+
+      await expect(
+        resumeEvaluationResultService.selectRunForReview("eval-1", "run-1")
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    }
+
+    expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
+  });
+
+  it("does not write ResumeEvaluationRun, CandidateResume, or latest successful state", async () => {
+    await resumeEvaluationResultService.selectRunForReview("eval-1", "run-1");
+
+    expect(transactionClient.resumeEvaluationRun.update).not.toHaveBeenCalled();
+    expect(transactionClient.resumeEvaluationRun.delete).not.toHaveBeenCalled();
+    expect(transactionClient.candidateResume.update).not.toHaveBeenCalled();
+    expect(resumeEvaluationRunRepository.findLatestSuccessfulRun).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND when evaluation master does not exist", async () => {
+    vi.mocked(resumeEvaluationRepository.findEvaluationForSelectedRunUpdate).mockResolvedValueOnce(
+      null
+    );
+
+    await expect(
+      resumeEvaluationResultService.selectRunForReview("missing-eval", "run-1")
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(resumeEvaluationRepository.updateSelectedRun).not.toHaveBeenCalled();
   });
 });
 

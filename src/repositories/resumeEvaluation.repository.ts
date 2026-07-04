@@ -22,6 +22,7 @@ const evaluationListSelect = {
   resumeRevisionId: true,
   reviewedAt: true,
   revision: true,
+  selectedRunId: true,
   status: true,
   templateVersionId: true,
   updatedAt: true
@@ -35,6 +36,20 @@ const evaluationDetailInclude = {
     ]
   }
 } satisfies Prisma.ResumeEvaluationResultInclude;
+
+const selectedRunUpdateSelect = {
+  id: true,
+  jobProfileId: true,
+  jobProfileVersion: true,
+  resumeId: true,
+  selectedRunId: true,
+  templateVersionId: true
+} satisfies Prisma.ResumeEvaluationResultSelect;
+
+export type ResumeEvaluationSelectedRunUpdateRecord =
+  Prisma.ResumeEvaluationResultGetPayload<{
+    select: typeof selectedRunUpdateSelect;
+  }>;
 
 export const resumeEvaluationRepository = {
   async createWithEvent(
@@ -121,6 +136,29 @@ export const resumeEvaluationRepository = {
           templateVersionId
         }
       }
+    });
+  },
+
+  async findEvaluationForSelectedRunUpdate(
+    evaluationId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<ResumeEvaluationSelectedRunUpdateRecord | null> {
+    return client.resumeEvaluationResult.findUnique({
+      select: selectedRunUpdateSelect,
+      where: { id: evaluationId }
+    });
+  },
+
+  async updateSelectedRun(
+    evaluationId: string,
+    selectedRunId: string | null,
+    client: CandidateDbClient = prisma
+  ): Promise<void> {
+    await client.resumeEvaluationResult.update({
+      data: {
+        selectedRunId
+      },
+      where: { id: evaluationId }
     });
   },
 

@@ -25,6 +25,21 @@ const runSafeSelect = {
   summary: true
 } satisfies Prisma.ResumeEvaluationRunSelect;
 
+const runSelectionSelect = {
+  evaluationId: true,
+  id: true,
+  jobProfileId: true,
+  jobProfileVersion: true,
+  resumeId: true,
+  status: true,
+  templateVersionId: true
+} satisfies Prisma.ResumeEvaluationRunSelect;
+
+export type ResumeEvaluationRunSelectionRecord =
+  Prisma.ResumeEvaluationRunGetPayload<{
+    select: typeof runSelectionSelect;
+  }>;
+
 export const resumeEvaluationRunRepository = {
   async createRun(
     input: CreateResumeEvaluationRunInput,
@@ -73,6 +88,16 @@ export const resumeEvaluationRunRepository = {
     return client.resumeEvaluationRun.findUnique({
       select: runSafeSelect,
       where: { id }
+    });
+  },
+
+  async findRunForSelection(
+    runId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<ResumeEvaluationRunSelectionRecord | null> {
+    return client.resumeEvaluationRun.findUnique({
+      select: runSelectionSelect,
+      where: { id: runId }
     });
   },
 

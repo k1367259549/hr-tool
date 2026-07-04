@@ -57,6 +57,7 @@ export type ResumeEvaluationSummaryDto = {
   resumeId: string;
   resumeRevisionId: string | null;
   parsedSnapshotId: string | null;
+  selectedRunId: string | null;
   jobProfileId: string;
   templateVersionId: string;
   jobProfileVersion: string;

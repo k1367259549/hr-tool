@@ -5,6 +5,7 @@ import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.
 import { jobProfileEvaluationAssignmentRepository } from "@/repositories/jobProfileEvaluationAssignment.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
+import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import type {
   EvaluationCriterion
@@ -359,6 +360,55 @@ export const resumeEvaluationResultService = {
     }
   },
 
+  async selectRunForReview(
+    evaluationId: string,
+    selectedRunId: string | null
+  ): Promise<ResumeEvaluationDetailDto> {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const evaluation = await resumeEvaluationRepository.findEvaluationForSelectedRunUpdate(
+          evaluationId,
+          tx
+        );
+
+        if (!evaluation) {
+          throw new ResumeEvaluationResultServiceError("NOT_FOUND", "评估记录不存在。");
+        }
+
+        if (selectedRunId !== null) {
+          const run = await resumeEvaluationRunRepository.findRunForSelection(
+            selectedRunId,
+            tx
+          );
+
+          if (!run) {
+            throw new ResumeEvaluationResultServiceError(
+              "NOT_FOUND",
+              "选择的评估 run 不存在。"
+            );
+          }
+
+          assertRunSelectableForEvaluation(evaluation, run);
+        }
+
+        await resumeEvaluationRepository.updateSelectedRun(evaluationId, selectedRunId, tx);
+
+        const updated = await resumeEvaluationRepository.findDetailById(evaluationId, tx);
+
+        if (!updated) {
+          throw new ResumeEvaluationResultServiceError(
+            "DATABASE_ERROR",
+            "更新 selectedRunId 后读取失败。"
+          );
+        }
+
+        return toDetailDto(updated);
+      });
+    } catch (error) {
+      throw normalizeError(error, "更新 selectedRunId 失败。");
+    }
+  },
+
   async getEvaluationOptions(resumeId: string): Promise<ResumeEvaluationOptionsDto> {
     try {
       const options = await resumeEvaluationRepository.listEvaluationOptions(resumeId);
@@ -397,6 +447,7 @@ function toSummaryDto(
     overallNote: string | null;
     evaluatedBy: string | null;
     reviewedAt: Date | null;
+    selectedRunId?: string | null;
     createdAt: Date;
     updatedAt: Date;
   }
@@ -413,10 +464,55 @@ function toSummaryDto(
     resumeRevisionId: evaluation.resumeRevisionId ?? null,
     reviewedAt: evaluation.reviewedAt?.toISOString() ?? null,
     revision: evaluation.revision,
+    selectedRunId: evaluation.selectedRunId ?? null,
     status: evaluation.status,
     templateVersionId: evaluation.templateVersionId,
     updatedAt: evaluation.updatedAt.toISOString()
   };
+}
+
+function assertRunSelectableForEvaluation(
+  evaluation: {
+    id: string;
+    resumeId: string;
+    jobProfileId: string;
+    templateVersionId: string;
+    jobProfileVersion: string;
+  },
+  run: {
+    evaluationId: string;
+    status: "PENDING" | "SUCCEEDED" | "FAILED";
+    resumeId: string;
+    jobProfileId: string;
+    templateVersionId: string;
+    jobProfileVersion: string;
+  }
+): void {
+  if (run.evaluationId !== evaluation.id) {
+    throw new ResumeEvaluationResultServiceError(
+      "VALIDATION_ERROR",
+      "选择的评估 run 不属于当前评估。"
+    );
+  }
+
+  if (run.status !== "SUCCEEDED") {
+    throw new ResumeEvaluationResultServiceError(
+      "VALIDATION_ERROR",
+      "只能选择 SUCCEEDED 状态的评估 run。"
+    );
+  }
+
+  if (
+    run.resumeId !== evaluation.resumeId ||
+    run.jobProfileId !== evaluation.jobProfileId ||
+    run.templateVersionId !== evaluation.templateVersionId ||
+    run.jobProfileVersion !== evaluation.jobProfileVersion
+  ) {
+    throw new ResumeEvaluationResultServiceError(
+      "VALIDATION_ERROR",
+      "选择的评估 run 与当前评估上下文不匹配。"
+    );
+  }
 }
 
 async function resolveEvaluationRevisionContext(

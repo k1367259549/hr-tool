@@ -148,7 +148,6 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain(
       '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
     );
-    expect(evaluationResultModel).not.toContain("selectedRunId");
     expect(evaluationResultModel).not.toContain("latestRunId");
     expect(evaluationResultModel).not.toContain("score");
     expect(evaluationResultModel).not.toContain("rating");
@@ -200,13 +199,13 @@ describe("Prisma schema safeguards", () => {
     expect(evaluationRunModel).toContain("parsedSnapshotId");
     expect(evaluationRunModel).toContain("rawOutputJson");
     expect(evaluationRunModel).toContain(
-      "evaluation      ResumeEvaluationResult    @relation(fields: [evaluationId], references: [id], onDelete: Restrict)"
+      'evaluation            ResumeEvaluationResult    @relation("EvaluationRuns", fields: [evaluationId], references: [id], onDelete: Restrict)'
     );
     expect(evaluationRunModel).toContain(
-      "resumeRevision  ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)"
+      "resumeRevision        ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)"
     );
     expect(evaluationRunModel).toContain(
-      "parsedSnapshot  ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)"
+      "parsedSnapshot        ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)"
     );
     expect(evaluationRunModel).toContain("@@index([evaluationId])");
     expect(evaluationRunModel).toContain("@@index([resumeId])");
@@ -219,7 +218,6 @@ describe("Prisma schema safeguards", () => {
     expect(evaluationRunModel).toContain("@@index([createdAt])");
     expect(evaluationRunModel).toContain("@@index([evaluationId, status, createdAt])");
     expect(evaluationRunModel).not.toContain("@@unique");
-    expect(evaluationResultModel).not.toContain("selectedRunId");
     expect(evaluationResultModel).not.toContain("latestRunId");
     expect(evaluationResultModel).not.toContain("modelProvider");
     expect(evaluationResultModel).not.toContain("modelName");
@@ -240,6 +238,56 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toContain("ResumeEvaluationResult_context_key");
     expect(migration).not.toContain("selectedRunId");
     expect(migration).not.toContain("latestRunId");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toContain("SET NOT NULL");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
+  it("adds selectedRunId review-basis pointer with SetNull without changing run history", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const evaluationResultModel = extractPrismaBlock(schema, "model ResumeEvaluationResult");
+    const evaluationRunModel = extractPrismaBlock(schema, "model ResumeEvaluationRun");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260704150000_m07_b2_e_b_selected_run_foundation",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(evaluationResultModel).toContain("selectedRunId     String?");
+    expect(evaluationResultModel).toContain(
+      'selectedRun     ResumeEvaluationRun?      @relation("SelectedEvaluationRun", fields: [selectedRunId], references: [id], onDelete: SetNull)'
+    );
+    expect(evaluationResultModel).toContain('runs            ResumeEvaluationRun[]     @relation("EvaluationRuns")');
+    expect(evaluationResultModel).toContain("@@index([selectedRunId])");
+    expect(evaluationResultModel).not.toContain("latestRunId");
+    expect(evaluationResultModel).not.toContain("reviewerDecision");
+    expect(evaluationResultModel).not.toContain("reviewerNotes");
+    expect(evaluationResultModel).not.toContain("reviewedBy");
+    expect(evaluationResultModel).toContain(
+      '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
+    );
+    expect(evaluationRunModel).toContain(
+      'selectedByEvaluations ResumeEvaluationResult[]  @relation("SelectedEvaluationRun")'
+    );
+    expect(evaluationRunModel).toContain(
+      'evaluation            ResumeEvaluationResult    @relation("EvaluationRuns", fields: [evaluationId], references: [id], onDelete: Restrict)'
+    );
+
+    expect(migration).toContain('ADD COLUMN "selectedRunId" TEXT');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationResult_selectedRunId_idx"');
+    expect(migration).toContain('REFERENCES "ResumeEvaluationRun"("id")');
+    expect(migration).toContain("ON DELETE SET NULL");
+    expect(migration).not.toContain("ResumeEvaluationResult_context_key");
+    expect(migration).not.toContain("latestRunId");
+    expect(migration).not.toContain("reviewerDecision");
+    expect(migration).not.toContain("reviewerNotes");
+    expect(migration).not.toContain("reviewedBy");
     expect(migration).not.toContain("DROP TABLE");
     expect(migration).not.toContain("DROP COLUMN");
     expect(migration).not.toContain("SET NOT NULL");

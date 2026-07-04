@@ -683,6 +683,7 @@ model ResumeEvaluationResult {
   resumeId          String
   resumeRevisionId  String?
   parsedSnapshotId  String?
+  selectedRunId     String?
   jobProfileId      String
   templateVersionId String
   jobProfileVersion String
@@ -698,15 +699,17 @@ model ResumeEvaluationResult {
   resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
   resumeRevision  ResumeRevision?           @relation("EvaluationResumeRevision", fields: [resumeRevisionId], references: [id], onDelete: SetNull)
   parsedSnapshot  ParsedSnapshot?           @relation("EvaluationParsedSnapshot", fields: [parsedSnapshotId], references: [id], onDelete: SetNull)
+  selectedRun     ResumeEvaluationRun?      @relation("SelectedEvaluationRun", fields: [selectedRunId], references: [id], onDelete: SetNull)
   jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
   templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   events          ResumeEvaluationEvent[]
-  runs            ResumeEvaluationRun[]
+  runs            ResumeEvaluationRun[]     @relation("EvaluationRuns")
 
   @@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")
   @@index([resumeId])
   @@index([resumeRevisionId])
   @@index([parsedSnapshotId])
+  @@index([selectedRunId])
   @@index([jobProfileId])
   @@index([templateVersionId])
   @@index([status])
@@ -748,12 +751,13 @@ model ResumeEvaluationRun {
   createdAt                DateTime                  @default(now())
   completedAt              DateTime?
 
-  evaluation      ResumeEvaluationResult    @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
-  resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
-  resumeRevision  ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)
-  parsedSnapshot  ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)
-  jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
-  templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  evaluation            ResumeEvaluationResult    @relation("EvaluationRuns", fields: [evaluationId], references: [id], onDelete: Restrict)
+  resume                CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
+  resumeRevision        ResumeRevision            @relation(fields: [resumeRevisionId], references: [id], onDelete: Restrict)
+  parsedSnapshot        ParsedSnapshot            @relation(fields: [parsedSnapshotId], references: [id], onDelete: Restrict)
+  jobProfile            JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
+  templateVersion       EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  selectedByEvaluations ResumeEvaluationResult[]  @relation("SelectedEvaluationRun")
 
   @@index([evaluationId])
   @@index([resumeId])

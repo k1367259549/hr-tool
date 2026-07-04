@@ -65,6 +65,7 @@ function makeEvaluation(
     resumeRevisionId: "revision-1",
     reviewedAt: null,
     revision: 0,
+    selectedRunId: null,
     status: "DRAFT",
     templateVersionId: "template-version-1",
     updatedAt: new Date("2026-07-04T00:00:00.000Z"),

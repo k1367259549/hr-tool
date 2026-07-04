@@ -2,7 +2,12 @@ export type ResumeEvaluationRunCreatePayload = {
   runType: "MOCK";
 };
 
+export type ResumeEvaluationSelectedRunPayload = {
+  selectedRunId: string | null;
+};
+
 const createRunFields = ["runType"] as const;
+const selectedRunFields = ["selectedRunId"] as const;
 
 export class ResumeEvaluationRunValidationError extends Error {
   constructor(message: string) {
@@ -30,6 +35,39 @@ export function parseResumeEvaluationRunCreatePayload(
   }
 
   return { runType: "MOCK" };
+}
+
+export function parseResumeEvaluationSelectedRunPayload(
+  payload: unknown
+): ResumeEvaluationSelectedRunPayload {
+  const body = assertRecord(payload);
+  assertAllowedFields(body, selectedRunFields);
+
+  if (!("selectedRunId" in body)) {
+    throw new ResumeEvaluationRunValidationError("selectedRunId 为必填项。");
+  }
+
+  const selectedRunId = body.selectedRunId;
+
+  if (selectedRunId === null) {
+    return { selectedRunId: null };
+  }
+
+  if (typeof selectedRunId !== "string") {
+    throw new ResumeEvaluationRunValidationError("selectedRunId 必须是字符串或 null。");
+  }
+
+  const normalized = selectedRunId.trim();
+
+  if (!normalized) {
+    throw new ResumeEvaluationRunValidationError("selectedRunId 不能为空字符串。");
+  }
+
+  if (normalized.length > 120) {
+    throw new ResumeEvaluationRunValidationError("selectedRunId 不能超过 120 个字符。");
+  }
+
+  return { selectedRunId: normalized };
 }
 
 function assertRecord(value: unknown): Record<string, unknown> {

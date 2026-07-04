@@ -5,7 +5,9 @@ import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repo
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     resumeEvaluationResult: {
-      create: vi.fn()
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn()
     }
   }
 }));
@@ -115,5 +117,46 @@ describe("resumeEvaluationRepository", () => {
         })
       })
     );
+  });
+
+  it("finds evaluation context for selected-run updates", async () => {
+    vi.mocked(prisma.resumeEvaluationResult.findUnique).mockResolvedValueOnce({
+      id: "eval-1",
+      jobProfileId: "job-1",
+      jobProfileVersion: "2026-07-04T00:00:00.000Z",
+      resumeId: "resume-1",
+      selectedRunId: null,
+      templateVersionId: "template-version-1"
+    } as never);
+
+    await resumeEvaluationRepository.findEvaluationForSelectedRunUpdate("eval-1");
+
+    expect(prisma.resumeEvaluationResult.findUnique).toHaveBeenCalledWith({
+      select: {
+        id: true,
+        jobProfileId: true,
+        jobProfileVersion: true,
+        resumeId: true,
+        selectedRunId: true,
+        templateVersionId: true
+      },
+      where: { id: "eval-1" }
+    });
+  });
+
+  it("updates only selectedRunId on the evaluation master", async () => {
+    vi.mocked(prisma.resumeEvaluationResult.update).mockResolvedValueOnce({
+      id: "eval-1",
+      selectedRunId: "run-1"
+    } as never);
+
+    await resumeEvaluationRepository.updateSelectedRun("eval-1", "run-1");
+
+    expect(prisma.resumeEvaluationResult.update).toHaveBeenCalledWith({
+      data: {
+        selectedRunId: "run-1"
+      },
+      where: { id: "eval-1" }
+    });
   });
 });

@@ -45,6 +45,7 @@ const baseEvaluation: ResumeEvaluationDetailDto = {
   resumeRevisionId: null,
   reviewedAt: null,
   revision: 0,
+  selectedRunId: null,
   status: "DRAFT",
   templateVersionId: "tv-1",
   updatedAt: "2026-07-01T00:00:00.000Z"

@@ -3,8 +3,32 @@
 Version: V2.0 Draft
 System: hr-tool V2 / AI Recruiter
 Scope: MILESTONE-07B2-E-A - Selected Run / HR Review Binding Architecture Decision
+Implementation Status: M07-B2-E-B selectedRunId relation and selected-run API implemented
 
 ---
+
+## Implementation Status
+
+M07-B2-E-B implements:
+
+- nullable `ResumeEvaluationResult.selectedRunId`
+- `selectedRunId` relation to `ResumeEvaluationRun`
+- `onDelete: SetNull` for the selected-run pointer
+- `PATCH /api/evaluations/[id]/selected-run`
+- service-layer validation that selected runs belong to the same evaluation context
+- clearing `selectedRunId` without deleting run history
+
+Still not implemented:
+
+- `latestRunId`
+- `reviewerDecision`
+- `reviewerNotes`
+- `reviewedBy`
+- selected-run UI
+- AI provider integration
+- automatic selection of latest successful run
+
+The latest-successful query path remains unchanged. Run creation does not auto-update `selectedRunId`.
 
 ## 1. Background
 
@@ -198,8 +222,8 @@ reviewedBy String?
 
 Notes:
 
-- this document is design only
-- no schema change is implemented here
+- `selectedRunId` and its relation are implemented in M07-B2-E-B
+- `reviewerDecision`, `reviewerNotes`, `reviewedAt`, and `reviewedBy` remain deferred
 - `latestRunId` remains deferred
 - `ResumeEvaluationResult_context_key` must not be changed
 - new fields should be nullable first to avoid breaking existing rows

@@ -151,4 +151,31 @@ describe("resumeEvaluationRunRepository", () => {
       where: { id: "run-1" }
     });
   });
+
+  it("finds a run with only fields needed for selected-run validation", async () => {
+    vi.mocked(prisma.resumeEvaluationRun.findUnique).mockResolvedValueOnce({
+      evaluationId: "eval-1",
+      id: "run-1",
+      jobProfileId: "job-1",
+      jobProfileVersion: "2026-07-04T00:00:00.000Z",
+      resumeId: "resume-1",
+      status: "SUCCEEDED",
+      templateVersionId: "template-version-1"
+    } as never);
+
+    await resumeEvaluationRunRepository.findRunForSelection("run-1");
+
+    expect(prisma.resumeEvaluationRun.findUnique).toHaveBeenCalledWith({
+      select: {
+        evaluationId: true,
+        id: true,
+        jobProfileId: true,
+        jobProfileVersion: true,
+        resumeId: true,
+        status: true,
+        templateVersionId: true
+      },
+      where: { id: "run-1" }
+    });
+  });
 });
