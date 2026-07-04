@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import type {
   ResumeDetailDto,
   ResumeDetailRecord,
@@ -63,6 +64,20 @@ export const resumeLibraryService = {
         structureChunks: structureChunks as unknown as Prisma.InputJsonValue,
         workflowId
       });
+      await resumeRevisionRepository.createInitialRevision({
+        chunkCount: structureChunks.length,
+        contentHash,
+        parseStatus: "PARSED",
+        parsedText: parsedResume.parsedText,
+        parserVersion,
+        resumeId: resume.id,
+        source: "upload",
+        sourceFileName: parsedResume.fileName,
+        structuredData: {
+          semanticChunkCount: semanticChunks.length,
+          structureChunkCount: structureChunks.length
+        }
+      });
 
       return resumeLibraryService.getUploadResult(resume.id);
     } catch (error) {
@@ -87,6 +102,20 @@ export const resumeLibraryService = {
           semanticChunks: [],
           structureChunks: [],
           workflowId
+        });
+        await resumeRevisionRepository.createInitialRevision({
+          chunkCount: 0,
+          contentHash: null,
+          parseStatus: "FAILED",
+          parsedText: null,
+          parserVersion,
+          resumeId: resume.id,
+          source: "upload",
+          sourceFileName: input.file.name,
+          structuredData: {
+            semanticChunkCount: 0,
+            structureChunkCount: 0
+          }
         });
 
         return resumeLibraryService.getUploadResult(resume.id);

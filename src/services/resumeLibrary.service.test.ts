@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import {
   resumeLibraryService,
   ResumeLibraryServiceError
@@ -16,6 +17,12 @@ vi.mock("@/repositories/candidateResume.repository", () => ({
     findResumeList: vi.fn(),
     listPossibleDuplicates: vi.fn(),
     updateResumeMetadata: vi.fn()
+  }
+}));
+
+vi.mock("@/repositories/resumeRevision.repository", () => ({
+  resumeRevisionRepository: {
+    createInitialRevision: vi.fn()
   }
 }));
 
@@ -37,6 +44,7 @@ describe("resumeLibraryService", () => {
     vi.clearAllMocks();
     vi.mocked(candidateResumeRepository.countOtherResumesByHash).mockResolvedValue(0);
     vi.mocked(candidateResumeRepository.listPossibleDuplicates).mockResolvedValue([]);
+    vi.mocked(resumeRevisionRepository.createInitialRevision).mockResolvedValue({} as never);
   });
 
   it("uploads an independent Resume Library record without candidate or job profile", async () => {
@@ -74,6 +82,20 @@ describe("resumeLibraryService", () => {
         parsingStatus: "PARSED"
       })
     );
+    expect(resumeRevisionRepository.createInitialRevision).toHaveBeenCalledWith({
+      chunkCount: 1,
+      contentHash: generateResumeContentHash("hello resume"),
+      parseStatus: "PARSED",
+      parsedText: "hello resume",
+      parserVersion: "v1",
+      resumeId: "resume-id",
+      source: "upload",
+      sourceFileName: "resume.txt",
+      structuredData: {
+        semanticChunkCount: 1,
+        structureChunkCount: 1
+      }
+    });
   });
 
   it("stores supported parse failures as FAILED records", async () => {
@@ -103,6 +125,20 @@ describe("resumeLibraryService", () => {
         parsingStatus: "FAILED"
       })
     );
+    expect(resumeRevisionRepository.createInitialRevision).toHaveBeenCalledWith({
+      chunkCount: 0,
+      contentHash: null,
+      parseStatus: "FAILED",
+      parsedText: null,
+      parserVersion: "v1",
+      resumeId: "resume-id",
+      source: "upload",
+      sourceFileName: "resume.pdf",
+      structuredData: {
+        semanticChunkCount: 0,
+        structureChunkCount: 0
+      }
+    });
   });
 
   it("rejects unsupported files before persistence", async () => {

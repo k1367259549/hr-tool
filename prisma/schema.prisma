@@ -81,6 +81,11 @@ enum ResumeEvaluationEventType {
   REOPENED
 }
 
+enum ResumeParsingStatus {
+  PARSED
+  FAILED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -293,6 +298,7 @@ model CandidateResume {
   candidate         Candidate?               @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   jobProfile        JobProfile?              @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
   insight           CandidateInsight?
+  revisions         ResumeRevision[]
   resumeEvaluations ResumeEvaluationResult[]
 
   @@index([workflowId])
@@ -302,6 +308,39 @@ model CandidateResume {
   @@index([parsingStatus])
   @@index([fileType])
   @@index([intakeSource])
+  @@index([createdAt])
+}
+
+model ResumeRevision {
+  id             String              @id @default(cuid())
+  resumeId       String
+  revisionNumber Int
+  contentHash    String?
+  source         String?
+  sourceFileName String?
+  parserVersion  String?
+  parseStatus    ResumeParsingStatus
+  createdAt      DateTime            @default(now())
+
+  resume         CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  parsedSnapshot ParsedSnapshot?
+
+  @@unique([resumeId, revisionNumber])
+  @@index([resumeId])
+  @@index([contentHash])
+  @@index([createdAt])
+}
+
+model ParsedSnapshot {
+  id             String   @id @default(cuid())
+  revisionId     String   @unique
+  parsedText     String?
+  structuredData Json?
+  chunkCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  revision ResumeRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
   @@index([createdAt])
 }
 

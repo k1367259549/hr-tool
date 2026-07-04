@@ -83,6 +83,42 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain("resumeId                      String    @unique");
   });
 
+  it("adds minimal ResumeRevision and ParsedSnapshot foundation without backfill", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260704090000_task_063_resume_revision_foundation",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum ResumeParsingStatus");
+    expect(schema).toContain("model ResumeRevision");
+    expect(schema).toContain("model ParsedSnapshot");
+    expect(schema).toContain("revisions         ResumeRevision[]");
+    expect(schema).toContain("@@unique([resumeId, revisionNumber])");
+    expect(schema).toContain("revisionId     String   @unique");
+    expect(schema).toContain(
+      "resume         CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)"
+    );
+    expect(schema).toContain(
+      "revision ResumeRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)"
+    );
+    expect(migration).toContain('CREATE TABLE "ResumeRevision"');
+    expect(migration).toContain('CREATE TABLE "ParsedSnapshot"');
+    expect(migration).toContain('CREATE UNIQUE INDEX "ResumeRevision_resumeId_revisionNumber_key"');
+    expect(migration).toContain('CREATE UNIQUE INDEX "ParsedSnapshot_revisionId_key"');
+    expect(migration).toContain("ON DELETE CASCADE");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toContain("ALTER COLUMN");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
   it("keeps Evaluation Template versioning and assignment constraints in the migration", () => {
     const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
     const migration = readFileSync(

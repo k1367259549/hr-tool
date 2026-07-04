@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aiService } from "@/ai/ai.service";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import {
   candidateUnderstandingService,
   CandidateUnderstandingServiceError,
@@ -9,7 +10,7 @@ import {
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import type { CandidateInsight } from "@/types/candidateUnderstanding";
 import { generateResumeContentHash } from "@/utils/resumeContentHash";
-import { parseResumeFile } from "@/utils/resumeParser";
+import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 
 vi.mock("@/ai/ai.service", () => ({
   aiService: {
@@ -33,6 +34,12 @@ vi.mock("@/repositories/candidateResume.repository", () => ({
 vi.mock("@/repositories/jobProfile.repository", () => ({
   jobProfileRepository: {
     findById: vi.fn()
+  }
+}));
+
+vi.mock("@/repositories/resumeRevision.repository", () => ({
+  resumeRevisionRepository: {
+    createInitialRevision: vi.fn()
   }
 }));
 
@@ -109,6 +116,7 @@ describe("toCandidateInsightDto", () => {
 describe("candidateUnderstandingService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resumeRevisionRepository.createInitialRevision).mockResolvedValue({} as never);
   });
 
   it("stores contentHash from normalized parsed resume text", async () => {
@@ -222,6 +230,20 @@ describe("candidateUnderstandingService", () => {
         parsingStatus: "PARSED"
       })
     );
+    expect(resumeRevisionRepository.createInitialRevision).toHaveBeenCalledWith({
+      chunkCount: 1,
+      contentHash: generateResumeContentHash(parsedText),
+      parseStatus: "PARSED",
+      parsedText,
+      parserVersion: "v1",
+      resumeId: "resume-id",
+      source: "CANDIDATE_UNDERSTANDING",
+      sourceFileName: "resume.txt",
+      structuredData: {
+        semanticChunkCount: 1,
+        structureChunkCount: 1
+      }
+    });
   });
 
   it("rejects candidate understanding when job profile is not reviewed", async () => {
@@ -262,5 +284,83 @@ describe("candidateUnderstandingService", () => {
       code: "VALIDATION_ERROR",
       message: "该岗位画像尚未完成人工确认。"
     } satisfies Partial<CandidateUnderstandingServiceError>);
+  });
+
+  it("creates failed initial revision when resume parsing fails after reviewed job profile", async () => {
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce({
+      aiModel: "test-model",
+      aiProvider: "openai-compatible",
+      coreResponsibilities: ["招聘交付"],
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      generationTimeMs: 1000,
+      hiringFocus: ["沟通业务需求"],
+      hiringGoal: null,
+      id: "job-profile-id",
+      interviewFocus: ["候选人沟通"],
+      jd: "负责招聘。",
+      jobSummary: "招聘岗位。",
+      jobTitle: "招聘专员",
+      leaderRequirements: null,
+      missingInformation: [],
+      notes: null,
+      potentialRisks: [],
+      preferredCompetencies: [],
+      promptFile: "job-understanding.md",
+      promptVersion: "1.0",
+      requiredCompetencies: ["招聘执行"],
+      reviewedAt: new Date("2026-01-03T00:00:00.000Z"),
+      suggestedFollowUpQuestions: [],
+      teamBackground: null,
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    });
+    vi.mocked(parseResumeFile).mockRejectedValueOnce(
+      new ResumeParserError("RESUME_PARSE_ERROR", "未能从简历中解析出文本。")
+    );
+    vi.mocked(candidateResumeRepository.create).mockResolvedValueOnce({
+      candidateId: null,
+      candidateSource: null,
+      contentHash: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      fileName: "resume.pdf",
+      fileSize: 11,
+      fileType: "PDF",
+      id: "failed-resume-id",
+      intakeSource: "CANDIDATE_UNDERSTANDING",
+      jobProfileId: "job-profile-id",
+      language: null,
+      notes: null,
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parserVersion: "v1",
+      parsedText: null,
+      parsingError: "未能从简历中解析出文本。",
+      parsingStatus: "FAILED",
+      resumeVersion: "resume-parser-v1",
+      semanticChunks: [],
+      structureChunks: [],
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    });
+
+    await expect(
+      candidateUnderstandingService.generateCandidateUnderstanding({
+        file: new File(["broken pdf"], "resume.pdf"),
+        jobProfileId: "job-profile-id"
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "未能从简历中解析出文本。"
+    } satisfies Partial<CandidateUnderstandingServiceError>);
+
+    expect(resumeRevisionRepository.createInitialRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chunkCount: 0,
+        contentHash: null,
+        parseStatus: "FAILED",
+        parsedText: null,
+        parserVersion: "v1",
+        resumeId: "failed-resume-id"
+      })
+    );
   });
 });

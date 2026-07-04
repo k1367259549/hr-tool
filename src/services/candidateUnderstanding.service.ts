@@ -4,6 +4,7 @@ import { aiService } from "@/ai/ai.service";
 import { candidateInsightRepository } from "@/repositories/candidateInsight.repository";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import type {
   CandidateInsight,
   CandidateInsightCreateInput,
@@ -72,6 +73,20 @@ export const candidateUnderstandingService = {
         semanticChunks,
         structureChunks,
         workflowId
+      });
+      await resumeRevisionRepository.createInitialRevision({
+        chunkCount: structureChunks.length,
+        contentHash,
+        parseStatus: "PARSED",
+        parsedText: parsedResume.parsedText,
+        parserVersion,
+        resumeId: savedResume.id,
+        source: "CANDIDATE_UNDERSTANDING",
+        sourceFileName: parsedResume.fileName,
+        structuredData: {
+          semanticChunkCount: semanticChunks.length,
+          structureChunkCount: structureChunks.length
+        }
       });
       const aiResult = await aiService.generateValidatedJsonFromPrompt({
         feature: "candidate-understanding",
@@ -217,7 +232,7 @@ async function persistFailedResumeIfPossible({
   try {
     const originalFile = new Uint8Array(await file.arrayBuffer());
 
-    await candidateResumeRepository.create({
+    const savedResume = await candidateResumeRepository.create({
       candidateSource: input.candidateSource,
       contentHash: null,
       fileName: file.name,
@@ -235,6 +250,20 @@ async function persistFailedResumeIfPossible({
       semanticChunks: [],
       structureChunks: [],
       workflowId
+    });
+    await resumeRevisionRepository.createInitialRevision({
+      chunkCount: 0,
+      contentHash: null,
+      parseStatus: "FAILED",
+      parsedText: null,
+      parserVersion,
+      resumeId: savedResume.id,
+      source: "CANDIDATE_UNDERSTANDING",
+      sourceFileName: file.name,
+      structuredData: {
+        semanticChunkCount: 0,
+        structureChunkCount: 0
+      }
     });
   } catch {
     // Parsing failure should remain the user-facing error; failed-resume persistence is best effort.

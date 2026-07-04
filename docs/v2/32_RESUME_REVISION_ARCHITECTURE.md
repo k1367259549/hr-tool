@@ -3,6 +3,7 @@
 Version: V2.0 Draft
 System: hr-tool V2 / AI Recruiter
 Scope: M06 Resume Library Foundation Architecture Design
+Implementation Status: TASK-063-B minimal schema foundation implemented
 
 ---
 
@@ -79,7 +80,7 @@ contentHash     String?
 source          String?
 sourceFileName  String?
 parserVersion   String?
-parseStatus     String
+parseStatus     ResumeParsingStatus
 createdAt       DateTime
 ```
 
@@ -110,7 +111,7 @@ id              String
 revisionId      String
 parsedText      String?
 structuredData  Json?
-chunkCount      Int
+chunkCount      Int @default(0)
 createdAt       DateTime
 ```
 
@@ -261,8 +262,8 @@ This architecture design does not implement:
 - object storage migration
 - authentication
 - multi-user permissions
-- schema changes
-- Prisma migration
+- historical revision backfill
+- revision timeline API or UI
 
 ---
 
@@ -281,6 +282,27 @@ Recommended sequence:
 7. Add no M07 evaluation behavior in the revision foundation task.
 
 Historical data can be backfilled later after the revision read path is stable.
+
+### TASK-063-B Implementation Status
+
+TASK-063-B implements the minimum schema foundation:
+
+- `ResumeRevision`
+- `ParsedSnapshot`
+- `CandidateResume.revisions`
+- initial revision creation for new Resume Library uploads
+- initial revision creation for new Candidate Understanding resume records
+
+Still not implemented:
+
+- historical `CandidateResume.parsedText` backfill into `ParsedSnapshot`
+- revision timeline API
+- revision timeline UI
+- file replacement workflow
+- re-parse workflow
+- M07 Resume x JobProfile Evaluation
+
+Current API DTOs remain compatible. Existing Resume Library detail responses still read from `CandidateResume` fields.
 
 ---
 
