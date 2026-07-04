@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import type { ResumeIntakeSource } from "@prisma/client";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { useResumeList } from "@/features/resume-library/hooks/useResumeList";
@@ -14,6 +13,7 @@ import {
 } from "@/features/resume-library/resumeLibraryLabels";
 import type {
   ResumeFileType,
+  ResumeIntakeSource,
   ResumeLinkStatus,
   ResumeListItemDto,
   ResumeParsingStatus
@@ -84,6 +84,10 @@ export function ResumeLibraryPage(): JSX.Element {
           }
         >
           <option value="">全部入口</option>
+          <option value="upload">Upload</option>
+          <option value="feishu">Feishu</option>
+          <option value="manual">Manual</option>
+          <option value="api">API</option>
           <option value="RESUME_LIBRARY">Resume Library</option>
           <option value="CANDIDATE_UNDERSTANDING">Candidate Understanding</option>
         </select>
@@ -161,7 +165,14 @@ function ResumeListRow({ resume }: { resume: ResumeListItemDto }): JSX.Element {
         <MetaLine label="Candidate" value={resume.candidateName ?? "未关联"} />
         <MetaLine label="初始岗位" value={resume.jobProfileTitle ?? "无初始岗位"} />
         <MetaLine label="来源渠道" value={resume.candidateSource ?? "未填写"} />
-        <MetaLine label="进入入口" value={resumeIntakeSourceLabels[resume.intakeSource]} />
+        <MetaLine
+          label="进入入口"
+          value={
+            resume.intakeSource
+              ? resumeIntakeSourceLabels[resume.intakeSource] ?? resume.intakeSource
+              : "未记录"
+          }
+        />
       </div>
       {resume.duplicateCount > 0 ? (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

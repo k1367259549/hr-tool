@@ -1,7 +1,9 @@
-import type { ResumeIntakeSource } from "@prisma/client";
-
-export const resumeIntakeSourceLabels: Record<ResumeIntakeSource, string> = {
+export const resumeIntakeSourceLabels: Record<string, string> = {
+  api: "API",
   CANDIDATE_UNDERSTANDING: "Candidate Understanding",
+  feishu: "Feishu",
+  manual: "Manual",
+  upload: "Upload",
   RESUME_LIBRARY: "Resume Library"
 };
 

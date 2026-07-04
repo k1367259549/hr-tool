@@ -6,7 +6,9 @@ export type SafeCandidateResume = {
   fileType: string;
   fileSize: number;
   parsingStatus: string;
-  intakeSource: string;
+  intakeSource: string | null;
+  language: string | null;
+  parserVersion: string | null;
   createdAt: Date;
   candidateId: string | null;
 };
@@ -17,7 +19,9 @@ export type SafeCandidateResumeDto = {
   fileType: string;
   fileSize: number;
   parsingStatus: string;
-  intakeSource: string;
+  intakeSource: string | null;
+  language: string | null;
+  parserVersion: string | null;
   createdAt: string;
   candidateId: string | null;
 };

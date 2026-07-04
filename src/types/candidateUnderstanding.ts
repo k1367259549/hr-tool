@@ -122,8 +122,10 @@ export type CandidateResume = {
   resumeVersion: string;
   candidateSource: string | null;
   notes: string | null;
-  intakeSource: "RESUME_LIBRARY" | "CANDIDATE_UNDERSTANDING";
+  intakeSource: string | null;
   contentHash: string | null;
+  language: string | null;
+  parserVersion: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

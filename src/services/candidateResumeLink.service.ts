@@ -255,7 +255,9 @@ function toSafeCandidateResumeDto(resume: SafeCandidateResume): SafeCandidateRes
     fileType: resume.fileType,
     id: resume.id,
     intakeSource: resume.intakeSource,
+    language: resume.language,
     originalName: resume.originalName,
+    parserVersion: resume.parserVersion,
     parsingStatus: resume.parsingStatus
   };
 }

@@ -78,7 +78,14 @@ export function ResumeDetailPage({ resumeId }: { resumeId: string }): JSX.Elemen
               label="解析状态"
               value={resumeParsingStatusLabels[resume.parsingStatus] ?? resume.parsingStatus}
             />
-            <MetaItem label="进入入口" value={resumeIntakeSourceLabels[resume.intakeSource]} />
+            <MetaItem
+              label="进入入口"
+              value={
+                resume.intakeSource
+                  ? resumeIntakeSourceLabels[resume.intakeSource] ?? resume.intakeSource
+                  : "未记录"
+              }
+            />
           </section>
 
           <section className="rounded-md border border-slate-200 bg-white p-5">
@@ -88,6 +95,8 @@ export function ResumeDetailPage({ resumeId }: { resumeId: string }): JSX.Elemen
               <MetaLine label="上传时间" value={formatDateTime(resume.createdAt)} />
               <MetaLine label="更新时间" value={formatDateTime(resume.updatedAt)} />
               <MetaLine label="内容哈希" value={resume.hasContentHash ? "已记录，用于重复提示" : "未记录"} />
+              <MetaLine label="简历语言" value={resume.language ?? "未识别"} />
+              <MetaLine label="解析器版本" value={resume.parserVersion ?? "未记录"} />
               <MetaLine
                 label="关联 Candidate"
                 value={resume.candidate ? resume.candidate.fullName : "未关联"}

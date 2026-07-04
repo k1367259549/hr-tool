@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ResumeIntakeSource } from "@prisma/client";
 import type { ApiResponse } from "@/types/api";
 import type {
   ResumeFileType,
+  ResumeIntakeSource,
   ResumeLinkStatus,
   ResumeListResultDto,
   ResumeParsingStatus

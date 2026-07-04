@@ -25,6 +25,7 @@ import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 
 const promptFile = "candidate-understanding.md";
 const resumeVersion = "resume-parser-v1";
+const parserVersion = "v1";
 
 export class CandidateUnderstandingServiceError extends Error {
   readonly code: "AI_ERROR" | "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND";
@@ -60,8 +61,10 @@ export const candidateUnderstandingService = {
         fileType: parsedResume.fileType,
         intakeSource: "CANDIDATE_UNDERSTANDING",
         jobProfileId: jobProfile.id,
+        language: null,
         notes: input.notes,
         originalFile: parsedResume.originalFile,
+        parserVersion,
         parsedText: parsedResume.parsedText,
         parsingStatus: "PARSED",
         resumeVersion,
@@ -221,8 +224,10 @@ async function persistFailedResumeIfPossible({
       fileType: getNormalizedResumeFileType(file.name) ?? "unknown",
       intakeSource: "CANDIDATE_UNDERSTANDING",
       jobProfileId,
+      language: null,
       notes: input.notes,
       originalFile,
+      parserVersion,
       parsingError: error.message,
       parsingStatus: "FAILED",
       resumeVersion,

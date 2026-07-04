@@ -69,21 +69,23 @@ maybeDescribe("Resume Library PostgreSQL integration", () => {
   it("creates an independent Resume Library resume", async () => {
     await prisma.candidateResume.create({
       data: {
-      candidateId: null,
-      contentHash,
-      fileName: "library-resume.txt",
-      fileSize: 32,
-      fileType: "TXT",
-      id: resumeLibraryId,
-      intakeSource: "RESUME_LIBRARY",
-      jobProfileId: null,
-      originalFile: Buffer.from("synthetic resume"),
-      parsedText: "Synthetic parsed resume.",
-      parsingStatus: "PARSED",
-      resumeVersion: "integration-test",
-      semanticChunks: [],
-      structureChunks: [],
-      workflowId: `it-library-upload-${suffix}`
+        candidateId: null,
+        contentHash,
+        fileName: "library-resume.txt",
+        fileSize: 32,
+        fileType: "TXT",
+        id: resumeLibraryId,
+        intakeSource: "upload",
+        jobProfileId: null,
+        language: null,
+        originalFile: Buffer.from("synthetic resume"),
+        parsedText: "Synthetic parsed resume.",
+        parserVersion: "v1",
+        parsingStatus: "PARSED",
+        resumeVersion: "integration-test",
+        semanticChunks: [],
+        structureChunks: [],
+        workflowId: `it-library-upload-${suffix}`
       }
     });
 
@@ -100,7 +102,7 @@ maybeDescribe("Resume Library PostgreSQL integration", () => {
 
     expect(resume).toEqual({
       candidateId: null,
-      intakeSource: "RESUME_LIBRARY",
+      intakeSource: "upload",
       jobProfileId: null
     });
   });
@@ -108,21 +110,23 @@ maybeDescribe("Resume Library PostgreSQL integration", () => {
   it("keeps Candidate Understanding compatible with a reviewed Job Profile context", async () => {
     await prisma.candidateResume.create({
       data: {
-      candidateId: null,
-      contentHash: `${contentHash}-candidate-understanding`,
-      fileName: "candidate-understanding-resume.txt",
-      fileSize: 32,
-      fileType: "TXT",
-      id: candidateUnderstandingResumeId,
-      intakeSource: "CANDIDATE_UNDERSTANDING",
-      jobProfileId,
-      originalFile: Buffer.from("synthetic resume"),
-      parsedText: "Synthetic parsed resume.",
-      parsingStatus: "PARSED",
-      resumeVersion: "integration-test",
-      semanticChunks: [],
-      structureChunks: [],
-      workflowId: `it-cu-upload-${suffix}`
+        candidateId: null,
+        contentHash: `${contentHash}-candidate-understanding`,
+        fileName: "candidate-understanding-resume.txt",
+        fileSize: 32,
+        fileType: "TXT",
+        id: candidateUnderstandingResumeId,
+        intakeSource: "CANDIDATE_UNDERSTANDING",
+        jobProfileId,
+        language: null,
+        originalFile: Buffer.from("synthetic resume"),
+        parsedText: "Synthetic parsed resume.",
+        parserVersion: "v1",
+        parsingStatus: "PARSED",
+        resumeVersion: "integration-test",
+        semanticChunks: [],
+        structureChunks: [],
+        workflowId: `it-cu-upload-${suffix}`
       }
     });
 
@@ -185,9 +189,11 @@ function createDuplicateResumeData(id: string, contentHash: string, suffix: stri
     fileSize: 32,
     fileType: "TXT",
     id,
-    intakeSource: "RESUME_LIBRARY" as const,
+    intakeSource: "upload",
+    language: null,
     originalFile: Buffer.from("same synthetic resume"),
     parsedText: "Same synthetic parsed resume.",
+    parserVersion: "v1",
     parsingStatus: "PARSED",
     resumeVersion: "integration-test",
     semanticChunks: [],

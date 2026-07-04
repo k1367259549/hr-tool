@@ -50,28 +50,30 @@ describe("Prisma schema safeguards", () => {
         process.cwd(),
         "prisma",
         "migrations",
-        "20260702050000_add_resume_library_foundation",
+        "20260704070000_task_061_resume_job_decoupling",
         "migration.sql"
       ),
       "utf8"
     );
 
-    expect(schema).toContain("enum ResumeIntakeSource");
     expect(schema).toContain("jobProfileId    String?");
     expect(schema).toContain(
       "jobProfile        JobProfile?              @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)"
     );
-    expect(schema).toContain("intakeSource    ResumeIntakeSource @default(CANDIDATE_UNDERSTANDING)");
+    expect(schema).toContain("intakeSource    String?");
     expect(schema).toContain("contentHash     String?");
+    expect(schema).toContain("language        String?");
+    expect(schema).toContain("parserVersion   String?");
     expect(schema).toContain("@@index([contentHash])");
     expect(schema).toContain("@@index([parsingStatus])");
     expect(schema).toContain("@@index([fileType])");
     expect(schema).toContain("@@index([intakeSource])");
     expect(schema).not.toContain("@@unique([contentHash])");
-    expect(migration).toContain("CREATE TYPE \"ResumeIntakeSource\"");
-    expect(migration).toContain('ALTER COLUMN "jobProfileId" DROP NOT NULL');
-    expect(migration).toContain("ON DELETE SET NULL");
-    expect(migration).toContain("CandidateResume_contentHash_idx");
+    expect(schema).not.toContain("enum ResumeIntakeSource");
+    expect(migration).toContain('ADD COLUMN "language" TEXT');
+    expect(migration).toContain('ADD COLUMN "parserVersion" TEXT');
+    expect(migration).toContain('ALTER COLUMN "intakeSource" TYPE TEXT');
+    expect(migration).toContain('ALTER COLUMN "intakeSource" DROP NOT NULL');
   });
 
   it("keeps CandidateInsight as the legacy Candidate Understanding compatibility object", () => {

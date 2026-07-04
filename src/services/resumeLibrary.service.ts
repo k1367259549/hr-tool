@@ -18,6 +18,7 @@ import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 import { validateResumeFile } from "@/utils/resumeLibraryValidation";
 
 const resumeVersion = "resume-parser-v1";
+const parserVersion = "v1";
 
 export class ResumeLibraryServiceError extends Error {
   readonly code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND";
@@ -47,10 +48,12 @@ export const resumeLibraryService = {
         fileName: parsedResume.fileName,
         fileSize: parsedResume.fileSize,
         fileType,
-        intakeSource: "RESUME_LIBRARY",
+        intakeSource: "upload",
         jobProfileId: null,
+        language: null,
         notes: input.notes,
         originalFile,
+        parserVersion,
         parsedText: parsedResume.parsedText,
         parsingError: null,
         parsingStatus: "PARSED",
@@ -70,10 +73,12 @@ export const resumeLibraryService = {
           fileName: input.file.name,
           fileSize: input.file.size,
           fileType,
-          intakeSource: "RESUME_LIBRARY",
+          intakeSource: "upload",
           jobProfileId: null,
+          language: null,
           notes: input.notes,
           originalFile,
+          parserVersion,
           parsedText: null,
           parsingError: error.message,
           parsingStatus: "FAILED",
@@ -181,8 +186,10 @@ async function toResumeListItemDto(resume: ResumeListRecord): Promise<ResumeList
     hasContentHash: Boolean(resume.contentHash),
     id: resume.id,
     intakeSource: resume.intakeSource,
+    language: resume.language,
     jobProfileId: resume.jobProfileId,
     jobProfileTitle: resume.jobProfile?.jobTitle ?? null,
+    parserVersion: resume.parserVersion,
     parsingStatus: resume.parsingStatus,
     updatedAt: resume.updatedAt.toISOString()
   };

@@ -33,8 +33,10 @@ type CandidateResumeCreateInput = {
   resumeVersion: string;
   candidateSource?: string;
   notes?: string;
-  intakeSource?: "RESUME_LIBRARY" | "CANDIDATE_UNDERSTANDING";
+  intakeSource?: string | null;
   contentHash?: string | null;
+  language?: string | null;
+  parserVersion?: string | null;
 };
 
 const safeResumeSelect = {
@@ -45,6 +47,8 @@ const safeResumeSelect = {
   fileType: true,
   id: true,
   intakeSource: true,
+  language: true,
+  parserVersion: true,
   parsingStatus: true
 } satisfies Prisma.CandidateResumeSelect;
 
@@ -64,6 +68,8 @@ const resumeListSelect = {
   fileType: true,
   id: true,
   intakeSource: true,
+  language: true,
+  parserVersion: true,
   jobProfile: {
     select: {
       id: true,
@@ -139,8 +145,10 @@ export const candidateResumeRepository = {
       fileType: data.fileType as ResumeCreateData["fileType"],
       intakeSource: data.intakeSource ?? "CANDIDATE_UNDERSTANDING",
       jobProfileId: data.jobProfileId,
+      language: data.language,
       notes: data.notes,
       originalFile: data.originalFile,
+      parserVersion: data.parserVersion,
       parsedText: data.parsedText,
       parsingError: data.parsingError,
       parsingStatus: data.parsingStatus as ResumeCreateData["parsingStatus"],
@@ -162,8 +170,10 @@ export const candidateResumeRepository = {
         fileType: data.fileType,
         intakeSource: data.intakeSource,
         jobProfileId: data.jobProfileId,
+        language: data.language,
         notes: data.notes,
         originalFile: data.originalFile,
+        parserVersion: data.parserVersion,
         parsedText: data.parsedText,
         parsingError: data.parsingError,
         parsingStatus: data.parsingStatus,
@@ -484,6 +494,8 @@ function toSafeCandidateResume(resume: SafeCandidateResumeRecord): SafeCandidate
     fileType: resume.fileType,
     id: resume.id,
     intakeSource: resume.intakeSource,
+    language: resume.language,
+    parserVersion: resume.parserVersion,
     originalName: resume.fileName,
     parsingStatus: resume.parsingStatus
   };

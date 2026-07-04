@@ -59,11 +59,6 @@ enum ApplicationEventType {
   NOTE_ADDED
 }
 
-enum ResumeIntakeSource {
-  RESUME_LIBRARY
-  CANDIDATE_UNDERSTANDING
-}
-
 enum EvaluationTemplateStatus {
   ACTIVE
   ARCHIVED
@@ -272,7 +267,7 @@ model JobProfile {
 }
 
 model CandidateResume {
-  id              String             @id @default(uuid())
+  id              String   @id @default(uuid())
   workflowId      String
   jobProfileId    String?
   candidateId     String?
@@ -288,10 +283,12 @@ model CandidateResume {
   resumeVersion   String
   candidateSource String?
   notes           String?
-  intakeSource    ResumeIntakeSource @default(CANDIDATE_UNDERSTANDING)
+  intakeSource    String?
   contentHash     String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  language        String?
+  parserVersion   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   candidate         Candidate?               @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   jobProfile        JobProfile?              @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)

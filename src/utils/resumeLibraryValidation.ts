@@ -1,4 +1,3 @@
-import type { ResumeIntakeSource } from "@prisma/client";
 import {
   getNormalizedResumeFileType,
   isSupportedResumeFileName,
@@ -16,7 +15,14 @@ import type {
 
 const supportedFileTypes = ["PDF", "DOCX", "TXT"] as const;
 const supportedParsingStatuses = ["PARSED", "FAILED"] as const;
-const supportedIntakeSources = ["RESUME_LIBRARY", "CANDIDATE_UNDERSTANDING"] as const;
+const supportedIntakeSources = [
+  "upload",
+  "feishu",
+  "manual",
+  "api",
+  "RESUME_LIBRARY",
+  "CANDIDATE_UNDERSTANDING"
+] as const;
 const supportedLinkStatuses = ["linked", "unlinked", "all"] as const;
 const uploadFields = ["file", "candidateSource", "notes"] as const;
 const metadataFields = ["candidateSource", "notes"] as const;
@@ -245,8 +251,8 @@ export function isResumeParsingStatus(value: string): value is ResumeParsingStat
   return supportedParsingStatuses.includes(value as ResumeParsingStatus);
 }
 
-export function isResumeIntakeSource(value: string): value is ResumeIntakeSource {
-  return supportedIntakeSources.includes(value as ResumeIntakeSource);
+export function isResumeIntakeSource(value: string): boolean {
+  return supportedIntakeSources.includes(value as (typeof supportedIntakeSources)[number]);
 }
 
 export function isResumeLinkStatus(value: string): value is ResumeLinkStatus {

@@ -28,7 +28,9 @@ const safeResumeDto: SafeCandidateResumeDto = {
   fileType: "PDF",
   id: "resume-id",
   intakeSource: "RESUME_LIBRARY",
+  language: null,
   originalName: "resume.pdf",
+  parserVersion: "v1",
   parsingStatus: "PARSED"
 };
 

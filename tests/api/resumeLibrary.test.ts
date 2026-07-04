@@ -48,7 +48,9 @@ const detailDto: ResumeDetailDto = {
   jobProfile: null,
   jobProfileId: null,
   jobProfileTitle: null,
+  language: null,
   notes: "备注",
+  parserVersion: "v1",
   parsedText: "hello resume",
   parsingError: null,
   parsingStatus: "PARSED",
@@ -72,6 +74,8 @@ const listItemDto: ResumeListItemDto = {
   intakeSource: detailDto.intakeSource,
   jobProfileId: detailDto.jobProfileId,
   jobProfileTitle: detailDto.jobProfileTitle,
+  language: detailDto.language,
+  parserVersion: detailDto.parserVersion,
   parsingStatus: detailDto.parsingStatus,
   updatedAt: detailDto.updatedAt
 };

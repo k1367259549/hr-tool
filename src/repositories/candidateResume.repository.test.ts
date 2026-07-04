@@ -24,6 +24,8 @@ const safeRecord = {
   fileType: "PDF",
   id: "resume-id",
   intakeSource: "RESUME_LIBRARY",
+  language: null,
+  parserVersion: "v1",
   parsingStatus: "PARSED"
 };
 
@@ -133,9 +135,11 @@ describe("candidateResumeRepository", () => {
       ...safeRecord,
       candidateSource: null,
       contentHash: "hash-value",
+      language: null,
       jobProfileId: null,
       notes: null,
       originalFile: new Uint8Array([1]),
+      parserVersion: "v1",
       parsedText: "hello",
       parsingError: null,
       resumeVersion: "resume-parser-v1",
@@ -154,8 +158,10 @@ describe("candidateResumeRepository", () => {
       fileType: "TXT",
       intakeSource: "RESUME_LIBRARY",
       jobProfileId: null,
+      language: null,
       notes: null,
       originalFile: new Uint8Array([1]) as Uint8Array<ArrayBuffer>,
+      parserVersion: "v1",
       parsedText: "hello",
       parsingError: null,
       parsingStatus: "PARSED",
@@ -169,8 +175,10 @@ describe("candidateResumeRepository", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           candidateId: null,
+          language: null,
           intakeSource: "RESUME_LIBRARY",
-          jobProfileId: null
+          jobProfileId: null,
+          parserVersion: "v1"
         })
       })
     );

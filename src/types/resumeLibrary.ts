@@ -1,9 +1,9 @@
-import type { ResumeIntakeSource } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
 export type ResumeFileType = "PDF" | "DOCX" | "TXT";
 export type ResumeParsingStatus = "PARSED" | "FAILED";
 export type ResumeLinkStatus = "linked" | "unlinked" | "all";
+export type ResumeIntakeSource = string;
 
 export type ResumeListQuery = {
   search?: string;
@@ -63,7 +63,9 @@ export type ResumeListItemDto = {
   fileSize: number;
   parsingStatus: string;
   candidateSource: string | null;
-  intakeSource: ResumeIntakeSource;
+  intakeSource: ResumeIntakeSource | null;
+  language: string | null;
+  parserVersion: string | null;
   hasContentHash: boolean;
   duplicateCount: number;
   candidateId: string | null;
@@ -117,8 +119,10 @@ export type ResumeCreateData = {
   resumeVersion: string;
   candidateSource?: string | null;
   notes?: string | null;
-  intakeSource: ResumeIntakeSource;
+  intakeSource?: ResumeIntakeSource | null;
   contentHash?: string | null;
+  language?: string | null;
+  parserVersion?: string | null;
 };
 
 export type ResumeRepositoryListResult = {
@@ -135,6 +139,8 @@ export type ResumeListRecord = Prisma.CandidateResumeGetPayload<{
     parsingStatus: true;
     candidateSource: true;
     intakeSource: true;
+    language: true;
+    parserVersion: true;
     contentHash: true;
     candidateId: true;
     candidate: {
@@ -169,6 +175,8 @@ export type ResumeDetailRecord = Prisma.CandidateResumeGetPayload<{
     candidateSource: true;
     notes: true;
     intakeSource: true;
+    language: true;
+    parserVersion: true;
     contentHash: true;
     candidateId: true;
     candidate: {
