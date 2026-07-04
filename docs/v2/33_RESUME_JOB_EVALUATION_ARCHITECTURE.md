@@ -3,6 +3,7 @@
 Version: V2.0 Draft
 System: hr-tool V2 / AI Recruiter
 Scope: MILESTONE-07A - Resume x JobProfile Evaluation Architecture Design
+Implementation Status: M07-B1 revision/snapshot reference foundation implemented
 
 ---
 
@@ -542,3 +543,31 @@ Recommended sequence:
 10. Do not add automatic rejection, ranking, or pipeline movement.
 
 M07-B should explicitly decide whether the implementation name remains `ResumeEvaluationResult` or migrates toward `ResumeJobEvaluation`.
+
+### M07-B1 Implementation Status
+
+M07-B1 implements the revision/snapshot reference foundation on the existing `ResumeEvaluationResult` master record:
+
+- `ResumeEvaluationResult.resumeRevisionId`
+- `ResumeEvaluationResult.parsedSnapshotId`
+- nullable relations to `ResumeRevision` and `ParsedSnapshot`
+- indexes for the new reference fields
+- service-layer resolution of actual `resumeRevisionId` and `parsedSnapshotId` for new evaluations when available
+
+The existing unique constraint remains unchanged:
+
+```text
+@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion])
+```
+
+Still not implemented:
+
+- `EvaluationRun` or `EvaluationPromptRun`
+- AI trace fields
+- rerun semantics
+- AI scoring
+- ranking
+- automatic screening
+- automatic Candidate Pipeline movement
+
+Historical evaluation rows are not backfilled. New fields are nullable so older data remains valid.

@@ -1,5 +1,6 @@
 import type { Prisma, ResumeParsingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { CandidateDbClient } from "@/repositories/candidate.repository";
 
 export type CreateInitialResumeRevisionInput = {
   resumeId: string;
@@ -12,6 +13,18 @@ export type CreateInitialResumeRevisionInput = {
   structuredData?: Prisma.InputJsonValue | null;
   chunkCount?: number | null;
 };
+
+export type LatestResumeRevisionRecord = Prisma.ResumeRevisionGetPayload<{
+  include: {
+    parsedSnapshot: true;
+  };
+}>;
+
+export type ParsedSnapshotWithRevisionRecord = Prisma.ParsedSnapshotGetPayload<{
+  include: {
+    revision: true;
+  };
+}>;
 
 export const resumeRevisionRepository = {
   async createInitialRevision(input: CreateInitialResumeRevisionInput) {
@@ -38,5 +51,58 @@ export const resumeRevisionRepository = {
         }
       })
     );
+  },
+
+  async findLatestRevisionWithSnapshot(
+    resumeId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<LatestResumeRevisionRecord | null> {
+    return client.resumeRevision.findFirst({
+      include: {
+        parsedSnapshot: true
+      },
+      orderBy: [
+        {
+          revisionNumber: "desc"
+        },
+        {
+          createdAt: "desc"
+        },
+        {
+          id: "asc"
+        }
+      ],
+      where: {
+        resumeId
+      }
+    });
+  },
+
+  async findRevisionWithSnapshotById(
+    revisionId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<LatestResumeRevisionRecord | null> {
+    return client.resumeRevision.findUnique({
+      include: {
+        parsedSnapshot: true
+      },
+      where: {
+        id: revisionId
+      }
+    });
+  },
+
+  async findSnapshotWithRevisionById(
+    snapshotId: string,
+    client: CandidateDbClient = prisma
+  ): Promise<ParsedSnapshotWithRevisionRecord | null> {
+    return client.parsedSnapshot.findUnique({
+      include: {
+        revision: true
+      },
+      where: {
+        id: snapshotId
+      }
+    });
   }
 };

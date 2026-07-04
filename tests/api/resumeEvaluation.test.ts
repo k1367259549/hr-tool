@@ -40,7 +40,9 @@ const baseEvaluation: ResumeEvaluationDetailDto = {
   jobProfileId: "jp-1",
   jobProfileVersion: "2026-07-01T00:00:00.000Z",
   overallNote: null,
+  parsedSnapshotId: null,
   resumeId: "resume-1",
+  resumeRevisionId: null,
   reviewedAt: null,
   revision: 0,
   status: "DRAFT",
@@ -102,6 +104,34 @@ describe("POST /api/resume-evaluations", () => {
 
     expect(response.status).toBe(201);
     expect(json.data?.id).toBe("eval-1");
+  });
+
+  it("accepts optional revision and snapshot references", async () => {
+    vi.mocked(serviceMock.createEvaluation).mockResolvedValueOnce({
+      ...baseEvaluation,
+      parsedSnapshotId: "snapshot-1",
+      resumeRevisionId: "revision-1"
+    });
+
+    const { POST } = await import("@/app/api/resume-evaluations/route");
+    const request = createJsonRequest("http://localhost/api/resume-evaluations", {
+      jobProfileId: "jp-1",
+      parsedSnapshotId: "snapshot-1",
+      resumeId: "resume-1",
+      resumeRevisionId: "revision-1",
+      templateVersionId: "tv-1"
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    expect(serviceMock.createEvaluation).toHaveBeenCalledWith({
+      evaluatedBy: undefined,
+      jobProfileId: "jp-1",
+      parsedSnapshotId: "snapshot-1",
+      resumeId: "resume-1",
+      resumeRevisionId: "revision-1",
+      templateVersionId: "tv-1"
+    });
   });
 
   it("returns 400 for missing required fields", async () => {

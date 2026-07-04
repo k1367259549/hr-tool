@@ -18,6 +18,8 @@ export type ResumeCriterionResult = {
 
 export type ResumeEvaluationCreateInput = {
   resumeId: string;
+  resumeRevisionId?: string | null;
+  parsedSnapshotId?: string | null;
   jobProfileId: string;
   templateVersionId: string;
   evaluatedBy?: string | null;
@@ -53,6 +55,8 @@ export type ResumeEvaluationListQuery = {
 export type ResumeEvaluationSummaryDto = {
   id: string;
   resumeId: string;
+  resumeRevisionId: string | null;
+  parsedSnapshotId: string | null;
   jobProfileId: string;
   templateVersionId: string;
   jobProfileVersion: string;

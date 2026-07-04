@@ -16,7 +16,14 @@ const criterionAssessments = [
   "NOT_SUPPORTED",
   "NOT_APPLICABLE"
 ] as const;
-const createFields = ["resumeId", "jobProfileId", "templateVersionId", "evaluatedBy"] as const;
+const createFields = [
+  "resumeId",
+  "resumeRevisionId",
+  "parsedSnapshotId",
+  "jobProfileId",
+  "templateVersionId",
+  "evaluatedBy"
+] as const;
 const updateFields = ["criterionResults", "overallNote", "evaluatedBy", "expectedRevision"] as const;
 const reviewFields = ["expectedRevision", "actor"] as const;
 const reopenFields = ["expectedRevision", "actor", "note"] as const;
@@ -65,7 +72,9 @@ export function parseResumeEvaluationCreatePayload(
   return {
     evaluatedBy: readNullableText(body, "evaluatedBy", 120),
     jobProfileId: readRequiredText(body, "jobProfileId", 120),
+    parsedSnapshotId: readNullableText(body, "parsedSnapshotId", 120),
     resumeId: readRequiredText(body, "resumeId", 120),
+    resumeRevisionId: readNullableText(body, "resumeRevisionId", 120),
     templateVersionId: readRequiredText(body, "templateVersionId", 120)
   };
 }

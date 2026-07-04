@@ -322,8 +322,9 @@ model ResumeRevision {
   parseStatus    ResumeParsingStatus
   createdAt      DateTime            @default(now())
 
-  resume         CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  parsedSnapshot ParsedSnapshot?
+  resume            CandidateResume          @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  parsedSnapshot    ParsedSnapshot?
+  resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationResumeRevision")
 
   @@unique([resumeId, revisionNumber])
   @@index([resumeId])
@@ -339,7 +340,8 @@ model ParsedSnapshot {
   chunkCount     Int      @default(0)
   createdAt      DateTime @default(now())
 
-  revision ResumeRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  revision          ResumeRevision           @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationParsedSnapshot")
 
   @@index([createdAt])
 }
@@ -662,6 +664,8 @@ model RecruitmentTaskAudit {
 model ResumeEvaluationResult {
   id                String                 @id @default(cuid())
   resumeId          String
+  resumeRevisionId  String?
+  parsedSnapshotId  String?
   jobProfileId      String
   templateVersionId String
   jobProfileVersion String
@@ -675,12 +679,16 @@ model ResumeEvaluationResult {
   updatedAt         DateTime               @updatedAt
 
   resume          CandidateResume           @relation(fields: [resumeId], references: [id], onDelete: Restrict)
+  resumeRevision  ResumeRevision?           @relation("EvaluationResumeRevision", fields: [resumeRevisionId], references: [id], onDelete: SetNull)
+  parsedSnapshot  ParsedSnapshot?           @relation("EvaluationParsedSnapshot", fields: [parsedSnapshotId], references: [id], onDelete: SetNull)
   jobProfile      JobProfile                @relation(fields: [jobProfileId], references: [id], onDelete: Restrict)
   templateVersion EvaluationTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   events          ResumeEvaluationEvent[]
 
   @@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")
   @@index([resumeId])
+  @@index([resumeRevisionId])
+  @@index([parsedSnapshotId])
   @@index([jobProfileId])
   @@index([templateVersionId])
   @@index([status])

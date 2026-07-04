@@ -5,6 +5,7 @@ import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.
 import { jobProfileEvaluationAssignmentRepository } from "@/repositories/jobProfileEvaluationAssignment.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import type {
   EvaluationCriterion
 } from "@/types/evaluationTemplate";
@@ -131,9 +132,15 @@ export const resumeEvaluationResultService = {
           criterionKey: criterion.key,
           evidenceNotes: []
         }));
+        const revisionContext = await resolveEvaluationRevisionContext(input, tx);
+        const createInput: ResumeEvaluationCreateInput = {
+          ...input,
+          parsedSnapshotId: revisionContext.parsedSnapshotId,
+          resumeRevisionId: revisionContext.resumeRevisionId
+        };
 
         const evaluation = await resumeEvaluationRepository.createWithEvent(
-          input,
+          createInput,
           jobProfileVersion,
           initialCriterionResults,
           input.evaluatedBy ?? null,
@@ -380,6 +387,8 @@ function toSummaryDto(
   evaluation: ResumeEvaluationResultDetailRecord | {
     id: string;
     resumeId: string;
+    resumeRevisionId?: string | null;
+    parsedSnapshotId?: string | null;
     jobProfileId: string;
     templateVersionId: string;
     jobProfileVersion: string;
@@ -399,12 +408,90 @@ function toSummaryDto(
     jobProfileId: evaluation.jobProfileId,
     jobProfileVersion: evaluation.jobProfileVersion,
     overallNote: evaluation.overallNote,
+    parsedSnapshotId: evaluation.parsedSnapshotId ?? null,
     resumeId: evaluation.resumeId,
+    resumeRevisionId: evaluation.resumeRevisionId ?? null,
     reviewedAt: evaluation.reviewedAt?.toISOString() ?? null,
     revision: evaluation.revision,
     status: evaluation.status,
     templateVersionId: evaluation.templateVersionId,
     updatedAt: evaluation.updatedAt.toISOString()
+  };
+}
+
+async function resolveEvaluationRevisionContext(
+  input: ResumeEvaluationCreateInput,
+  client: Parameters<typeof resumeRevisionRepository.findLatestRevisionWithSnapshot>[1]
+): Promise<{
+  resumeRevisionId: string | null;
+  parsedSnapshotId: string | null;
+}> {
+  if (input.resumeRevisionId && input.parsedSnapshotId) {
+    const snapshot = await resumeRevisionRepository.findSnapshotWithRevisionById(
+      input.parsedSnapshotId,
+      client
+    );
+
+    if (!snapshot || snapshot.revisionId !== input.resumeRevisionId) {
+      throw new ResumeEvaluationResultServiceError(
+        "VALIDATION_ERROR",
+        "解析快照与简历修订版本不匹配。"
+      );
+    }
+
+    return {
+      parsedSnapshotId: input.parsedSnapshotId,
+      resumeRevisionId: input.resumeRevisionId
+    };
+  }
+
+  if (input.resumeRevisionId) {
+    const revision = await resumeRevisionRepository.findRevisionWithSnapshotById(
+      input.resumeRevisionId,
+      client
+    );
+
+    if (!revision) {
+      throw new ResumeEvaluationResultServiceError(
+        "VALIDATION_ERROR",
+        "指定的简历修订版本不存在。"
+      );
+    }
+
+    return {
+      parsedSnapshotId: revision.parsedSnapshot?.id ?? null,
+      resumeRevisionId: revision.id
+    };
+  }
+
+  if (input.parsedSnapshotId) {
+    const snapshot = await resumeRevisionRepository.findSnapshotWithRevisionById(
+      input.parsedSnapshotId,
+      client
+    );
+
+    if (!snapshot) {
+      throw new ResumeEvaluationResultServiceError(
+        "VALIDATION_ERROR",
+        "指定的解析快照不存在。"
+      );
+    }
+
+    return {
+      parsedSnapshotId: snapshot.id,
+      resumeRevisionId: snapshot.revisionId
+    };
+  }
+
+  const latestRevision = await resumeRevisionRepository.findLatestRevisionWithSnapshot(
+    input.resumeId,
+    client
+  );
+
+  return {
+    // Historical resumes may predate M06 revision backfill, so new evaluations stay compatible.
+    parsedSnapshotId: input.parsedSnapshotId ?? latestRevision?.parsedSnapshot?.id ?? null,
+    resumeRevisionId: input.resumeRevisionId ?? latestRevision?.id ?? null
   };
 }
 

@@ -102,11 +102,11 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain("revisions         ResumeRevision[]");
     expect(schema).toContain("@@unique([resumeId, revisionNumber])");
     expect(schema).toContain("revisionId     String   @unique");
-    expect(schema).toContain(
-      "resume         CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)"
+    expect(schema).toMatch(
+      /resume\s+CandidateResume\s+@relation\(fields: \[resumeId\], references: \[id\], onDelete: Cascade\)/
     );
-    expect(schema).toContain(
-      "revision ResumeRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)"
+    expect(schema).toMatch(
+      /revision\s+ResumeRevision\s+@relation\(fields: \[revisionId\], references: \[id\], onDelete: Cascade\)/
     );
     expect(migration).toContain('CREATE TABLE "ResumeRevision"');
     expect(migration).toContain('CREATE TABLE "ParsedSnapshot"');
@@ -116,6 +116,55 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toContain("DROP TABLE");
     expect(migration).not.toContain("DROP COLUMN");
     expect(migration).not.toContain("ALTER COLUMN");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
+  it("adds ResumeEvaluationResult revision and snapshot refs without changing context uniqueness", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260704110000_m07_b1_evaluation_revision_snapshot_refs",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("resumeRevisionId  String?");
+    expect(schema).toContain("parsedSnapshotId  String?");
+    expect(schema).toMatch(
+      /resumeRevision\s+ResumeRevision\?\s+@relation\("EvaluationResumeRevision", fields: \[resumeRevisionId\], references: \[id\], onDelete: SetNull\)/
+    );
+    expect(schema).toMatch(
+      /parsedSnapshot\s+ParsedSnapshot\?\s+@relation\("EvaluationParsedSnapshot", fields: \[parsedSnapshotId\], references: \[id\], onDelete: SetNull\)/
+    );
+    expect(schema).toContain('resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationResumeRevision")');
+    expect(schema).toContain('resumeEvaluations ResumeEvaluationResult[] @relation("EvaluationParsedSnapshot")');
+    expect(schema).toContain("@@index([resumeRevisionId])");
+    expect(schema).toContain("@@index([parsedSnapshotId])");
+    expect(schema).toContain(
+      '@@unique([resumeId, jobProfileId, templateVersionId, jobProfileVersion], name: "resumeEvaluationContext", map: "ResumeEvaluationResult_context_key")'
+    );
+    expect(schema).not.toContain("model EvaluationRun");
+    expect(schema).not.toContain("model EvaluationPromptRun");
+    expect(schema).not.toContain("score             Int?");
+    expect(schema).not.toContain("rating            String?");
+    expect(schema).not.toContain("modelProvider");
+    expect(schema).not.toContain("promptVersion     String?");
+
+    expect(migration).toContain('ADD COLUMN "resumeRevisionId" TEXT');
+    expect(migration).toContain('ADD COLUMN "parsedSnapshotId" TEXT');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationResult_resumeRevisionId_idx"');
+    expect(migration).toContain('CREATE INDEX "ResumeEvaluationResult_parsedSnapshotId_idx"');
+    expect(migration).toContain('REFERENCES "ResumeRevision"("id")');
+    expect(migration).toContain('REFERENCES "ParsedSnapshot"("id")');
+    expect(migration).toContain("ON DELETE SET NULL");
+    expect(migration).not.toContain("ResumeEvaluationResult_context_key");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toContain("SET NOT NULL");
     expect(migration).not.toMatch(/^\s*UPDATE\s/im);
   });
 

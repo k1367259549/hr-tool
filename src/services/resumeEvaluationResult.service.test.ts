@@ -6,6 +6,7 @@ import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.
 import { jobProfileEvaluationAssignmentRepository } from "@/repositories/jobProfileEvaluationAssignment.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
+import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import {
   isResumeEvaluationContextUniqueViolation,
   resumeEvaluationResultService,
@@ -59,6 +60,14 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
     reopenWithEvent: vi.fn(),
     reviewWithEvent: vi.fn(),
     updateDraftWithEvent: vi.fn()
+  }
+}));
+
+vi.mock("@/repositories/resumeRevision.repository", () => ({
+  resumeRevisionRepository: {
+    findLatestRevisionWithSnapshot: vi.fn(),
+    findRevisionWithSnapshotById: vi.fn(),
+    findSnapshotWithRevisionById: vi.fn()
   }
 }));
 
@@ -116,7 +125,9 @@ function makeEvaluation(overrides?: object): ResumeEvaluationResultDetailRecord 
     jobProfileId: "jp-1",
     jobProfileVersion: "2026-07-01T00:00:00.000Z",
     overallNote: "整体评估摘要",
+    parsedSnapshotId: null,
     resumeId: "resume-1",
+    resumeRevisionId: null,
     reviewedAt: null,
     revision: 0,
     status: "DRAFT",
@@ -181,6 +192,22 @@ describe("isResumeEvaluationContextUniqueViolation", () => {
 describe("resumeEvaluationResultService.createEvaluation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resumeRevisionRepository.findLatestRevisionWithSnapshot).mockResolvedValue({
+      id: "revision-1",
+      parsedSnapshot: {
+        id: "snapshot-1"
+      }
+    } as never);
+    vi.mocked(resumeRevisionRepository.findRevisionWithSnapshotById).mockResolvedValue({
+      id: "explicit-revision",
+      parsedSnapshot: {
+        id: "explicit-snapshot"
+      }
+    } as never);
+    vi.mocked(resumeRevisionRepository.findSnapshotWithRevisionById).mockResolvedValue({
+      id: "explicit-snapshot",
+      revisionId: "explicit-revision"
+    } as never);
   });
 
   it("creates evaluation in a transaction", async () => {
@@ -204,9 +231,14 @@ describe("resumeEvaluationResultService.createEvaluation", () => {
 
     expect(result.status).toBe("DRAFT");
     expect(result.revision).toBe(0);
+    expect(result.resumeRevisionId).toBeNull();
+    expect(result.parsedSnapshotId).toBeNull();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(resumeEvaluationRepository.createWithEvent).toHaveBeenCalledWith(
-      expect.any(Object),
+      expect.objectContaining({
+        parsedSnapshotId: "snapshot-1",
+        resumeRevisionId: "revision-1"
+      }),
       "2026-07-01T00:00:00.000Z",
       [
         {
@@ -215,6 +247,190 @@ describe("resumeEvaluationResultService.createEvaluation", () => {
           evidenceNotes: []
         }
       ],
+      null,
+      transactionClient
+    );
+  });
+
+  it("persists explicit resumeRevisionId and parsedSnapshotId when provided", async () => {
+    vi.mocked(candidateResumeRepository.findById).mockResolvedValueOnce(makeResume() as never);
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(makeJobProfile() as never);
+    vi.mocked(jobProfileEvaluationAssignmentRepository.findActiveAssignment).mockResolvedValueOnce(
+      makeAssignment() as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion() as never
+    );
+    vi.mocked(resumeEvaluationRepository.createWithEvent).mockResolvedValueOnce(
+      makeEvaluation({
+        parsedSnapshotId: "explicit-snapshot",
+        resumeRevisionId: "explicit-revision"
+      })
+    );
+
+    const result = await resumeEvaluationResultService.createEvaluation({
+      jobProfileId: "jp-1",
+      parsedSnapshotId: "explicit-snapshot",
+      resumeId: "resume-1",
+      resumeRevisionId: "explicit-revision",
+      templateVersionId: "tv-1"
+    });
+
+    expect(result.resumeRevisionId).toBe("explicit-revision");
+    expect(result.parsedSnapshotId).toBe("explicit-snapshot");
+    expect(resumeRevisionRepository.findSnapshotWithRevisionById).toHaveBeenCalledWith(
+      "explicit-snapshot",
+      transactionClient
+    );
+    expect(resumeRevisionRepository.findLatestRevisionWithSnapshot).not.toHaveBeenCalled();
+    expect(resumeEvaluationRepository.createWithEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parsedSnapshotId: "explicit-snapshot",
+        resumeRevisionId: "explicit-revision"
+      }),
+      expect.any(String),
+      expect.any(Array),
+      null,
+      transactionClient
+    );
+  });
+
+  it("uses the specified resumeRevisionId and its own parsed snapshot", async () => {
+    vi.mocked(candidateResumeRepository.findById).mockResolvedValueOnce(makeResume() as never);
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(makeJobProfile() as never);
+    vi.mocked(jobProfileEvaluationAssignmentRepository.findActiveAssignment).mockResolvedValueOnce(
+      makeAssignment() as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion() as never
+    );
+    vi.mocked(resumeRevisionRepository.findRevisionWithSnapshotById).mockResolvedValueOnce({
+      id: "revision-only",
+      parsedSnapshot: {
+        id: "snapshot-for-revision"
+      }
+    } as never);
+    vi.mocked(resumeEvaluationRepository.createWithEvent).mockResolvedValueOnce(
+      makeEvaluation({
+        parsedSnapshotId: "snapshot-for-revision",
+        resumeRevisionId: "revision-only"
+      })
+    );
+
+    await resumeEvaluationResultService.createEvaluation({
+      jobProfileId: "jp-1",
+      resumeId: "resume-1",
+      resumeRevisionId: "revision-only",
+      templateVersionId: "tv-1"
+    });
+
+    expect(resumeEvaluationRepository.createWithEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parsedSnapshotId: "snapshot-for-revision",
+        resumeRevisionId: "revision-only"
+      }),
+      expect.any(String),
+      expect.any(Array),
+      null,
+      transactionClient
+    );
+    expect(resumeRevisionRepository.findLatestRevisionWithSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("uses the specified parsedSnapshotId and its own revision", async () => {
+    vi.mocked(candidateResumeRepository.findById).mockResolvedValueOnce(makeResume() as never);
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(makeJobProfile() as never);
+    vi.mocked(jobProfileEvaluationAssignmentRepository.findActiveAssignment).mockResolvedValueOnce(
+      makeAssignment() as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion() as never
+    );
+    vi.mocked(resumeRevisionRepository.findSnapshotWithRevisionById).mockResolvedValueOnce({
+      id: "snapshot-only",
+      revisionId: "revision-for-snapshot"
+    } as never);
+    vi.mocked(resumeEvaluationRepository.createWithEvent).mockResolvedValueOnce(
+      makeEvaluation({
+        parsedSnapshotId: "snapshot-only",
+        resumeRevisionId: "revision-for-snapshot"
+      })
+    );
+
+    await resumeEvaluationResultService.createEvaluation({
+      jobProfileId: "jp-1",
+      parsedSnapshotId: "snapshot-only",
+      resumeId: "resume-1",
+      templateVersionId: "tv-1"
+    });
+
+    expect(resumeEvaluationRepository.createWithEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parsedSnapshotId: "snapshot-only",
+        resumeRevisionId: "revision-for-snapshot"
+      }),
+      expect.any(String),
+      expect.any(Array),
+      null,
+      transactionClient
+    );
+    expect(resumeRevisionRepository.findLatestRevisionWithSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("rejects mismatched explicit resumeRevisionId and parsedSnapshotId", async () => {
+    vi.mocked(candidateResumeRepository.findById).mockResolvedValueOnce(makeResume() as never);
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(makeJobProfile() as never);
+    vi.mocked(jobProfileEvaluationAssignmentRepository.findActiveAssignment).mockResolvedValueOnce(
+      makeAssignment() as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion() as never
+    );
+    vi.mocked(resumeRevisionRepository.findSnapshotWithRevisionById).mockResolvedValueOnce({
+      id: "explicit-snapshot",
+      revisionId: "other-revision"
+    } as never);
+
+    await expect(
+      resumeEvaluationResultService.createEvaluation({
+        jobProfileId: "jp-1",
+        parsedSnapshotId: "explicit-snapshot",
+        resumeId: "resume-1",
+        resumeRevisionId: "explicit-revision",
+        templateVersionId: "tv-1"
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(resumeEvaluationRepository.createWithEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps creation compatible with null refs when no revision or snapshot exists", async () => {
+    vi.mocked(candidateResumeRepository.findById).mockResolvedValueOnce(makeResume() as never);
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(makeJobProfile() as never);
+    vi.mocked(jobProfileEvaluationAssignmentRepository.findActiveAssignment).mockResolvedValueOnce(
+      makeAssignment() as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion() as never
+    );
+    vi.mocked(resumeRevisionRepository.findLatestRevisionWithSnapshot).mockResolvedValueOnce(null);
+    vi.mocked(resumeEvaluationRepository.createWithEvent).mockResolvedValueOnce(
+      makeEvaluation()
+    );
+
+    await resumeEvaluationResultService.createEvaluation({
+      jobProfileId: "jp-1",
+      resumeId: "resume-1",
+      templateVersionId: "tv-1"
+    });
+
+    expect(resumeEvaluationRepository.createWithEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parsedSnapshotId: null,
+        resumeRevisionId: null
+      }),
+      expect.any(String),
+      expect.any(Array),
       null,
       transactionClient
     );

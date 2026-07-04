@@ -17,7 +17,9 @@ const evaluationListSelect = {
   jobProfileId: true,
   jobProfileVersion: true,
   overallNote: true,
+  parsedSnapshotId: true,
   resumeId: true,
+  resumeRevisionId: true,
   reviewedAt: true,
   revision: true,
   status: true,
@@ -55,7 +57,9 @@ export const resumeEvaluationRepository = {
         },
         jobProfileId: input.jobProfileId,
         jobProfileVersion,
+        parsedSnapshotId: input.parsedSnapshotId,
         resumeId: input.resumeId,
+        resumeRevisionId: input.resumeRevisionId,
         templateVersionId: input.templateVersionId
       },
       include: evaluationDetailInclude
