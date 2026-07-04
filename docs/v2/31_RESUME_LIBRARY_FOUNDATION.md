@@ -25,8 +25,7 @@ A Resume can exist without a Candidate and without a Job Profile. Candidate Unde
 The milestone keeps the existing `CandidateResume` table and adds:
 
 ```text
-ResumeIntakeSource
-CandidateResume.intakeSource
+CandidateResume.intakeSource String?
 CandidateResume.contentHash
 CandidateResume.jobProfileId nullable
 ```
@@ -36,7 +35,7 @@ Rules:
 - `jobProfileId` is nullable and only represents the initial processing context.
 - Resume Library uploads set `jobProfileId = null`.
 - Candidate Understanding uploads still set a reviewed Job Profile ID.
-- `contentHash` is SHA-256 over original file bytes.
+- `contentHash` is a nullable SHA-256 over normalized parsed resume text when text is available.
 - `contentHash` is indexed but not unique.
 - Duplicate files are allowed and only produce a recruiter-visible signal.
 - `CandidateInsight.resumeId @unique` remains unchanged until the future Resume x Job Profile evaluation milestone.
@@ -47,16 +46,34 @@ The Job Profile foreign key uses `ON DELETE SET NULL` so deleting an initial con
 
 ## 3. Resume Intake Sources
 
-`ResumeIntakeSource` values:
+`intakeSource` is a nullable free-string field, not a Prisma enum.
+
+Current new entry value:
+
+```text
+upload
+```
+
+Legacy compatibility values:
 
 ```text
 RESUME_LIBRARY
 CANDIDATE_UNDERSTANDING
 ```
 
+Possible future values:
+
+```text
+feishu
+manual
+api
+```
+
 `intakeSource` means which software entry created the file record.
 
 It is separate from `candidateSource`, which means the recruiting source channel such as referral, job board, or sourcing.
+
+When adding a new intake entry, update the application-level allowlist and validation rules at the same time.
 
 ---
 
@@ -78,7 +95,7 @@ Supported behavior:
 - non-AI parsing
 - parsed and failed parsing states
 - metadata update for `candidateSource` and `notes`
-- duplicate signal by exact file hash
+- duplicate signal by normalized text hash
 - safe detail response with parsed text but no original binary
 
 The API does not implement download, delete, automatic Candidate creation, automatic Candidate linking, automatic Job Profile matching, scoring, ranking, hire recommendation, reject recommendation, Interview, Offer, Analytics, or Feishu integration.
@@ -138,8 +155,8 @@ upload file
 Compatibility rules:
 
 - Candidate Understanding must pass `jobProfileId`.
-- Candidate Understanding sets `intakeSource = CANDIDATE_UNDERSTANDING`.
-- Resume Library uploads set `intakeSource = RESUME_LIBRARY`.
+- Candidate Understanding may still set `intakeSource = CANDIDATE_UNDERSTANDING` as the legacy workflow compatibility value.
+- Resume Library uploads now set `intakeSource = "upload"`.
 - `saveReviewedCandidateInsight` still validates the Resume and Job Profile match.
 - Independent Resume Library records do not directly enter Candidate Understanding in this milestone.
 

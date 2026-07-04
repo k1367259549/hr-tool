@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { validateCandidateUnderstandingAiOutput } from "@/ai/schemas/candidateUnderstanding.schema";
 import { aiService } from "@/ai/ai.service";
 import { candidateInsightRepository } from "@/repositories/candidateInsight.repository";
@@ -21,6 +21,7 @@ import { getSafeAiErrorMessage } from "@/utils/aiErrorMessage";
 import { AppError } from "@/utils/errors";
 import { normalizeCandidateInsightOutput } from "@/utils/candidateUnderstandingValidation";
 import { createSemanticChunks, createStructureChunks } from "@/utils/resumeChunking";
+import { generateResumeContentHash } from "@/utils/resumeContentHash";
 import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 
 const promptFile = "candidate-understanding.md";
@@ -52,7 +53,7 @@ export const candidateUnderstandingService = {
       const parsedResume = await parseResumeFile(input.file);
       const structureChunks = createStructureChunks(parsedResume.parsedText);
       const semanticChunks = createSemanticChunks(structureChunks);
-      const contentHash = createContentHash(parsedResume.originalFile);
+      const contentHash = generateResumeContentHash(parsedResume.parsedText);
       const savedResume = await candidateResumeRepository.create({
         candidateSource: input.candidateSource,
         contentHash,
@@ -218,7 +219,7 @@ async function persistFailedResumeIfPossible({
 
     await candidateResumeRepository.create({
       candidateSource: input.candidateSource,
-      contentHash: createContentHash(originalFile),
+      contentHash: null,
       fileName: file.name,
       fileSize: file.size,
       fileType: getNormalizedResumeFileType(file.name) ?? "unknown",
@@ -254,8 +255,4 @@ export function toCandidateInsightDto(insight: CandidateInsight): CandidateInsig
 
 function truncateText(value: string, maxLength: number): string {
   return value.length > maxLength ? `${value.slice(0, maxLength).trim()}...` : value;
-}
-
-function createContentHash(bytes: Uint8Array<ArrayBuffer>): string {
-  return createHash("sha256").update(bytes).digest("hex");
 }

@@ -277,7 +277,14 @@ export const candidateResumeRepository = {
     });
   },
 
-  async countOtherResumesByHash(contentHash: string, excludeResumeId?: string): Promise<number> {
+  async countOtherResumesByHash(
+    contentHash: string | null | undefined,
+    excludeResumeId?: string
+  ): Promise<number> {
+    if (!contentHash) {
+      return 0;
+    }
+
     return prisma.candidateResume.count({
       where: {
         contentHash,
@@ -290,11 +297,40 @@ export const candidateResumeRepository = {
     });
   },
 
+  async findByContentHash(
+    contentHash: string | null | undefined,
+    take = 20
+  ): Promise<ResumeDuplicateRecord[]> {
+    if (!contentHash) {
+      return [];
+    }
+
+    return prisma.candidateResume.findMany({
+      orderBy: [
+        {
+          createdAt: "desc"
+        },
+        {
+          id: "asc"
+        }
+      ],
+      select: duplicateResumeSelect,
+      take,
+      where: {
+        contentHash
+      }
+    });
+  },
+
   async listPossibleDuplicates(
-    contentHash: string,
+    contentHash: string | null | undefined,
     excludeResumeId: string,
     take = 5
   ): Promise<ResumeDuplicateRecord[]> {
+    if (!contentHash) {
+      return [];
+    }
+
     return prisma.candidateResume.findMany({
       orderBy: [
         {

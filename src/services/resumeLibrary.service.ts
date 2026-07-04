@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
 import type {
@@ -14,6 +14,7 @@ import type {
   ResumeLibraryUploadInput
 } from "@/types/resumeLibrary";
 import { createSemanticChunks, createStructureChunks } from "@/utils/resumeChunking";
+import { generateResumeContentHash } from "@/utils/resumeContentHash";
 import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 import { validateResumeFile } from "@/utils/resumeLibraryValidation";
 
@@ -34,11 +35,11 @@ export const resumeLibraryService = {
   async uploadResume(input: ResumeLibraryUploadInput): Promise<ResumeUploadResultDto> {
     const fileType = validateResumeFile(input.file);
     const originalFile = new Uint8Array(await input.file.arrayBuffer());
-    const contentHash = createContentHash(originalFile);
     const workflowId = randomUUID();
 
     try {
       const parsedResume = await parseResumeFile(input.file);
+      const contentHash = generateResumeContentHash(parsedResume.parsedText);
       const structureChunks = createStructureChunks(parsedResume.parsedText);
       const semanticChunks = createSemanticChunks(structureChunks);
       const resume = await candidateResumeRepository.createResume({
@@ -69,7 +70,7 @@ export const resumeLibraryService = {
         const resume = await candidateResumeRepository.createResume({
           candidateId: null,
           candidateSource: input.candidateSource,
-          contentHash,
+          contentHash: null,
           fileName: input.file.name,
           fileSize: input.file.size,
           fileType,
@@ -164,10 +165,6 @@ export const resumeLibraryService = {
     }
   }
 };
-
-function createContentHash(bytes: Uint8Array<ArrayBuffer>): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
 
 async function toResumeListItemDto(resume: ResumeListRecord): Promise<ResumeListItemDto> {
   const duplicateCount = resume.contentHash

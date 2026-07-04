@@ -4,6 +4,7 @@ import {
   resumeLibraryService,
   ResumeLibraryServiceError
 } from "@/services/resumeLibrary.service";
+import { generateResumeContentHash } from "@/utils/resumeContentHash";
 import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 import { ResumeLibraryValidationError } from "@/utils/resumeLibraryValidation";
 
@@ -65,7 +66,7 @@ describe("resumeLibraryService", () => {
       expect.objectContaining({
         candidateId: null,
         candidateSource: "内推",
-        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        contentHash: generateResumeContentHash("hello resume"),
         intakeSource: "upload",
         jobProfileId: null,
         language: null,
@@ -96,6 +97,7 @@ describe("resumeLibraryService", () => {
     expect(result.resume.parsingStatus).toBe("FAILED");
     expect(candidateResumeRepository.createResume).toHaveBeenCalledWith(
       expect.objectContaining({
+        contentHash: null,
         parsedText: null,
         parsingError: "未能从简历中解析出文本。",
         parsingStatus: "FAILED"

@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { aiService } from "@/ai/ai.service";
+import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
 import {
   candidateUnderstandingService,
   CandidateUnderstandingServiceError,
@@ -6,6 +8,8 @@ import {
 } from "@/services/candidateUnderstanding.service";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import type { CandidateInsight } from "@/types/candidateUnderstanding";
+import { generateResumeContentHash } from "@/utils/resumeContentHash";
+import { parseResumeFile } from "@/utils/resumeParser";
 
 vi.mock("@/ai/ai.service", () => ({
   aiService: {
@@ -103,6 +107,123 @@ describe("toCandidateInsightDto", () => {
 });
 
 describe("candidateUnderstandingService", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("stores contentHash from normalized parsed resume text", async () => {
+    const reviewedJobProfile = {
+      aiModel: "test-model",
+      aiProvider: "openai-compatible",
+      coreResponsibilities: ["招聘交付"],
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      generationTimeMs: 1000,
+      hiringFocus: ["沟通业务需求"],
+      hiringGoal: null,
+      id: "job-profile-id",
+      interviewFocus: ["候选人沟通"],
+      jd: "负责招聘。",
+      jobSummary: "招聘岗位。",
+      jobTitle: "招聘专员",
+      leaderRequirements: null,
+      missingInformation: [],
+      notes: null,
+      potentialRisks: [],
+      preferredCompetencies: [],
+      promptFile: "job-understanding.md",
+      promptVersion: "1.0",
+      requiredCompetencies: ["招聘执行"],
+      reviewedAt: new Date("2026-01-03T00:00:00.000Z"),
+      suggestedFollowUpQuestions: [],
+      teamBackground: null,
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    };
+    const parsedText = "  候选人简历\r\n招聘经验  ";
+
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(reviewedJobProfile);
+    vi.mocked(parseResumeFile).mockResolvedValueOnce({
+      fileName: "resume.txt",
+      fileSize: 24,
+      fileType: "TXT",
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parsedText
+    });
+    vi.mocked(candidateResumeRepository.create).mockResolvedValueOnce({
+      candidateId: null,
+      candidateSource: null,
+      contentHash: generateResumeContentHash(parsedText),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      fileName: "resume.txt",
+      fileSize: 24,
+      fileType: "TXT",
+      id: "resume-id",
+      intakeSource: "CANDIDATE_UNDERSTANDING",
+      jobProfileId: "job-profile-id",
+      language: null,
+      notes: null,
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parserVersion: "v1",
+      parsedText,
+      parsingError: null,
+      parsingStatus: "PARSED",
+      resumeVersion: "resume-parser-v1",
+      semanticChunks: [],
+      structureChunks: [],
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    });
+    vi.mocked(aiService.generateValidatedJsonFromPrompt).mockResolvedValueOnce({
+      generationTimeMs: 1000,
+      model: "test-model",
+      output: {
+        evidence: [],
+        insights: {
+          contextSignals: [],
+          openQuestions: [],
+          relevantExperience: [],
+          transferableStrengths: []
+        },
+        missingInformation: [],
+        potentialRisks: [],
+        strengths: [],
+        suggestedInterviewQuestions: [],
+        suggestedNextActions: [],
+        suggestedPhoneScreenQuestions: [],
+        summary: {
+          candidateOverview: "候选人具备招聘经验。",
+          evidenceCoverage: "简历覆盖工作经历。",
+          roleContextUnderstanding: "与岗位相关。"
+        }
+      },
+      prompt: {
+        category: "candidate-understanding",
+        fileName: "candidate-understanding.md",
+        path: "prompts/candidate-understanding.md",
+        version: "1.0"
+      },
+      provider: "openai-compatible",
+      providerRetryCount: 0,
+      rawOutput: "{}",
+      retryCount: 0,
+      validationResult: "success"
+    });
+
+    await candidateUnderstandingService.generateCandidateUnderstanding({
+      file: new File(["resume"], "resume.txt"),
+      jobProfileId: "job-profile-id"
+    });
+
+    expect(candidateResumeRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contentHash: generateResumeContentHash(parsedText),
+        fileName: "resume.txt",
+        jobProfileId: "job-profile-id",
+        parsingStatus: "PARSED"
+      })
+    );
+  });
+
   it("rejects candidate understanding when job profile is not reviewed", async () => {
     vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce({
       aiModel: "test-model",

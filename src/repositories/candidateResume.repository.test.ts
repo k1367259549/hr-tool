@@ -257,12 +257,17 @@ describe("candidateResumeRepository", () => {
 
   it("counts and lists duplicate records by non-unique content hash", async () => {
     vi.mocked(prisma.candidateResume.count).mockResolvedValueOnce(2 as never);
-    vi.mocked(prisma.candidateResume.findMany).mockResolvedValueOnce([resumeListRecord] as never);
+    vi.mocked(prisma.candidateResume.findMany)
+      .mockResolvedValueOnce([resumeListRecord] as never)
+      .mockResolvedValueOnce([resumeListRecord] as never);
 
     await expect(
       candidateResumeRepository.countOtherResumesByHash("hash-value", "resume-id")
     ).resolves.toBe(2);
     await candidateResumeRepository.listPossibleDuplicates("hash-value", "resume-id", 5);
+    await expect(candidateResumeRepository.findByContentHash("hash-value", 5)).resolves.toEqual([
+      resumeListRecord
+    ]);
 
     expect(prisma.candidateResume.count).toHaveBeenCalledWith({
       where: {
@@ -283,6 +288,23 @@ describe("candidateResumeRepository", () => {
         }
       })
     );
+    expect(prisma.candidateResume.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 5,
+        where: {
+          contentHash: "hash-value"
+        }
+      })
+    );
+  });
+
+  it("does not query duplicate records for null content hash", async () => {
+    await expect(candidateResumeRepository.countOtherResumesByHash(null, "resume-id")).resolves.toBe(0);
+    await expect(candidateResumeRepository.findByContentHash(null)).resolves.toEqual([]);
+    await expect(candidateResumeRepository.listPossibleDuplicates(null, "resume-id")).resolves.toEqual([]);
+
+    expect(prisma.candidateResume.count).not.toHaveBeenCalled();
+    expect(prisma.candidateResume.findMany).not.toHaveBeenCalled();
   });
 
   it("links resume using candidateId null condition", async () => {
