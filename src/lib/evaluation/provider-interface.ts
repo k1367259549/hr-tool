@@ -31,6 +31,7 @@ export type EvaluationProviderMetadata = {
   startedAt: string;
   completedAt: string;
   durationMs: number;
+  model?: string;
 };
 
 export type EvaluationProviderError = {
