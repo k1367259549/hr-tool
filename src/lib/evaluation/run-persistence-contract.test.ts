@@ -247,8 +247,10 @@ describe("EvaluationRun persistence contract", () => {
 
   it("rejects audit events that are missing required fields", () => {
     const result = validateEvaluationRunAuditEvent({
+      actor: "SYSTEM",
       createdAt,
-      eventType: "CREATED",
+      eventType: "RUN_CREATED",
+      id: "audit-event-1",
       runId: "run-1"
     });
 
@@ -267,8 +269,10 @@ describe("EvaluationRun persistence contract", () => {
     const updated = await repository.updateRunLifecycle("run-1", completedSnapshot);
     const saved = await repository.saveRunOutput("run-1", createValidEvaluationOutput());
     const event = await repository.appendAuditEvent("run-1", {
+      actor: "TEST",
       createdAt: updatedAt,
-      eventType: "OUTPUT_SAVED",
+      eventType: "OUTPUT_BOUND",
+      id: "audit-event-1",
       metadata: {
         source: "contract-test"
       },

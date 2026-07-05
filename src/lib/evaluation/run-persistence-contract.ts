@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
+import {
+  validateEvaluationRunAuditEvent,
+  type EvaluationRunAuditEvent
+} from "@/lib/evaluation/run-audit-contract";
 import { validateEvaluationRunLifecycleSnapshot } from "@/lib/evaluation/run-lifecycle-validation";
 import {
   EvaluationRunLifecycleSnapshotSchema,
@@ -18,20 +22,8 @@ export const EvaluationRunPersistenceRunTypeSchema = z.enum([
   "AI"
 ]);
 
-export const EvaluationRunAuditEventTypeSchema = z.enum([
-  "CREATED",
-  "LIFECYCLE_UPDATED",
-  "OUTPUT_SAVED",
-  "FAILED",
-  "RETRIED"
-]);
-
 export type EvaluationRunPersistenceRunType = z.infer<
   typeof EvaluationRunPersistenceRunTypeSchema
->;
-
-export type EvaluationRunAuditEventType = z.infer<
-  typeof EvaluationRunAuditEventTypeSchema
 >;
 
 export type EvaluationRunPersistenceRecord = {
@@ -72,13 +64,6 @@ export type EvaluationRunUpdateInput = {
   updatedAt: string;
 };
 
-export type EvaluationRunAuditEvent = {
-  runId: string;
-  eventType: EvaluationRunAuditEventType;
-  createdAt: string;
-  metadata: Record<string, unknown>;
-};
-
 export interface EvaluationRunRepository {
   createRun(input: EvaluationRunCreateInput): Promise<EvaluationRunPersistenceRecord>;
   updateRunLifecycle(
@@ -110,16 +95,6 @@ type UpdateInputValidationResult =
   | {
       success: true;
       input: EvaluationRunUpdateInput;
-    }
-  | {
-      success: false;
-      error: string;
-    };
-
-type AuditEventValidationResult =
-  | {
-      success: true;
-      event: EvaluationRunAuditEvent;
     }
   | {
       success: false;
@@ -168,15 +143,6 @@ const EvaluationRunUpdateInputSchema = z
     lifecycleSnapshot: z.unknown().optional(),
     output: z.unknown().optional(),
     updatedAt: isoDateTime
-  })
-  .strict();
-
-const EvaluationRunAuditEventSchema = z
-  .object({
-    runId: stableId,
-    eventType: EvaluationRunAuditEventTypeSchema,
-    createdAt: isoDateTime,
-    metadata: z.record(z.unknown())
   })
   .strict();
 
@@ -302,25 +268,6 @@ export function validateEvaluationRunOutputForPersistence(
   };
 }
 
-export function validateEvaluationRunAuditEvent(
-  input: unknown
-): AuditEventValidationResult {
-  const result = EvaluationRunAuditEventSchema.safeParse(input);
-
-  if (!result.success) {
-    return {
-      success: false,
-      error:
-        result.error.issues[0]?.message ?? "EvaluationRun audit event is invalid."
-    };
-  }
-
-  return {
-    success: true,
-    event: result.data
-  };
-}
-
 export function createEvaluationRunPersistenceRecord(input: {
   id: string;
   evaluationId: string;
@@ -343,4 +290,6 @@ export function createEvaluationRunPersistenceRecord(input: {
   };
 }
 
+export { validateEvaluationRunAuditEvent };
+export type { EvaluationRunAuditEvent };
 export { EvaluationRunLifecycleSnapshotSchema };
