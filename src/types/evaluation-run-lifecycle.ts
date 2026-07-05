@@ -48,6 +48,7 @@ export type EvaluationRunLifecycleSnapshot = {
   failedAt: string | null;
   cancelledAt: string | null;
   retryOfRunId: string | null;
+  retryCount?: number;
   error: EvaluationRunLifecycleError | null;
 };
 
@@ -90,6 +91,7 @@ export const EvaluationRunLifecycleSnapshotSchema = z
     failedAt: isoDateTime.nullable(),
     cancelledAt: isoDateTime.nullable(),
     retryOfRunId: z.string().trim().min(1).max(120).nullable(),
+    retryCount: z.number().int().min(0).optional(),
     error: EvaluationRunLifecycleErrorSchema.nullable()
   })
   .strict()
