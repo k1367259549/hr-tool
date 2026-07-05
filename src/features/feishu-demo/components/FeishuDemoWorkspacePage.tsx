@@ -30,6 +30,19 @@ type EvaluationDemoMetadata = {
   durationMs?: number;
 };
 
+const summaryFallback = "暂无足够摘要，请招聘者结合简历和 JD 人工补充。";
+const evidenceBasedStrengthFallback =
+  "简历中存在与岗位相关的初步匹配信号，需人工复核。";
+const emptyStrengthFallback = "暂无明确亮点，需人工补充判断。";
+const riskFallback =
+  "当前评估证据不足，需进一步确认候选人与岗位要求的匹配度。";
+const weaknessFallback = "暂无明确弱点记录，建议电话筛选时补充确认。";
+const genericPhoneScreenQuestions = [
+  "请简单介绍你最近一段与该岗位最相关的经历。",
+  "你对这个岗位的核心工作内容理解是什么？",
+  "你目前的到岗时间、实习周期和每周可出勤天数是怎样的？"
+];
+
 export type FeishuDemoFormState = {
   candidateName: string;
   jobTitle: string;
@@ -285,6 +298,7 @@ function EvaluationResultPanel({
   result: Extract<EvaluationDemoApiResponse, { success: true }>;
 }): JSX.Element {
   const output = result.output;
+  const summary = resolveEvaluationSummary(output);
 
   return (
     <div className="space-y-5">
@@ -309,12 +323,12 @@ function EvaluationResultPanel({
         <p className="mt-1 text-3xl font-semibold text-slate-950">
           {output.overallScore}
         </p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">{output.overallSummary}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">{summary}</p>
       </div>
 
-      <StructuredList title="Strengths" items={output.strengths.map(formatStrength)} />
-      <StructuredList title="Weaknesses" items={output.weaknesses.map(formatWeakness)} />
-      <StructuredList title="Risks" items={output.risks.map(formatRisk)} />
+      <StructuredList title="Strengths" items={buildStrengthLines(output)} />
+      <StructuredList title="Weaknesses" items={buildWeaknessLines(output)} />
+      <StructuredList title="Risks" items={buildRiskLines(output)} />
       <StructuredList title="Evidence" items={output.evidence.map(formatEvidence)} />
       <StructuredList
         title="Dimension Scores"
@@ -322,7 +336,7 @@ function EvaluationResultPanel({
       />
       <StructuredList
         title="Interview Questions"
-        items={output.interviewQuestions.map(formatInterviewQuestion)}
+        items={buildInterviewQuestionLines(output)}
       />
     </div>
   );
@@ -469,19 +483,19 @@ export function buildFeishuEvaluationText({
     `岗位：${jobTitle || "未填写"}`,
     `评估结论：${output.recommendation}`,
     `分数：${output.overallScore}`,
-    `摘要：${output.overallSummary}`,
+    `摘要：${resolveEvaluationSummary(output)}`,
     "",
     "亮点：",
-    ...formatLines(output.strengths.map(formatStrength)),
+    ...formatLines(buildStrengthLines(output)),
     "",
     "风险点：",
-    ...formatLines(output.risks.map(formatRisk)),
+    ...formatLines(buildRiskLines(output)),
     "",
     "待确认弱点：",
-    ...formatLines(output.weaknesses.map(formatWeakness)),
+    ...formatLines(buildWeaknessLines(output)),
     "",
     "电话筛选问题：",
-    ...formatLines(output.interviewQuestions.map(formatInterviewQuestion)),
+    ...formatLines(buildInterviewQuestionLines(output)),
     "",
     "下一步建议：",
     "- 招聘者人工核对证据与岗位要求。",
@@ -508,7 +522,119 @@ export function buildDailyInternshipLogText(log: DailyInternshipLogState): strin
 }
 
 function formatLines(items: string[]): string[] {
-  return items.length > 0 ? items.map((item) => `- ${item}`) : ["- 暂无"];
+  return items.map((item) => `- ${item}`);
+}
+
+export function resolveEvaluationSummary(output: ResumeEvaluationResult): string {
+  const fallbackCandidates = [
+    output.overallSummary,
+    getOptionalString(output, "summary"),
+    getOptionalString(getOptionalRecord(output, "metadata"), "summary")
+  ];
+
+  return (
+    fallbackCandidates.find((candidate) => isUsefulSummary(candidate)) ??
+    summaryFallback
+  );
+}
+
+export function buildStrengthLines(output: ResumeEvaluationResult): string[] {
+  if (output.strengths.length > 0) {
+    return output.strengths.map(formatStrength);
+  }
+
+  return output.evidence.length > 0 || output.dimensionScores.length > 0
+    ? [evidenceBasedStrengthFallback]
+    : [emptyStrengthFallback];
+}
+
+export function buildRiskLines(output: ResumeEvaluationResult): string[] {
+  return output.risks.length > 0 ? output.risks.map(formatRisk) : [riskFallback];
+}
+
+export function buildWeaknessLines(output: ResumeEvaluationResult): string[] {
+  return output.weaknesses.length > 0
+    ? output.weaknesses.map(formatWeakness)
+    : [weaknessFallback];
+}
+
+export function buildInterviewQuestionLines(output: ResumeEvaluationResult): string[] {
+  const existingQuestions = output.interviewQuestions.map(formatInterviewQuestion);
+  const shouldAppendGenericQuestions =
+    existingQuestions.length < 3 || hasOnlyGenericInterviewQuestions(output);
+
+  if (!shouldAppendGenericQuestions) {
+    return existingQuestions;
+  }
+
+  return [
+    ...existingQuestions,
+    ...genericPhoneScreenQuestions.filter(
+      (question) =>
+        !existingQuestions.some((existingQuestion) =>
+          existingQuestion.includes(question)
+        )
+    )
+  ];
+}
+
+function isUsefulSummary(candidate: string | undefined): candidate is string {
+  if (!candidate) {
+    return false;
+  }
+
+  const normalized = candidate.trim();
+
+  return (
+    normalized.length > 0 &&
+    normalized.toLowerCase() !== "no evaluation summary provided."
+  );
+}
+
+function getOptionalString(source: unknown, key: string): string | undefined {
+  if (!isRecord(source)) {
+    return undefined;
+  }
+
+  const value = source[key];
+
+  return typeof value === "string" ? value : undefined;
+}
+
+function getOptionalRecord(source: unknown, key: string): Record<string, unknown> | undefined {
+  if (!isRecord(source)) {
+    return undefined;
+  }
+
+  const value = source[key];
+
+  return isRecord(value) ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyGenericInterviewQuestions(output: ResumeEvaluationResult): boolean {
+  return (
+    output.interviewQuestions.length > 0 &&
+    output.interviewQuestions.every((item) => isGenericInterviewQuestion(item.question))
+  );
+}
+
+function isGenericInterviewQuestion(question: string): boolean {
+  const normalized = question.trim().toLowerCase();
+  const genericSignals = [
+    "introduce yourself",
+    "tell me about yourself",
+    "why are you interested",
+    "自我介绍",
+    "介绍一下自己",
+    "为什么感兴趣",
+    "为什么想"
+  ];
+
+  return genericSignals.some((signal) => normalized.includes(signal));
 }
 
 function formatStrength(item: ResumeEvaluationResult["strengths"][number]): string {

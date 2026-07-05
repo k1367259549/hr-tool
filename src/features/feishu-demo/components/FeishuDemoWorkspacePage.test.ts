@@ -2,8 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildInterviewQuestionLines,
   buildDailyInternshipLogText,
   buildFeishuEvaluationText,
+  buildRiskLines,
+  buildStrengthLines,
+  buildWeaknessLines,
+  resolveEvaluationSummary,
   type DailyInternshipLogState
 } from "@/features/feishu-demo/components/FeishuDemoWorkspacePage";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
@@ -26,6 +31,94 @@ describe("Feishu demo workspace helpers", () => {
     expect(text).toContain("下一步建议：");
     expect(text).toContain(
       "本结果为 AI/规则辅助草稿，需招聘者人工确认，不代表自动录用/拒绝。"
+    );
+    expect(text).not.toContain("No evaluation summary provided.");
+  });
+
+  it("uses useful summary fields before the manual summary fallback", () => {
+    expect(resolveEvaluationSummary(sampleEvaluationOutput)).toBe(
+      sampleEvaluationOutput.overallSummary
+    );
+
+    const outputWithLegacySummary = {
+      ...sampleEvaluationOutput,
+      overallSummary: "No evaluation summary provided.",
+      summary: "Legacy summary from provider output."
+    } as ResumeEvaluationResult;
+    const outputWithMetadataSummary = {
+      ...sampleEvaluationOutput,
+      overallSummary: "",
+      metadata: {
+        summary: "Metadata summary from provider output."
+      }
+    } as ResumeEvaluationResult;
+    const outputWithoutSummary = {
+      ...sampleEvaluationOutput,
+      overallSummary: "No evaluation summary provided."
+    };
+
+    expect(resolveEvaluationSummary(outputWithLegacySummary)).toBe(
+      "Legacy summary from provider output."
+    );
+    expect(resolveEvaluationSummary(outputWithMetadataSummary)).toBe(
+      "Metadata summary from provider output."
+    );
+    expect(resolveEvaluationSummary(outputWithoutSummary)).toBe(
+      "暂无足够摘要，请招聘者结合简历和 JD 人工补充。"
+    );
+  });
+
+  it("fills readable fallback lines when strengths, risks, or weaknesses are empty", () => {
+    const output = {
+      ...sampleEvaluationOutput,
+      risks: [],
+      strengths: [],
+      weaknesses: []
+    };
+
+    expect(buildStrengthLines(output)).toEqual([
+      "简历中存在与岗位相关的初步匹配信号，需人工复核。"
+    ]);
+    expect(buildRiskLines(output)).toEqual([
+      "当前评估证据不足，需进一步确认候选人与岗位要求的匹配度。"
+    ]);
+    expect(buildWeaknessLines(output)).toEqual([
+      "暂无明确弱点记录，建议电话筛选时补充确认。"
+    ]);
+
+    const text = buildFeishuEvaluationText({
+      candidateName: "",
+      jobTitle: "",
+      output
+    });
+
+    expect(text).not.toContain("亮点：\n- 暂无");
+    expect(text).not.toContain("风险点：\n- 暂无");
+    expect(text).not.toContain("待确认弱点：\n- 暂无\n");
+  });
+
+  it("uses a manual strength fallback when no match evidence exists", () => {
+    const output = {
+      ...sampleEvaluationOutput,
+      dimensionScores: [],
+      evidence: [],
+      strengths: []
+    };
+
+    expect(buildStrengthLines(output)).toEqual([
+      "暂无明确亮点，需人工补充判断。"
+    ]);
+  });
+
+  it("adds general HR phone screen questions when questions are too sparse", () => {
+    const questions = buildInterviewQuestionLines(sampleEvaluationOutput);
+
+    expect(questions).toContain(
+      "请简单介绍你最近一段与该岗位最相关的经历。"
+    );
+    expect(questions).toContain("你对这个岗位的核心工作内容理解是什么？");
+    expect(questions).toContain(
+      "你目前的到岗时间、实习周期和每周可出勤天数是怎样的？"
     );
   });
 
