@@ -165,6 +165,8 @@ Resume Evaluation Result Foundation is available at:
 
 It supports creating per-criterion evidence assessments for a Resume × JobProfile × EvaluationTemplateVersion context, DRAFT/REVIEWED lifecycle, optimistic concurrency via revision, event history, and evaluation entry points from the Resume detail page. Evaluations do not produce scores, rankings, weights, thresholds, or automatic pipeline movement.
 
+The M07 rule-based output schema foundation defines the shared AI Resume Evaluation output contract in `src/types/evaluation-output.ts` and `src/lib/evaluation/schema.ts`. This contract is for future EvaluationRun outputs across rule-based and AI providers. It validates structured suggestions, evidence, dimension scores, risks, and interview questions, but it does not call an AI provider, add prompts, change database schema, modify review APIs, rank candidates, or move pipeline stages.
+
 Additional V2 placeholder routes remain available for future modules:
 
 ```text
