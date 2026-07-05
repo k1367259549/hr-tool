@@ -19,6 +19,8 @@ export type EvaluationProviderInput = {
   runId: string;
   resumeText: string;
   jobDescription: string;
+  candidateName?: string;
+  jobTitle?: string;
   candidateId?: string;
   jobProfileId?: string;
   templateVersionId?: string;

@@ -27,7 +27,9 @@ function createSequentialClock(values: string[]) {
 function createProviderInput() {
   return {
     candidateId: "candidate-1",
+    candidateName: "Demo Candidate",
     jobDescription: "Need a backend engineer with TypeScript and API experience.",
+    jobTitle: "Backend Engineer",
     jobProfileId: "job-profile-1",
     resumeText: "Built TypeScript API services for recruiting workflows.",
     runId: "run-1",
@@ -43,10 +45,43 @@ function createValidEvaluationOutput(
     dimensionScores: [
       {
         evidenceIds: ["ev_backend_api"],
-        key: "backend-api",
-        label: "Backend API",
-        rationale: "The resume describes building production APIs.",
+        key: "jd-match",
+        label: "JD Match",
+        rationale:
+          "The resume explicitly describes TypeScript API services, which maps to the backend API requirement in the JD.",
         score: 88
+      },
+      {
+        evidenceIds: ["ev_backend_api"],
+        key: "experience-relevance",
+        label: "Experience Relevance",
+        rationale:
+          "The recruiting workflow service experience is relevant to the job context and expected backend ownership.",
+        score: 84
+      },
+      {
+        evidenceIds: ["ev_typescript"],
+        key: "skill-match",
+        label: "Skill Match",
+        rationale:
+          "The resume names TypeScript and API service work, matching the technical stack requested by the JD.",
+        score: 86
+      },
+      {
+        evidenceIds: ["ev_backend_api"],
+        key: "communication-signal",
+        label: "Communication Signal",
+        rationale:
+          "The resume gives a concise project description but still needs an interview follow-up to confirm collaboration and written communication quality.",
+        score: 68
+      },
+      {
+        evidenceIds: ["ev_missing_availability"],
+        key: "risk-and-missing-info",
+        label: "Risk And Missing Info",
+        rationale:
+          "Availability, internship duration, and weekly attendance are not visible in the resume and must be confirmed before moving forward.",
+        score: 52
       }
     ],
     evidence: [
@@ -55,6 +90,18 @@ function createValidEvaluationOutput(
         relevance: "HIGH",
         source: "RESUME",
         text: "Built and maintained TypeScript backend APIs."
+      },
+      {
+        id: "ev_typescript",
+        relevance: "HIGH",
+        source: "JOB_PROFILE",
+        text: "The job description asks for TypeScript and API experience."
+      },
+      {
+        id: "ev_missing_availability",
+        relevance: "MEDIUM",
+        source: "RESUME",
+        text: "The resume does not state availability, internship duration, or weekly attendance."
       }
     ],
     interviewQuestions: [
@@ -63,17 +110,77 @@ function createValidEvaluationOutput(
         evidenceIds: ["ev_backend_api"],
         purpose: "Validate depth of backend API ownership.",
         question: "Which API design trade-offs did you own?"
+      },
+      {
+        category: "EXPERIENCE",
+        evidenceIds: ["ev_backend_api"],
+        purpose: "Confirm whether the listed backend work was hands-on and recent.",
+        question: "Please walk through the recruiting workflow API project and your direct responsibilities."
+      },
+      {
+        category: "MOTIVATION",
+        evidenceIds: ["ev_typescript"],
+        purpose: "Check role understanding against the backend internship JD.",
+        question: "How do you understand the core work of this backend internship role?"
+      },
+      {
+        category: "TECHNICAL",
+        evidenceIds: ["ev_typescript"],
+        purpose: "Validate practical TypeScript and API tooling experience.",
+        question: "Which TypeScript patterns or testing tools did you use when building the API services?"
+      },
+      {
+        category: "RISK_FOLLOW_UP",
+        evidenceIds: ["ev_missing_availability"],
+        purpose: "Clarify missing availability and internship commitment information.",
+        question: "What is your earliest start date, internship duration, and weekly availability?"
       }
     ],
     notes: null,
     overallScore: 82,
     overallSummary:
-      "The candidate shows relevant backend API experience with direct evidence.",
+      "The candidate is a credible potential fit for the backend internship because the resume mentions TypeScript API service work that maps directly to the JD's backend and API expectations. The strongest evidence is the recruiting workflow service experience, but the evaluation still needs recruiter follow-up on project depth, collaboration scope, availability, internship duration, and weekly attendance before any human decision is made.",
     recommendation: "POTENTIAL_FIT",
-    risks: [],
+    risks: [
+      {
+        description:
+          "The resume does not show availability, internship duration, or weekly attendance, which are important practical constraints for an internship role.",
+        evidenceIds: ["ev_missing_availability"],
+        severity: "MEDIUM",
+        type: "MISSING_REQUIREMENT"
+      }
+    ],
     schemaVersion: "m07-b3-a.v1",
-    strengths: [],
-    weaknesses: [],
+    strengths: [
+      {
+        description:
+          "The resume states TypeScript API service experience, which maps to the JD's backend API requirement.",
+        evidenceIds: ["ev_backend_api", "ev_typescript"],
+        title: "Relevant backend API signal"
+      },
+      {
+        description:
+          "The recruiting workflow project context is close to the HR tooling domain, making the experience easier to discuss against this role.",
+        evidenceIds: ["ev_backend_api"],
+        title: "Domain-adjacent project context"
+      }
+    ],
+    weaknesses: [
+      {
+        description:
+          "The resume does not explain the candidate's exact ownership level, so the interviewer should verify whether they designed, implemented, tested, or only assisted the APIs.",
+        evidenceIds: ["ev_backend_api"],
+        severity: "MEDIUM",
+        title: "Ownership depth unclear"
+      },
+      {
+        description:
+          "The resume does not mention availability or internship duration, which must be confirmed before treating the match as operationally viable.",
+        evidenceIds: ["ev_missing_availability"],
+        severity: "MEDIUM",
+        title: "Availability missing"
+      }
+    ],
     ...overrides
   };
 }
@@ -190,6 +297,44 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(body.messages[1]).toMatchObject({
       role: "user"
     });
+    expect(body.messages[0].content).toContain("Do not make automatic hiring");
+    expect(body.messages[0].content).toContain("jd-match");
+    expect(body.messages[1].content).toContain("<JOB_DESCRIPTION>");
+    expect(body.messages[1].content).toContain("</JOB_DESCRIPTION>");
+    expect(body.messages[1].content).toContain("<RESUME_TEXT>");
+    expect(body.messages[1].content).toContain("</RESUME_TEXT>");
+    expect(body.messages[1].content).toContain("candidateName: Demo Candidate");
+    expect(body.messages[1].content).toContain("jobTitle: Backend Engineer");
+    expect(body.messages[1].content).toContain(
+      "Need a backend engineer with TypeScript and API experience."
+    );
+    expect(body.messages[1].content).toContain(
+      "Built TypeScript API services for recruiting workflows."
+    );
+  });
+
+  it("sends distinct request bodies for different resumeText values", async () => {
+    const requestBodies: string[] = [];
+    const fetchImpl: FetchImpl = async (_url, init) => {
+      requestBodies.push(String(init?.body));
+
+      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+    };
+    const provider = createProvider(fetchImpl);
+
+    await provider.evaluate({
+      ...createProviderInput(),
+      resumeText: "Resume A: built TypeScript API services for recruiting workflows."
+    });
+    await provider.evaluate({
+      ...createProviderInput(),
+      resumeText: "Resume B: focused on campus operations and Excel reporting."
+    });
+
+    expect(requestBodies).toHaveLength(2);
+    expect(requestBodies[0]).not.toBe(requestBodies[1]);
+    expect(requestBodies[0]).toContain("Resume A");
+    expect(requestBodies[1]).toContain("Resume B");
   });
 
   it("fails when response content is invalid JSON", async () => {
@@ -221,6 +366,58 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(result).toMatchObject({
       error: {
         code: "openai-compatible-output-binding-failed"
+      },
+      failureReason: "VALIDATION_ERROR",
+      success: false
+    });
+  });
+
+  it("fails when parsed output is valid JSON but too generic", async () => {
+    const provider = createProvider(
+      async () =>
+        createChatResponse(
+          JSON.stringify(
+            createValidEvaluationOutput({
+              dimensionScores: [
+                {
+                  evidenceIds: ["ev_backend_api"],
+                  key: "jd-match",
+                  label: "JD Match",
+                  rationale: "Some match exists.",
+                  score: 60
+                }
+              ],
+              evidence: [
+                {
+                  id: "ev_backend_api",
+                  relevance: "LOW",
+                  source: "RESUME",
+                  text: "No evidence provided."
+                }
+              ],
+              interviewQuestions: [
+                {
+                  category: "OTHER",
+                  evidenceIds: ["ev_backend_api"],
+                  purpose: "Clarify.",
+                  question: "Tell me about yourself."
+                }
+              ],
+              overallSummary: "No evaluation summary provided.",
+              risks: [],
+              strengths: [],
+              weaknesses: []
+            })
+          )
+        )
+    );
+
+    const result = await provider.evaluate(createProviderInput());
+
+    expect(result).toMatchObject({
+      error: {
+        code: "openai-compatible-output-quality-failed",
+        message: "AI evaluation output is too generic or lacks evidence."
       },
       failureReason: "VALIDATION_ERROR",
       success: false

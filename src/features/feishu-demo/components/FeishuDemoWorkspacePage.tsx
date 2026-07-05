@@ -88,7 +88,9 @@ export function FeishuDemoWorkspacePage(): JSX.Element {
       ? buildFeishuEvaluationText({
           candidateName: form.candidateName,
           jobTitle: form.jobTitle,
-          output: result.output
+          metadata: result.metadata,
+          output: result.output,
+          runId: result.runId
         })
       : "";
   }, [form.candidateName, form.jobTitle, result]);
@@ -471,30 +473,48 @@ function StructuredList({
 export function buildFeishuEvaluationText({
   candidateName,
   jobTitle,
+  metadata,
+  runId,
   output
 }: {
   candidateName: string;
   jobTitle: string;
+  metadata?: Pick<EvaluationDemoMetadata, "model" | "providerName">;
+  runId?: string;
   output: ResumeEvaluationResult;
 }): string {
   return [
     "候选人评估草稿",
     `候选人：${candidateName || "未填写"}`,
     `岗位：${jobTitle || "未填写"}`,
+    `Provider：${metadata?.providerName ?? "unknown"}`,
+    `Model：${metadata?.model ?? "-"}`,
+    `Run ID：${runId ?? "-"}`,
     `评估结论：${output.recommendation}`,
     `分数：${output.overallScore}`,
-    `摘要：${resolveEvaluationSummary(output)}`,
+    "",
+    "总结：",
+    resolveEvaluationSummary(output),
     "",
     "亮点：",
     ...formatLines(buildStrengthLines(output)),
     "",
-    "风险点：",
-    ...formatLines(buildRiskLines(output)),
-    "",
-    "待确认弱点：",
+    "不足：",
     ...formatLines(buildWeaknessLines(output)),
     "",
+    "风险：",
+    ...formatLines(buildRiskLines(output)),
+    "",
+    "证据：",
+    ...formatLines(output.evidence.map(formatEvidence)),
+    "",
+    "维度评分：",
+    ...formatLines(output.dimensionScores.map(formatDimensionScore)),
+    "",
     "电话筛选问题：",
+    ...formatLines(buildInterviewQuestionLines(output)),
+    "",
+    "面试问题：",
     ...formatLines(buildInterviewQuestionLines(output)),
     "",
     "下一步建议：",

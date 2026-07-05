@@ -1,4 +1,5 @@
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
+import { validateEvaluationOutputQuality } from "@/lib/evaluation/output-quality-guard";
 import type {
   EvaluationProvider,
   EvaluationProviderInput,
@@ -41,6 +42,19 @@ type ChatCompletionResponse = {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions";
+const detailedAnalysisInstruction = [
+  "Return only JSON that conforms to the resume evaluation output schema.",
+  "Analyze only the CURRENT job description and CURRENT resume text in this request.",
+  "Do not reuse facts, names, scores, or evidence from any other candidate.",
+  "Do not make automatic hiring, rejection, ranking, or pipeline movement decisions.",
+  "Output must be detailed, evidence-based, and distinguishable across candidates.",
+  "Every conclusion should map to resume or job-description evidence whenever possible.",
+  "If evidence is missing, say what specific information is missing instead of writing empty placeholders.",
+  "Include concrete matches, weaknesses, risks, missing information, phone screen questions, and interview questions.",
+  "Use schema-compatible dimension keys: jd-match, experience-relevance, skill-match, communication-signal, risk-and-missing-info.",
+  "Include at least two strengths, two weaknesses, one risk, two evidence items, five dimension scores, and five interview questions.",
+  "Question coverage must include relevant experience, role understanding, skills or tools, availability or internship duration, and missing or risky information."
+].join(" ");
 
 export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
   readonly name = "OPENAI_COMPATIBLE";
@@ -125,6 +139,17 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
         );
       }
 
+      const quality = validateEvaluationOutputQuality(bound.output);
+
+      if (!quality.success) {
+        return this.failure(
+          "VALIDATION_ERROR",
+          "openai-compatible-output-quality-failed",
+          quality.error,
+          metadata
+        );
+      }
+
       return {
         success: true,
         output: bound.output,
@@ -177,19 +202,11 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
       messages: [
         {
           role: "system",
-          content:
-            "Return only JSON that conforms to the resume evaluation output schema. Do not make hiring decisions."
+          content: detailedAnalysisInstruction
         },
         {
           role: "user",
-          content: JSON.stringify({
-            jobDescription: input.jobDescription,
-            resumeText: input.resumeText,
-            runId: input.runId,
-            candidateId: input.candidateId ?? null,
-            jobProfileId: input.jobProfileId ?? null,
-            templateVersionId: input.templateVersionId ?? null
-          })
+          content: createEvaluationInputBlock(input)
         }
       ],
       response_format: {
@@ -219,6 +236,25 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
       metadata
     };
   }
+}
+
+function createEvaluationInputBlock(input: EvaluationProviderInput): string {
+  return [
+    "<EVALUATION_CONTEXT>",
+    `runId: ${input.runId}`,
+    `candidateName: ${input.candidateName ?? ""}`,
+    `jobTitle: ${input.jobTitle ?? ""}`,
+    `candidateId: ${input.candidateId ?? ""}`,
+    `jobProfileId: ${input.jobProfileId ?? ""}`,
+    `templateVersionId: ${input.templateVersionId ?? ""}`,
+    "</EVALUATION_CONTEXT>",
+    "<JOB_DESCRIPTION>",
+    input.jobDescription,
+    "</JOB_DESCRIPTION>",
+    "<RESUME_TEXT>",
+    input.resumeText,
+    "</RESUME_TEXT>"
+  ].join("\n");
 }
 
 function getChatMessageContent(payload: unknown): unknown {

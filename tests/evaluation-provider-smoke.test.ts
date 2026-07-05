@@ -55,10 +55,43 @@ function createValidEvaluationOutput(): ResumeEvaluationResult {
     dimensionScores: [
       {
         evidenceIds: ["ev_backend_api"],
-        key: "backend-api",
-        label: "Backend API",
-        rationale: "The resume describes building production APIs.",
+        key: "jd-match",
+        label: "JD Match",
+        rationale:
+          "The resume describes TypeScript backend API services, which maps directly to the smoke JD requirement.",
         score: 88
+      },
+      {
+        evidenceIds: ["ev_backend_api"],
+        key: "experience-relevance",
+        label: "Experience Relevance",
+        rationale:
+          "The backend service project is relevant to the demo role and gives an interviewable project basis.",
+        score: 84
+      },
+      {
+        evidenceIds: ["ev_typescript"],
+        key: "skill-match",
+        label: "Skill Match",
+        rationale:
+          "The resume mentions TypeScript API work and the JD asks for backend TypeScript capability.",
+        score: 86
+      },
+      {
+        evidenceIds: ["ev_backend_api"],
+        key: "communication-signal",
+        label: "Communication Signal",
+        rationale:
+          "The resume gives a concise technical project signal, but interview follow-up is needed to validate collaboration and explanation clarity.",
+        score: 66
+      },
+      {
+        evidenceIds: ["ev_missing_availability"],
+        key: "risk-and-missing-info",
+        label: "Risk And Missing Info",
+        rationale:
+          "The resume does not state start date, internship duration, or weekly availability.",
+        score: 50
       }
     ],
     evidence: [
@@ -67,6 +100,18 @@ function createValidEvaluationOutput(): ResumeEvaluationResult {
         relevance: "HIGH",
         source: "RESUME",
         text: "Built and maintained TypeScript backend APIs."
+      },
+      {
+        id: "ev_typescript",
+        relevance: "HIGH",
+        source: "JOB_PROFILE",
+        text: "The smoke JD asks for TypeScript and backend API experience."
+      },
+      {
+        id: "ev_missing_availability",
+        relevance: "MEDIUM",
+        source: "RESUME",
+        text: "The resume does not mention start date, internship duration, or weekly availability."
       }
     ],
     interviewQuestions: [
@@ -75,17 +120,77 @@ function createValidEvaluationOutput(): ResumeEvaluationResult {
         evidenceIds: ["ev_backend_api"],
         purpose: "Validate depth of backend API ownership.",
         question: "Which API design trade-offs did you own?"
+      },
+      {
+        category: "EXPERIENCE",
+        evidenceIds: ["ev_backend_api"],
+        purpose: "Confirm the candidate's direct project ownership.",
+        question: "Please walk through the backend API project and your exact responsibilities."
+      },
+      {
+        category: "MOTIVATION",
+        evidenceIds: ["ev_typescript"],
+        purpose: "Check understanding of the target backend internship role.",
+        question: "How do you understand the main work of this backend internship?"
+      },
+      {
+        category: "TECHNICAL",
+        evidenceIds: ["ev_typescript"],
+        purpose: "Validate TypeScript and API implementation depth.",
+        question: "Which TypeScript tools or testing practices did you use in the API project?"
+      },
+      {
+        category: "RISK_FOLLOW_UP",
+        evidenceIds: ["ev_missing_availability"],
+        purpose: "Clarify logistics missing from the resume.",
+        question: "What is your earliest start date, internship duration, and weekly availability?"
       }
     ],
     notes: null,
     overallScore: 82,
     overallSummary:
-      "The candidate shows relevant backend API experience with direct evidence.",
+      "The candidate is a credible potential fit for the smoke backend role because the resume mentions TypeScript backend API work that maps to the JD's technical requirements. The evidence is useful but incomplete: the recruiter still needs to verify exact ownership, technical depth, collaboration context, start date, internship duration, and weekly availability before any human review decision.",
     recommendation: "POTENTIAL_FIT",
-    risks: [],
+    risks: [
+      {
+        description:
+          "Start date, internship duration, and weekly availability are not visible in the resume and should be confirmed before moving forward.",
+        evidenceIds: ["ev_missing_availability"],
+        severity: "MEDIUM",
+        type: "MISSING_REQUIREMENT"
+      }
+    ],
     schemaVersion: "m07-b3-a.v1",
-    strengths: [],
-    weaknesses: []
+    strengths: [
+      {
+        description:
+          "The resume names TypeScript backend API work, which maps directly to the smoke JD's core technical requirement.",
+        evidenceIds: ["ev_backend_api", "ev_typescript"],
+        title: "Backend API match"
+      },
+      {
+        description:
+          "The API project gives the recruiter a concrete experience thread to validate during phone screening.",
+        evidenceIds: ["ev_backend_api"],
+        title: "Concrete project evidence"
+      }
+    ],
+    weaknesses: [
+      {
+        description:
+          "The resume does not explain whether the candidate owned design, implementation, testing, or maintenance.",
+        evidenceIds: ["ev_backend_api"],
+        severity: "MEDIUM",
+        title: "Ownership depth unclear"
+      },
+      {
+        description:
+          "The resume does not include start date, internship duration, or weekly availability information.",
+        evidenceIds: ["ev_missing_availability"],
+        severity: "MEDIUM",
+        title: "Availability missing"
+      }
+    ]
   };
 }
 

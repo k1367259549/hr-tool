@@ -18,16 +18,30 @@ describe("Feishu demo workspace helpers", () => {
     const text = buildFeishuEvaluationText({
       candidateName: "Lin Chen",
       jobTitle: "Backend Intern",
+      metadata: {
+        model: "gpt-5.5-demo",
+        providerName: "OPENAI_COMPATIBLE"
+      },
+      runId: "run-demo-1",
       output: sampleEvaluationOutput
     });
 
     expect(text).toContain("候选人：Lin Chen");
     expect(text).toContain("岗位：Backend Intern");
+    expect(text).toContain("Provider：OPENAI_COMPATIBLE");
+    expect(text).toContain("Model：gpt-5.5-demo");
+    expect(text).toContain("Run ID：run-demo-1");
     expect(text).toContain("评估结论：POTENTIAL_FIT");
     expect(text).toContain("分数：72");
-    expect(text).toContain("风险点：");
+    expect(text).toContain("总结：");
+    expect(text).toContain("风险：");
     expect(text).toContain("亮点：");
+    expect(text).toContain("不足：");
+    expect(text).toContain("证据：");
+    expect(text).toContain("维度评分：");
     expect(text).toContain("电话筛选问题：");
+    expect(text).toContain("面试问题：");
+    expect(text).toContain("RESUME / HIGH: Built REST APIs with Node.js and PostgreSQL.");
     expect(text).toContain("下一步建议：");
     expect(text).toContain(
       "本结果为 AI/规则辅助草稿，需招聘者人工确认，不代表自动录用/拒绝。"
@@ -93,8 +107,8 @@ describe("Feishu demo workspace helpers", () => {
     });
 
     expect(text).not.toContain("亮点：\n- 暂无");
-    expect(text).not.toContain("风险点：\n- 暂无");
-    expect(text).not.toContain("待确认弱点：\n- 暂无\n");
+    expect(text).not.toContain("风险：\n- 暂无");
+    expect(text).not.toContain("不足：\n- 暂无\n");
   });
 
   it("uses a manual strength fallback when no match evidence exists", () => {

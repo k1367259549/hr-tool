@@ -79,12 +79,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     const runId = `evaluation-demo-${Date.now().toString(36)}`;
     const result = await runEvaluationProvider({
       input: {
+        candidateName: parsed.data.candidateName,
         candidateId: parsed.data.candidateName
           ? slugify(parsed.data.candidateName)
           : undefined,
-        jobDescription: parsed.data.jobTitle
-          ? `${parsed.data.jobTitle}\n\n${parsed.data.jobDescription}`
-          : parsed.data.jobDescription,
+        jobDescription: parsed.data.jobDescription,
+        jobTitle: parsed.data.jobTitle,
         jobProfileId: parsed.data.jobTitle ? slugify(parsed.data.jobTitle) : undefined,
         resumeText: parsed.data.resumeText,
         runId,
