@@ -3,6 +3,7 @@ import type {
   ResumeEvaluationRunStatus,
   ResumeEvaluationRunType
 } from "@prisma/client";
+import type { EvaluationRecommendation } from "@/types/evaluation-output";
 
 export type { ResumeEvaluationRunStatus, ResumeEvaluationRunType };
 
@@ -23,6 +24,21 @@ export type ResumeEvaluationRunDto = {
   parsedSnapshotId: string;
   errorCode: string | null;
   errorMessage: string | null;
+};
+
+export type QuickScreeningResultDto = {
+  recommendation: EvaluationRecommendation;
+  score: number;
+  summary: string;
+  reasons: string[];
+  risks: string[];
+  evidence: string[];
+  nextStep: string;
+};
+
+export type QuickScreeningRunDto = {
+  run: ResumeEvaluationRunDto;
+  result: QuickScreeningResultDto;
 };
 
 export type ResumeEvaluationRunSafeRecord = Prisma.ResumeEvaluationRunGetPayload<{

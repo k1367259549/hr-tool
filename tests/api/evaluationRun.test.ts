@@ -7,6 +7,7 @@ import type { ResumeEvaluationRunDto } from "@/types/resumeEvaluationRun";
 
 const serviceMock = vi.hoisted(() => ({
   createMockEvaluationRun: vi.fn(),
+  createQuickScreeningRun: vi.fn(),
   getLatestSuccessfulRunByEvaluationId: vi.fn(),
   listRunsByEvaluationId: vi.fn()
 }));
@@ -264,6 +265,95 @@ describe("GET /api/evaluations/[id]/runs/latest-successful", () => {
   });
 });
 
+describe("POST /api/evaluations/[id]/quick-screening", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates a formal quick screening run through the service layer", async () => {
+    vi.mocked(serviceMock.createQuickScreeningRun).mockResolvedValueOnce({
+      result: {
+        evidence: ["Resume matched backend api keywords."],
+        nextStep: "建议进入详细分析或电话筛选，并由招聘者人工确认。",
+        reasons: ["Keyword evidence present: Matched backend api."],
+        recommendation: "POTENTIAL_FIT",
+        risks: ["Some job-description keywords were not clearly present."],
+        score: 72,
+        summary: "Rule-based quick screening summary."
+      },
+      run: {
+        ...baseRun,
+        modelName: "0.1.0",
+        modelProvider: "RULE_BASED",
+        rating: "POTENTIAL_FIT",
+        runType: "RULE_BASED",
+        score: 72,
+        summary: "Rule-based quick screening summary."
+      }
+    });
+
+    const { POST } = await import(
+      "@/app/api/evaluations/[id]/quick-screening/route"
+    );
+    const response = await POST(
+      createJsonRequest("http://localhost/api/evaluations/eval-1/quick-screening", {}),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<{
+      run: ResumeEvaluationRunDto;
+      result: {
+        recommendation: string;
+        score: number;
+        summary: string;
+        reasons: string[];
+        risks: string[];
+        evidence: string[];
+        nextStep: string;
+      };
+    }>(response);
+
+    expect(response.status).toBe(201);
+    expect(serviceMock.createQuickScreeningRun).toHaveBeenCalledWith("eval-1");
+    expect(json.data).toMatchObject({
+      result: {
+        recommendation: "POTENTIAL_FIT",
+        score: 72
+      },
+      run: {
+        runType: "RULE_BASED",
+        status: "SUCCEEDED"
+      }
+    });
+    expect(JSON.stringify(json.data)).not.toContain("rawOutputJson");
+    expect(JSON.stringify(json.data)).not.toContain("parsedText");
+    expect(JSON.stringify(json.data)).not.toContain("promptBody");
+    expect(JSON.stringify(json.data)).not.toContain("secret");
+  });
+
+  it("returns timeout-capable validation errors without Prisma fallback", async () => {
+    const { ResumeEvaluationRunServiceError } = await import(
+      "@/services/resumeEvaluationRun.service"
+    );
+    vi.mocked(serviceMock.createQuickScreeningRun).mockRejectedValueOnce(
+      new ResumeEvaluationRunServiceError(
+        "VALIDATION_ERROR",
+        "resumeText must contain enough text for rule-based evaluation."
+      )
+    );
+
+    const { POST } = await import(
+      "@/app/api/evaluations/[id]/quick-screening/route"
+    );
+    const response = await POST(
+      createJsonRequest("http://localhost/api/evaluations/eval-1/quick-screening", {}),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceMock.createQuickScreeningRun).toHaveBeenCalledWith("eval-1");
+  });
+});
+
 describe("EvaluationRun API route boundaries", () => {
   it("does not import Prisma, AI providers, prompts, or selected/latest run writes", () => {
     const routeSource = readFileSync(
@@ -284,7 +374,20 @@ describe("EvaluationRun API route boundaries", () => {
       ),
       "utf8"
     );
-    const combinedSource = `${routeSource}\n${latestRouteSource}`;
+    const quickScreeningRouteSource = readFileSync(
+      join(
+        process.cwd(),
+        "src",
+        "app",
+        "api",
+        "evaluations",
+        "[id]",
+        "quick-screening",
+        "route.ts"
+      ),
+      "utf8"
+    );
+    const combinedSource = `${routeSource}\n${latestRouteSource}\n${quickScreeningRouteSource}`;
 
     expect(combinedSource).not.toContain("@/lib/prisma");
     expect(combinedSource).not.toContain("@/ai");

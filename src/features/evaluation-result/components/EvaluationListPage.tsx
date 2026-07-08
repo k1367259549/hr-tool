@@ -30,18 +30,23 @@ export function EvaluationListPage(): JSX.Element {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-5">
         <div>
           <p className="text-sm font-medium uppercase text-slate-500">Resume Evaluations</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">评估记录</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950">
+            AI 简历评估工作区
+          </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            按照评价标准对简历进行人工逐项记录。不产生分数、排名或自动决策。
+            从正式飞书 V2 工作区进入评估流程：先做快速初筛，再对值得继续看的候选人做详细分析。
+            评估结果只作为招聘者辅助草稿，不产生排名、自动拒绝或自动推进 Pipeline。
           </p>
         </div>
         <Link
           href="/feishu/evaluations/new"
           className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
         >
-          新建评估
+          新建 AI 评估
         </Link>
       </header>
+
+      <AiEvaluationEntryPanel />
 
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-4">
         <select
@@ -78,7 +83,7 @@ export function EvaluationListPage(): JSX.Element {
               </div>
             ) : (
               <div className="p-6 text-sm text-slate-600">
-                暂无评估记录。可以在简历详情页或此处新建评估。
+                暂无正式评估记录。可以从上方 AI 评估入口创建快速初筛记录，再进入详细分析。
               </div>
             )}
           </section>
@@ -91,6 +96,87 @@ export function EvaluationListPage(): JSX.Element {
           />
         </>
       )}
+    </div>
+  );
+}
+
+export function AiEvaluationEntryPanel(): JSX.Element {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-sm font-medium uppercase text-slate-500">
+            AI Evaluation Entry
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">
+            正式 AI 评估入口
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            使用正式评估记录承接 AI 辅助结果。Quick Screening 用于判断候选人是否值得进入详细分析；
+            Detailed Analysis 用于输出岗位匹配、优势、不足、风险、证据和面试问题。
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href="/feishu/evaluations/new?mode=quick"
+            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+          >
+            开始快速初筛
+          </Link>
+          <Link
+            href="/feishu/evaluations/new?mode=detailed-analysis"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            准备详细分析
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
+        <EvaluationStageCard
+          title="Quick Screening 快速初筛"
+          description="用于快速判断简历是否值得进入详细分析。重点看岗位基础匹配、明显缺口和需要电话确认的信息。"
+          items={[
+            "先确认简历、岗位和评价标准版本",
+            "只形成辅助判断，不自动拒绝或录用",
+            "适合批量简历进入人工复核前的第一步"
+          ]}
+        />
+        <EvaluationStageCard
+          title="Detailed Analysis 详细分析"
+          description="用于沉淀可复核的岗位匹配分析，输出优势、不足、风险、证据和面试问题。"
+          items={[
+            "围绕岗位要求组织证据和风险",
+            "为电话筛选和面试准备问题",
+            "最终决策仍由招聘者人工确认"
+          ]}
+        />
+      </div>
+    </section>
+  );
+}
+
+function EvaluationStageCard({
+  title,
+  description,
+  items
+}: {
+  title: string;
+  description: string;
+  items: string[];
+}): JSX.Element {
+  return (
+    <div className="min-w-0 rounded-md border border-slate-200 p-4">
+      <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+        {items.map((item) => (
+          <li key={item} className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
