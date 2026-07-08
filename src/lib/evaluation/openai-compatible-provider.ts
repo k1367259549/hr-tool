@@ -45,6 +45,7 @@ const CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions";
 const detailedAnalysisInstruction = [
   "Return only JSON that conforms to the resume evaluation output schema.",
   "Analyze only the CURRENT job description and CURRENT resume text in this request.",
+  "Use the structured job understanding context first when it is provided, then use the raw job description as supporting context.",
   "Do not reuse facts, names, scores, or evidence from any other candidate.",
   "Do not make automatic hiring, rejection, ranking, or pipeline movement decisions.",
   "Output must be detailed, evidence-based, and distinguishable across candidates.",
@@ -247,7 +248,9 @@ function createEvaluationInputBlock(input: EvaluationProviderInput): string {
     `candidateId: ${input.candidateId ?? ""}`,
     `jobProfileId: ${input.jobProfileId ?? ""}`,
     `templateVersionId: ${input.templateVersionId ?? ""}`,
+    `evaluationTemplateVersionId: ${input.evaluationTemplateVersionId ?? ""}`,
     "</EVALUATION_CONTEXT>",
+    ...createJobUnderstandingBlock(input),
     "<JOB_DESCRIPTION>",
     input.jobDescription,
     "</JOB_DESCRIPTION>",
@@ -255,6 +258,26 @@ function createEvaluationInputBlock(input: EvaluationProviderInput): string {
     input.resumeText,
     "</RESUME_TEXT>"
   ].join("\n");
+}
+
+function createJobUnderstandingBlock(input: EvaluationProviderInput): string[] {
+  const content = formatJobUnderstanding(input);
+
+  if (!content) {
+    return [];
+  }
+
+  return ["<JOB_UNDERSTANDING>", content, "</JOB_UNDERSTANDING>"];
+}
+
+function formatJobUnderstanding(input: EvaluationProviderInput): string | null {
+  if (input.jobUnderstandingJson !== undefined) {
+    return JSON.stringify(input.jobUnderstandingJson, null, 2);
+  }
+
+  const summary = input.jobUnderstandingSummary?.trim();
+
+  return summary ? summary : null;
 }
 
 function getChatMessageContent(payload: unknown): unknown {

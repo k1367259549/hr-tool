@@ -31,6 +31,16 @@ function createProviderInput() {
     jobDescription: "Need a backend engineer with TypeScript and API experience.",
     jobTitle: "Backend Engineer",
     jobProfileId: "job-profile-1",
+    jobUnderstandingJson: {
+      coreResponsibilities: ["Build backend API services"],
+      interviewFocus: ["API ownership depth"],
+      jobSummary: "Backend engineering role for recruiting workflow services.",
+      mustHaveRequirements: ["TypeScript", "API design"],
+      niceToHaveRequirements: ["HR tooling domain familiarity"],
+      risks: ["Availability is not confirmed"],
+      screeningFocus: ["Recent backend project depth"]
+    },
+    jobUnderstandingSummary: "Backend engineering role for recruiting workflow services.",
     resumeText: "Built TypeScript API services for recruiting workflows.",
     runId: "run-1",
     templateVersionId: "template-version-1"
@@ -299,6 +309,11 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     });
     expect(body.messages[0].content).toContain("Do not make automatic hiring");
     expect(body.messages[0].content).toContain("jd-match");
+    expect(body.messages[0].content).toContain("structured job understanding");
+    expect(body.messages[1].content).toContain("<JOB_UNDERSTANDING>");
+    expect(body.messages[1].content).toContain("</JOB_UNDERSTANDING>");
+    expect(body.messages[1].content).toContain("mustHaveRequirements");
+    expect(body.messages[1].content).toContain("Recent backend project depth");
     expect(body.messages[1].content).toContain("<JOB_DESCRIPTION>");
     expect(body.messages[1].content).toContain("</JOB_DESCRIPTION>");
     expect(body.messages[1].content).toContain("<RESUME_TEXT>");
@@ -311,6 +326,29 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(body.messages[1].content).toContain(
       "Built TypeScript API services for recruiting workflows."
     );
+  });
+
+  it("falls back to raw job description when no job understanding context is provided", async () => {
+    let requestInit: FetchInit;
+    const fetchImpl: FetchImpl = async (_url, init) => {
+      requestInit = init;
+
+      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+    };
+    const provider = createProvider(fetchImpl);
+    const input = createProviderInput();
+
+    await provider.evaluate({
+      ...input,
+      jobUnderstandingJson: undefined,
+      jobUnderstandingSummary: undefined
+    });
+
+    const body = JSON.parse(String(requestInit?.body));
+
+    expect(body.messages[1].content).not.toContain("<JOB_UNDERSTANDING>");
+    expect(body.messages[1].content).toContain("<JOB_DESCRIPTION>");
+    expect(body.messages[1].content).toContain(input.jobDescription);
   });
 
   it("sends distinct request bodies for different resumeText values", async () => {

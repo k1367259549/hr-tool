@@ -1,4 +1,5 @@
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
+import type { JsonValue } from "@/types/ai";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type {
   EvaluationRunFailureReason,
@@ -23,7 +24,10 @@ export type EvaluationProviderInput = {
   jobTitle?: string;
   candidateId?: string;
   jobProfileId?: string;
+  jobUnderstandingSummary?: string;
+  jobUnderstandingJson?: JsonValue;
   templateVersionId?: string;
+  evaluationTemplateVersionId?: string;
   lifecycleSnapshot?: EvaluationRunLifecycleSnapshot;
 };
 
