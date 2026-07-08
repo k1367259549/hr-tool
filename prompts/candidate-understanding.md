@@ -20,6 +20,9 @@ Rules:
 - Suggested next actions must be neutral recruiter actions such as clarify, verify, ask, collect evidence, or schedule a review.
 - Every insight should be grounded in resume evidence when possible.
 - If evidence is missing, put it in missingInformation or suggested questions.
+- Keep the output lightweight and practical. Prefer concise arrays with 3-5 high-signal items.
+- Prioritize candidateSummary, key experience, skills or capability signals, risks, missingInfo, and phone screen questions.
+- If the resume is long or noisy, summarize only the strongest current evidence and the most important missing information.
 - Return JSON only.
 - Do not include markdown, comments, or prose outside the JSON object.
 

@@ -6,7 +6,7 @@ export const aiConfig: AIConfig = {
   defaultModel: readStringEnv(resolveModelEnv(), "gpt-4.1"),
   defaultTemperature: readNumberEnv(envConfig.openAiTemperature, 0.2),
   defaultMaxTokens: readIntegerEnv(envConfig.openAiMaxTokens, 2000),
-  timeoutMs: readIntegerEnv(envConfig.aiTimeoutMs, 60000),
+  timeoutMs: readIntegerEnv(envConfig.aiTimeoutMs, 120000),
   maxRetries: readNonNegativeIntegerEnv(envConfig.aiMaxRetries, 2),
   supportedProviders: ["openai", "openai-compatible"]
 };

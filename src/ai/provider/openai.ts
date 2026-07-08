@@ -45,6 +45,7 @@ export const openAiProvider = {
   async generate(input: AIGenerateInput): Promise<AIGenerateResult> {
     const startedAt = Date.now();
     const model = input.model ?? aiConfig.defaultModel;
+    const timeoutMs = input.timeoutMs ?? aiConfig.timeoutMs;
 
     try {
       logger.info("OpenAI request started.", {
@@ -58,7 +59,7 @@ export const openAiProvider = {
         model,
         temperature: input.temperature ?? aiConfig.defaultTemperature
       }, {
-        timeout: aiConfig.timeoutMs
+        timeout: timeoutMs
       });
       const text = response.output_text.trim();
 

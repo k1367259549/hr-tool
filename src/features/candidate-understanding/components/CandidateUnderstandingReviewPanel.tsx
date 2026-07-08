@@ -74,11 +74,17 @@ export function CandidateUnderstandingReviewPanel({
         AI 结果只是候选人理解草稿，不是录用、拒绝、排名或评分。保存前必须由 Recruiter 人工确认。
       </div>
 
-      <div className="grid gap-3 text-xs text-slate-500 md:grid-cols-4">
+      <div className="grid gap-3 text-xs text-slate-500 md:grid-cols-5">
         <Metadata label="Workflow ID" value={result.workflowId} />
         <Metadata label="Resume" value={result.resumeFileName} />
         <Metadata label="Provider" value={result.aiProvider} />
         <Metadata label="Prompt" value={`${result.promptFile} / v${result.promptVersion}`} />
+        <Metadata
+          label="AI Input"
+          value={`${result.resumeInputMetadata.sentLength}/${result.resumeInputMetadata.originalLength}${
+            result.resumeInputMetadata.truncated ? " truncated" : ""
+          }`}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

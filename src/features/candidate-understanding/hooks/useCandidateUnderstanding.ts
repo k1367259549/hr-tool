@@ -241,7 +241,14 @@ export function useCandidateUnderstanding(): UseCandidateUnderstandingResult {
 
       setResult(nextResult);
       setReviewedOutput(createOutputFromResult(nextResult));
-      setSuccessMessage("候选人理解已生成，请人工确认后保存。");
+      if (nextResult.generationError) {
+        setErrorMessage(nextResult.generationError);
+      }
+      setSuccessMessage(
+        nextResult.fallbackDraft
+          ? "AI 生成超时，已生成可人工编辑的候选人理解草稿。"
+          : "候选人理解已生成，请人工确认后保存。"
+      );
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {

@@ -55,6 +55,7 @@ export const openAiCompatibleProvider = {
   async generate(input: AIGenerateInput): Promise<AIGenerateResult> {
     const startedAt = Date.now();
     const model = input.model ?? aiConfig.defaultModel;
+    const timeoutMs = input.timeoutMs ?? aiConfig.timeoutMs;
 
     try {
       logger.info("OpenAI-compatible request started.", {
@@ -74,7 +75,7 @@ export const openAiCompatibleProvider = {
         model,
         temperature: input.temperature ?? aiConfig.defaultTemperature
       }, {
-        timeout: aiConfig.timeoutMs
+        timeout: timeoutMs
       });
       const text = response.choices[0]?.message.content?.trim() ?? "";
 

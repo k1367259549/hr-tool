@@ -88,6 +88,9 @@ export type CandidateUnderstandingResult = CandidateInsightOutput & {
   promptVersion: string;
   generationTimeMs?: number;
   generatedAt: string;
+  resumeInputMetadata: CandidateUnderstandingResumeInputMetadata;
+  fallbackDraft?: boolean;
+  generationError?: string;
 };
 
 export type CandidateInsightCreateInput = CandidateInsightOutput & {
@@ -186,4 +189,10 @@ export type CandidateUnderstandingPromptInput = JsonObject & {
   resume: JsonObject;
   structureChunks: JsonValue;
   semanticChunks: JsonValue;
+};
+
+export type CandidateUnderstandingResumeInputMetadata = {
+  originalLength: number;
+  sentLength: number;
+  truncated: boolean;
 };

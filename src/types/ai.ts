@@ -22,6 +22,7 @@ export interface AIGenerateInput {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  timeoutMs?: number;
 }
 
 export interface AIGenerateResult {
@@ -82,6 +83,7 @@ export type AiPromptGenerationInput = {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  timeoutMs?: number;
   provider?: string;
   workflow?: string;
   promptCategory?: PromptCategory;

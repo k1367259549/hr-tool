@@ -77,6 +77,26 @@ describe("aiService structured JSON pipeline", () => {
     expect(providerGenerateMock).toHaveBeenCalledTimes(2);
     expect(retryCallInput.prompt).toContain("Retry Instruction:");
   });
+
+  it("passes per-call timeout to the provider", async () => {
+    providerGenerateMock.mockResolvedValue(createAiResult(JSON.stringify({ ok: true })));
+    const { aiService } = await import("@/ai/ai.service");
+
+    await aiService.generateValidatedJsonFromPrompt({
+      feature: "test-timeout",
+      promptFile: "job-understanding.md",
+      timeoutMs: 123456,
+      validate: validateOkJson,
+      variables: {
+        INPUT: {
+          jobTitle: "Recruiter"
+        }
+      }
+    });
+    const firstCallInput = providerGenerateMock.mock.calls[0]?.[0] as AIGenerateInput;
+
+    expect(firstCallInput.timeoutMs).toBe(123456);
+  });
 });
 
 function createAiResult(content: string): AIGenerateResult {

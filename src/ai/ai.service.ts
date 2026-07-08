@@ -46,6 +46,7 @@ async function generateFromPrompt(input: AiPromptGenerationInput): Promise<AIGen
     model: input.model,
     temperature: input.temperature,
     maxTokens: input.maxTokens,
+    timeoutMs: input.timeoutMs,
     provider: input.provider
   });
 }
@@ -83,7 +84,8 @@ async function generateValidatedJsonFromPrompt<TOutput>(
         model,
         prompt,
         provider,
-        temperature: input.temperature
+        temperature: input.temperature,
+        timeoutMs: input.timeoutMs
       });
       const parsedJson = parseJsonOutput<JsonValue>(result.content);
       const output = input.validate(parsedJson);
@@ -173,9 +175,10 @@ async function generate(
   const feature = input.feature ?? "unknown";
   const model = input.model ?? aiConfig.defaultModel;
   const provider = getAIProvider(input.provider ?? aiConfig.defaultProvider);
+  const timeoutMs = input.timeoutMs ?? aiConfig.timeoutMs;
 
   try {
-    const { result, retryCount } = await runWithRetry(() => provider.generate(input));
+    const { result, retryCount } = await runWithRetry(() => provider.generate(input), timeoutMs);
     const resultWithRetryCount = {
       ...result,
       retryCount
@@ -207,13 +210,14 @@ async function generate(
 }
 
 async function runWithRetry(
-  operation: () => Promise<AIGenerateResult>
+  operation: () => Promise<AIGenerateResult>,
+  timeoutMs: number
 ): Promise<{ result: AIGenerateResult; retryCount: number }> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= aiConfig.maxRetries; attempt += 1) {
     try {
-      const result = await runWithTimeout(operation(), aiConfig.timeoutMs);
+      const result = await runWithTimeout(operation(), timeoutMs);
 
       return {
         result,
@@ -235,7 +239,7 @@ async function runWithTimeout<TValue>(promise: Promise<TValue>, timeoutMs: numbe
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new AIServiceError("AI_TIMEOUT", "AI generation timed out."));
+      reject(new AIServiceError("AI_TIMEOUT", `AI generation timed out after ${timeoutMs} ms.`));
     }, timeoutMs);
   });
 

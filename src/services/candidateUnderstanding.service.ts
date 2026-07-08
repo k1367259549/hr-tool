@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { validateCandidateUnderstandingAiOutput } from "@/ai/schemas/candidateUnderstanding.schema";
 import { aiService } from "@/ai/ai.service";
+import { aiConfig } from "@/config/ai.config";
 import { candidateInsightRepository } from "@/repositories/candidateInsight.repository";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
@@ -9,6 +10,8 @@ import type {
   CandidateInsight,
   CandidateInsightCreateInput,
   CandidateInsightDto,
+  CandidateInsightOutput,
+  CandidateUnderstandingResumeInputMetadata,
   CandidateUnderstandingGenerateInput,
   CandidateUnderstandingPromptInput,
   CandidateUnderstandingResult,
@@ -28,6 +31,9 @@ import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 const promptFile = "candidate-understanding.md";
 const resumeVersion = "resume-parser-v1";
 const parserVersion = "v1";
+const promptVersion = "1.0";
+const maxCandidateUnderstandingResumeChars = 16000;
+const maxCandidateUnderstandingChunkChars = 3200;
 
 export class CandidateUnderstandingServiceError extends Error {
   readonly code: "AI_ERROR" | "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND";
@@ -55,6 +61,11 @@ export const candidateUnderstandingService = {
       const structureChunks = createStructureChunks(parsedResume.parsedText);
       const semanticChunks = createSemanticChunks(structureChunks);
       const contentHash = generateResumeContentHash(parsedResume.parsedText);
+      const promptResumeInput = createPromptResumeInput(
+        parsedResume.parsedText,
+        structureChunks,
+        semanticChunks
+      );
       const savedResume = await candidateResumeRepository.create({
         candidateSource: input.candidateSource,
         contentHash,
@@ -88,37 +99,73 @@ export const candidateUnderstandingService = {
           structureChunkCount: structureChunks.length
         }
       });
-      const aiResult = await aiService.generateValidatedJsonFromPrompt({
-        feature: "candidate-understanding",
-        promptFile,
-        validate: (value) =>
-          normalizeCandidateInsightOutput(validateCandidateUnderstandingAiOutput(value)),
-        variables: {
-          INPUT: createPromptInput(jobProfile, parsedResume.parsedText, structureChunks, semanticChunks)
-        },
-        workflow: "Workflow-02 Candidate Understanding"
-      });
+      const aiStartedAt = Date.now();
 
-      return {
-        ...aiResult.output,
-        aiModel: aiResult.model,
-        aiProvider: aiResult.provider,
-        generatedAt: new Date().toISOString(),
-        generationTimeMs: aiResult.generationTimeMs,
-        jobProfileId: jobProfile.id,
-        jobProfileTitle: jobProfile.jobTitle,
-        jobProfileVersion,
-        parsedTextPreview: truncateText(parsedResume.parsedText, 1200),
-        parsingStatus: "PARSED",
-        promptFile: aiResult.prompt.fileName,
-        promptVersion: aiResult.prompt.version,
-        resumeFileName: parsedResume.fileName,
-        resumeId: savedResume.id,
-        resumeVersion,
-        semanticChunks,
-        structureChunks,
-        workflowId
-      };
+      try {
+        const aiResult = await aiService.generateValidatedJsonFromPrompt({
+          feature: "candidate-understanding",
+          promptFile,
+          timeoutMs: aiConfig.timeoutMs,
+          validate: (value) =>
+            normalizeCandidateInsightOutput(validateCandidateUnderstandingAiOutput(value)),
+          variables: {
+            INPUT: createPromptInput(jobProfile, promptResumeInput)
+          },
+          workflow: "Workflow-02 Candidate Understanding"
+        });
+
+        return {
+          ...aiResult.output,
+          aiModel: aiResult.model,
+          aiProvider: aiResult.provider,
+          generatedAt: new Date().toISOString(),
+          generationTimeMs: aiResult.generationTimeMs,
+          jobProfileId: jobProfile.id,
+          jobProfileTitle: jobProfile.jobTitle,
+          jobProfileVersion,
+          parsedTextPreview: truncateText(parsedResume.parsedText, 1200),
+          parsingStatus: "PARSED",
+          promptFile: aiResult.prompt.fileName,
+          promptVersion: aiResult.prompt.version,
+          resumeFileName: parsedResume.fileName,
+          resumeId: savedResume.id,
+          resumeInputMetadata: promptResumeInput.metadata,
+          resumeVersion,
+          semanticChunks,
+          structureChunks,
+          workflowId
+        };
+      } catch (error) {
+        if (isAiTimeoutError(error)) {
+          const timeoutMessage = createCandidateUnderstandingTimeoutMessage(aiConfig.timeoutMs);
+
+          return {
+            ...createTimeoutFallbackOutput(),
+            aiModel: aiConfig.defaultModel,
+            aiProvider: aiConfig.defaultProvider,
+            fallbackDraft: true,
+            generatedAt: new Date().toISOString(),
+            generationError: timeoutMessage,
+            generationTimeMs: Date.now() - aiStartedAt,
+            jobProfileId: jobProfile.id,
+            jobProfileTitle: jobProfile.jobTitle,
+            jobProfileVersion,
+            parsedTextPreview: truncateText(parsedResume.parsedText, 1200),
+            parsingStatus: "PARSED",
+            promptFile,
+            promptVersion,
+            resumeFileName: parsedResume.fileName,
+            resumeId: savedResume.id,
+            resumeInputMetadata: promptResumeInput.metadata,
+            resumeVersion,
+            semanticChunks,
+            structureChunks,
+            workflowId
+          };
+        }
+
+        throw error;
+      }
     } catch (error) {
       await persistFailedResumeIfPossible({
         error,
@@ -188,9 +235,12 @@ function createJobProfileVersion(jobProfile: JobProfile): string {
 
 function createPromptInput(
   jobProfile: JobProfile,
-  parsedText: string,
-  structureChunks: ResumeStructureChunk[],
-  semanticChunks: ResumeSemanticChunk[]
+  promptResumeInput: {
+    parsedText: string;
+    structureChunks: ResumeStructureChunk[];
+    semanticChunks: ResumeSemanticChunk[];
+    metadata: CandidateUnderstandingResumeInputMetadata;
+  }
 ): CandidateUnderstandingPromptInput {
   return {
     jobProfile: {
@@ -204,11 +254,155 @@ function createPromptInput(
       requiredCompetencies: jobProfile.requiredCompetencies
     },
     resume: {
-      parsedText: truncateText(parsedText, 12000),
+      inputMetadata: promptResumeInput.metadata,
+      parsedText: promptResumeInput.parsedText,
       resumeVersion
     },
-    semanticChunks: semanticChunks as unknown as JsonValue,
-    structureChunks: structureChunks as unknown as JsonValue
+    semanticChunks: promptResumeInput.semanticChunks as unknown as JsonValue,
+    structureChunks: promptResumeInput.structureChunks as unknown as JsonValue
+  };
+}
+
+function createPromptResumeInput(
+  parsedText: string,
+  structureChunks: ResumeStructureChunk[],
+  semanticChunks: ResumeSemanticChunk[]
+): {
+  parsedText: string;
+  structureChunks: ResumeStructureChunk[];
+  semanticChunks: ResumeSemanticChunk[];
+  metadata: CandidateUnderstandingResumeInputMetadata;
+} {
+  if (parsedText.length <= maxCandidateUnderstandingResumeChars) {
+    return {
+      metadata: {
+        originalLength: parsedText.length,
+        sentLength: parsedText.length,
+        truncated: false
+      },
+      parsedText,
+      semanticChunks,
+      structureChunks
+    };
+  }
+
+  const selectedChunks = selectPromptStructureChunks(structureChunks);
+  const selectedChunkIds = new Set(selectedChunks.map((chunk) => chunk.chunkId));
+  const selectedSemanticChunks = semanticChunks.filter((chunk) =>
+    chunk.evidenceChunkIds.some((chunkId) => selectedChunkIds.has(chunkId))
+  );
+  const promptText = buildPromptTextFromChunks(selectedChunks, parsedText);
+
+  return {
+    metadata: {
+      originalLength: parsedText.length,
+      sentLength: promptText.length,
+      truncated: true
+    },
+    parsedText: promptText,
+    semanticChunks: selectedSemanticChunks,
+    structureChunks: selectedChunks
+  };
+}
+
+function selectPromptStructureChunks(
+  structureChunks: ResumeStructureChunk[]
+): ResumeStructureChunk[] {
+  const prioritizedTypes: ResumeStructureChunk["chunkType"][] = [
+    "Personal Information",
+    "Experience",
+    "Projects",
+    "Skills",
+    "Education"
+  ];
+  const priorityByType = new Map(prioritizedTypes.map((type, index) => [type, index]));
+  const selected: ResumeStructureChunk[] = [];
+  let sentLength = 0;
+
+  for (const chunk of [...structureChunks].sort((left, right) => {
+    const leftPriority = priorityByType.get(left.chunkType) ?? prioritizedTypes.length;
+    const rightPriority = priorityByType.get(right.chunkType) ?? prioritizedTypes.length;
+
+    return leftPriority - rightPriority;
+  })) {
+    if (sentLength >= maxCandidateUnderstandingResumeChars) {
+      break;
+    }
+
+    const remainingLength = maxCandidateUnderstandingResumeChars - sentLength;
+    const chunkLengthLimit = Math.min(remainingLength, maxCandidateUnderstandingChunkChars);
+    const content =
+      chunk.content.length > chunkLengthLimit
+        ? truncatePromptText(chunk.content, chunkLengthLimit)
+        : chunk.content;
+
+    selected.push({
+      ...chunk,
+      content
+    });
+    sentLength += content.length;
+  }
+
+  return selected;
+}
+
+function buildPromptTextFromChunks(
+  selectedChunks: ResumeStructureChunk[],
+  fallbackParsedText: string
+): string {
+  const chunkText = selectedChunks
+    .map((chunk) => `[${chunk.chunkType}] ${chunk.content.trim()}`)
+    .filter((value) => value.length > 0)
+    .join("\n\n")
+    .trim();
+
+  if (chunkText.length > 0) {
+    return truncatePromptText(chunkText, maxCandidateUnderstandingResumeChars);
+  }
+
+  return truncatePromptText(fallbackParsedText, maxCandidateUnderstandingResumeChars);
+}
+
+function truncatePromptText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function isAiTimeoutError(error: unknown): boolean {
+  return error instanceof AppError && /timed out/i.test(error.message);
+}
+
+function createCandidateUnderstandingTimeoutMessage(timeoutMs: number): string {
+  return `Candidate understanding AI generation timed out after ${timeoutMs} ms.`;
+}
+
+function createTimeoutFallbackOutput(): CandidateInsightOutput {
+  return {
+    evidence: [],
+    insights: {
+      contextSignals: [],
+      openQuestions: ["AI 生成超时，请人工补充候选人理解。"],
+      relevantExperience: [],
+      transferableStrengths: []
+    },
+    missingInformation: ["AI 生成超时，请人工补充候选人理解。"],
+    potentialRisks: ["简历较长或模型响应较慢，建议缩短输入后重试。"],
+    strengths: [],
+    suggestedInterviewQuestions: [],
+    suggestedNextActions: ["人工检查简历关键信息后，再决定是否重试 AI 生成。"],
+    suggestedPhoneScreenQuestions: [
+      "请简单介绍你最近一段与该岗位最相关的经历。",
+      "你目前的到岗时间、实习周期和每周可出勤天数是怎样的？",
+      "你对这个岗位的核心工作内容理解是什么？"
+    ],
+    summary: {
+      candidateOverview: "AI 生成超时，请人工补充候选人理解。",
+      evidenceCoverage: "AI 未能在超时时间内完成证据整理，请人工查看简历原文。",
+      roleContextUnderstanding: "AI 生成超时，暂未形成与岗位画像的结构化对应关系。"
+    }
   };
 }
 

@@ -63,6 +63,11 @@ const candidateUnderstandingResult: CandidateUnderstandingResult = {
   promptVersion: "1.0",
   resumeFileName: "resume.txt",
   resumeId: "00000000-0000-4000-8000-000000000002",
+  resumeInputMetadata: {
+    originalLength: 9,
+    sentLength: 9,
+    truncated: false
+  },
   resumeVersion: "resume-parser-v1",
   semanticChunks: [
     {

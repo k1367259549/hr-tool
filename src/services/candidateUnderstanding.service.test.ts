@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aiService } from "@/ai/ai.service";
+import { aiConfig } from "@/config/ai.config";
 import { candidateResumeRepository } from "@/repositories/candidateResume.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/services/candidateUnderstanding.service";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import type { CandidateInsight } from "@/types/candidateUnderstanding";
+import { AppError } from "@/utils/errors";
 import { generateResumeContentHash } from "@/utils/resumeContentHash";
 import { parseResumeFile, ResumeParserError } from "@/utils/resumeParser";
 
@@ -246,6 +248,150 @@ describe("candidateUnderstandingService", () => {
     });
   });
 
+  it("truncates long resume input before calling candidate understanding AI", async () => {
+    const reviewedJobProfile = createReviewedJobProfile();
+    const parsedText = [
+      "基本信息",
+      "候选人 A / 机器人调试工程师",
+      "工作经历",
+      "负责机器人手臂现场调试、节拍优化、客户沟通。".repeat(500),
+      "项目经历",
+      "主导机器人上下料项目，完成方案验证和现场问题定位。".repeat(500),
+      "技能",
+      "机器人手臂 调试 PLC 视觉 系统集成".repeat(300),
+      "教育经历",
+      "自动化 本科"
+    ].join("\n");
+
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(reviewedJobProfile);
+    vi.mocked(parseResumeFile).mockResolvedValueOnce({
+      fileName: "resume.txt",
+      fileSize: parsedText.length,
+      fileType: "TXT",
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parsedText
+    });
+    vi.mocked(candidateResumeRepository.create).mockResolvedValueOnce({
+      candidateId: null,
+      candidateSource: null,
+      contentHash: generateResumeContentHash(parsedText),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      fileName: "resume.txt",
+      fileSize: parsedText.length,
+      fileType: "TXT",
+      id: "resume-id",
+      intakeSource: "CANDIDATE_UNDERSTANDING",
+      jobProfileId: "job-profile-id",
+      language: null,
+      notes: null,
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parserVersion: "v1",
+      parsedText,
+      parsingError: null,
+      parsingStatus: "PARSED",
+      resumeVersion: "resume-parser-v1",
+      semanticChunks: [],
+      structureChunks: [],
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    });
+    vi.mocked(aiService.generateValidatedJsonFromPrompt).mockResolvedValueOnce(
+      createAiCandidateUnderstandingResult()
+    );
+
+    const result = await candidateUnderstandingService.generateCandidateUnderstanding({
+      file: new File(["resume"], "resume.txt"),
+      jobProfileId: "job-profile-id"
+    });
+    const aiInput = vi.mocked(aiService.generateValidatedJsonFromPrompt).mock.calls[0]?.[0];
+    const promptInput = aiInput?.variables?.INPUT as {
+      resume: {
+        inputMetadata: {
+          originalLength: number;
+          sentLength: number;
+          truncated: boolean;
+        };
+        parsedText: string;
+      };
+      structureChunks: Array<{ chunkType: string; content: string }>;
+    };
+
+    expect(aiInput).toEqual(
+      expect.objectContaining({
+        timeoutMs: aiConfig.timeoutMs
+      })
+    );
+    expect(promptInput.resume.inputMetadata).toEqual({
+      originalLength: parsedText.length,
+      sentLength: expect.any(Number),
+      truncated: true
+    });
+    expect(promptInput.resume.inputMetadata.sentLength).toBeLessThanOrEqual(16000);
+    expect(promptInput.resume.parsedText).toContain("候选人 A");
+    expect(promptInput.resume.parsedText).toContain("机器人手臂现场调试");
+    expect(promptInput.structureChunks.map((chunk) => chunk.chunkType)).toContain("Skills");
+    expect(result.resumeInputMetadata.truncated).toBe(true);
+  });
+
+  it("returns editable fallback draft when candidate understanding AI times out", async () => {
+    const reviewedJobProfile = createReviewedJobProfile();
+    const parsedText = "工作经历\n负责机器人手臂调试。";
+
+    vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce(reviewedJobProfile);
+    vi.mocked(parseResumeFile).mockResolvedValueOnce({
+      fileName: "resume.txt",
+      fileSize: parsedText.length,
+      fileType: "TXT",
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parsedText
+    });
+    vi.mocked(candidateResumeRepository.create).mockResolvedValueOnce({
+      candidateId: null,
+      candidateSource: null,
+      contentHash: generateResumeContentHash(parsedText),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      fileName: "resume.txt",
+      fileSize: parsedText.length,
+      fileType: "TXT",
+      id: "resume-id",
+      intakeSource: "CANDIDATE_UNDERSTANDING",
+      jobProfileId: "job-profile-id",
+      language: null,
+      notes: null,
+      originalFile: new Uint8Array([1, 2, 3]) as Uint8Array<ArrayBuffer>,
+      parserVersion: "v1",
+      parsedText,
+      parsingError: null,
+      parsingStatus: "PARSED",
+      resumeVersion: "resume-parser-v1",
+      semanticChunks: [],
+      structureChunks: [],
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      workflowId: "workflow-id"
+    });
+    vi.mocked(aiService.generateValidatedJsonFromPrompt).mockRejectedValueOnce(
+      new AppError("AI_ERROR", `AI generation timed out after ${aiConfig.timeoutMs} ms.`, 502)
+    );
+
+    const result = await candidateUnderstandingService.generateCandidateUnderstanding({
+      file: new File(["resume"], "resume.txt"),
+      jobProfileId: "job-profile-id"
+    });
+
+    expect(result.fallbackDraft).toBe(true);
+    expect(result.generationError).toBe(
+      `Candidate understanding AI generation timed out after ${aiConfig.timeoutMs} ms.`
+    );
+    expect(result.summary.candidateOverview).toBe("AI 生成超时，请人工补充候选人理解。");
+    expect(result.potentialRisks).toContain("简历较长或模型响应较慢，建议缩短输入后重试。");
+    expect(result.suggestedPhoneScreenQuestions).toEqual([
+      "请简单介绍你最近一段与该岗位最相关的经历。",
+      "你目前的到岗时间、实习周期和每周可出勤天数是怎样的？",
+      "你对这个岗位的核心工作内容理解是什么？"
+    ]);
+    expect(result.resumeInputMetadata.truncated).toBe(false);
+  });
+
   it("rejects candidate understanding when job profile is not reviewed", async () => {
     vi.mocked(jobProfileRepository.findById).mockResolvedValueOnce({
       aiModel: "test-model",
@@ -364,3 +510,71 @@ describe("candidateUnderstandingService", () => {
     );
   });
 });
+
+function createReviewedJobProfile() {
+  return {
+    aiModel: "test-model",
+    aiProvider: "openai-compatible",
+    coreResponsibilities: ["机器人调试", "现场交付"],
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    generationTimeMs: 1000,
+    hiringFocus: ["机器人手臂经验", "现场问题定位"],
+    hiringGoal: null,
+    id: "job-profile-id",
+    interviewFocus: ["项目深度", "工具链"],
+    jd: "负责机器人手臂调试和现场交付。",
+    jobSummary: "机器人调试岗位。",
+    jobTitle: "机器人调试工程师",
+    leaderRequirements: null,
+    missingInformation: [],
+    notes: null,
+    potentialRisks: [],
+    preferredCompetencies: [],
+    promptFile: "job-understanding.md",
+    promptVersion: "1.0",
+    requiredCompetencies: ["机器人手臂调试"],
+    reviewedAt: new Date("2026-01-03T00:00:00.000Z"),
+    suggestedFollowUpQuestions: [],
+    teamBackground: null,
+    updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    workflowId: "workflow-id"
+  };
+}
+
+function createAiCandidateUnderstandingResult() {
+  return {
+    generationTimeMs: 1000,
+    model: "test-model",
+    output: {
+      evidence: [],
+      insights: {
+        contextSignals: [],
+        openQuestions: [],
+        relevantExperience: ["机器人手臂调试"],
+        transferableStrengths: []
+      },
+      missingInformation: [],
+      potentialRisks: [],
+      strengths: ["机器人手臂项目经验"],
+      suggestedInterviewQuestions: [],
+      suggestedNextActions: ["电话确认项目深度"],
+      suggestedPhoneScreenQuestions: ["请介绍最近一个机器人手臂项目。"],
+      summary: {
+        candidateOverview: "候选人具备机器人手臂调试经验。",
+        evidenceCoverage: "简历覆盖项目经历。",
+        roleContextUnderstanding: "与机器人调试岗位存在相关性。"
+      }
+    },
+    prompt: {
+      category: "candidate-understanding" as const,
+      fileName: "candidate-understanding.md",
+      path: "prompts/candidate-understanding.md",
+      version: "1.0"
+    },
+    provider: "openai-compatible",
+    providerRetryCount: 0,
+    rawOutput: "{}",
+    retryCount: 0,
+    validationResult: "success" as const
+  };
+}
