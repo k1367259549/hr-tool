@@ -1,5 +1,5 @@
+import { createRequire } from "node:module";
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 import {
   getResumeFileExtension,
   getNormalizedResumeFileType,
@@ -7,6 +7,15 @@ import {
   MAX_RESUME_FILE_SIZE_BYTES,
   RESUME_FILE_SIZE_LIMIT_LABEL
 } from "@/config/resume.config";
+
+type PdfParseModule = {
+  PDFParse: new (options: { data: Buffer }) => {
+    getText(): Promise<{ text: string }>;
+    destroy(): Promise<void>;
+  };
+};
+
+const requirePdfParse = createRequire(import.meta.url);
 
 export class ResumeParserError extends Error {
   readonly code:
@@ -91,6 +100,7 @@ async function parseBufferByExtension(buffer: Buffer, extension: string): Promis
   }
 
   if (extension === ".pdf") {
+    const { PDFParse } = requirePdfParse("pdf-parse") as PdfParseModule;
     const parser = new PDFParse({ data: buffer });
 
     try {

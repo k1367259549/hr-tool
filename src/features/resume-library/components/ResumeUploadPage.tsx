@@ -31,7 +31,7 @@ export function ResumeUploadPage(): JSX.Element {
         body: formData,
         method: "POST"
       });
-      const json = (await response.json()) as ApiResponse<ResumeUploadResultDto>;
+      const json = await readResumeUploadResponse(response);
 
       if (!json.success || !json.data) {
         throw new Error(json.error?.message ?? "简历上传失败。");
@@ -101,4 +101,25 @@ export function ResumeUploadPage(): JSX.Element {
       </section>
     </div>
   );
+}
+
+async function readResumeUploadResponse(
+  response: Response
+): Promise<ApiResponse<ResumeUploadResultDto>> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = await response.text();
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new Error(
+      response.ok
+        ? "简历上传接口返回了非 JSON 响应，请刷新后重试。"
+        : `简历上传接口返回异常响应（HTTP ${response.status}），请稍后重试。`
+    );
+  }
+
+  try {
+    return JSON.parse(body) as ApiResponse<ResumeUploadResultDto>;
+  } catch {
+    throw new Error("简历上传接口返回的 JSON 无法解析，请稍后重试。");
+  }
 }
