@@ -390,6 +390,7 @@ model Candidate {
   resumes      CandidateResume[]
   audits       CandidateAudit[]
   applications CandidateApplication[]
+  feishuBitableRecordMappings FeishuBitableRecordMapping[]
 
   @@index([fullName])
   @@index([status])
@@ -397,6 +398,25 @@ model Candidate {
   @@index([owner])
   @@index([latestActivityAt])
   @@index([createdAt])
+}
+
+model FeishuBitableRecordMapping {
+  id           String    @id @default(cuid())
+  candidateId  String
+  appToken     String
+  tableId      String
+  recordId     String
+  syncStatus   String?
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, appToken, tableId], name: "feishuBitableCandidateTableMapping")
+  @@index([candidateId])
+  @@index([recordId])
 }
 
 model CandidateAudit {

@@ -4,6 +4,7 @@ import {
   ScheduleInterviewError
 } from "@/lib/interviewScheduling/scheduleInterview";
 import type { CandidateDto } from "@/types/candidate";
+import type { FeishuBitableRecordMapping } from "@/lib/feishu/feishuBitableMapping";
 
 const env = {
   FEISHU_APP_ID: "cli_test",
@@ -54,6 +55,7 @@ describe("scheduleInterview", () => {
     const result = await scheduleInterview(input, {
       createCalendarEvent,
       env,
+      findBitableRecordMapping: vi.fn(async () => createMapping()),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => [
         {
@@ -81,6 +83,11 @@ describe("scheduleInterview", () => {
         calendarEventId: "event-1"
       })),
       env,
+      findBitableRecordMapping: vi.fn(async () =>
+        createMapping({
+          recordId: "rec_real_1"
+        })
+      ),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => []),
       now: () => new Date("2026-07-09T12:00:00.000Z"),
@@ -88,7 +95,7 @@ describe("scheduleInterview", () => {
     });
 
     expect(result).toEqual({
-      bitableRecordId: "candidate-1",
+      bitableRecordId: "rec_real_1",
       calendarEventId: "event-1",
       candidateId: "candidate-1",
       success: true,
@@ -100,13 +107,35 @@ describe("scheduleInterview", () => {
         appToken: "base-token",
         calendarEventId: "event-1",
         interviewerEmail: "interviewer@example.com",
-        recordId: "candidate-1",
+        recordId: "rec_real_1",
         round: "一面",
         scheduledStartTime: input.startTime,
         status: "已预约面试",
         tableId: "tbl_test"
       })
     );
+  });
+
+  it("does not create event or update bitable when mapping is missing", async () => {
+    const createCalendarEvent = vi.fn();
+    const updateCandidateInterviewStatus = vi.fn();
+
+    const result = await scheduleInterview(input, {
+      createCalendarEvent,
+      env,
+      findBitableRecordMapping: vi.fn(async () => null),
+      getCandidate: vi.fn(async () => candidate),
+      listBusyTimes: vi.fn(async () => []),
+      updateCandidateInterviewStatus
+    });
+
+    expect(result).toEqual({
+      code: "FEISHU_RECORD_MAPPING_NOT_FOUND",
+      message: "未找到候选人与飞书多维表格记录的映射，无法安排面试。",
+      success: false
+    });
+    expect(createCalendarEvent).not.toHaveBeenCalled();
+    expect(updateCandidateInterviewStatus).not.toHaveBeenCalled();
   });
 
   it("throws when bitable update fails after calendar event creation", async () => {
@@ -116,6 +145,7 @@ describe("scheduleInterview", () => {
           calendarEventId: "event-1"
         })),
         env,
+        findBitableRecordMapping: vi.fn(async () => createMapping()),
         getCandidate: vi.fn(async () => candidate),
         listBusyTimes: vi.fn(async () => []),
         updateCandidateInterviewStatus: vi.fn(async () => {
@@ -128,3 +158,23 @@ describe("scheduleInterview", () => {
     } satisfies Partial<ScheduleInterviewError>);
   });
 });
+
+function createMapping(
+  overrides: Partial<FeishuBitableRecordMapping> = {}
+): FeishuBitableRecordMapping {
+  const now = new Date("2026-07-09T00:00:00.000Z");
+
+  return {
+    appToken: "base-token",
+    candidateId: "candidate-1",
+    createdAt: now,
+    id: "mapping-1",
+    lastError: null,
+    lastSyncedAt: null,
+    recordId: "rec_real_default",
+    syncStatus: null,
+    tableId: "tbl_test",
+    updatedAt: now,
+    ...overrides
+  };
+}

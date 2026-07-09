@@ -67,6 +67,25 @@ describe("POST /api/interviews/schedule", () => {
     expect(JSON.stringify(json)).not.toContain("tenant_access_token");
   });
 
+  it("returns FEISHU_RECORD_MAPPING_NOT_FOUND without leaking secrets", async () => {
+    scheduleInterviewMock.mockResolvedValueOnce({
+      code: "FEISHU_RECORD_MAPPING_NOT_FOUND",
+      message: "未找到候选人与飞书多维表格记录的映射，无法安排面试。",
+      success: false
+    });
+
+    const { POST } = await import("@/app/api/interviews/schedule/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/interviews/schedule", createSchedulePayload())
+    );
+    const json = await readApiJson<null>(response);
+
+    expect(response.status).toBe(409);
+    expect(json.error?.code).toBe("FEISHU_RECORD_MAPPING_NOT_FOUND");
+    expect(JSON.stringify(json)).not.toContain("tenant_access_token");
+    expect(JSON.stringify(json)).not.toContain("app-secret");
+  });
+
   it("rejects invalid payload before calling service", async () => {
     const { POST } = await import("@/app/api/interviews/schedule/route");
     const response = await POST(

@@ -6,6 +6,7 @@ export type StandardErrorCode =
   | "AI_ERROR"
   | "CONFIG_ERROR"
   | "FEISHU_SYNC_ERROR"
+  | "FEISHU_RECORD_MAPPING_NOT_FOUND"
   | "TIME_CONFLICT"
   | "UNKNOWN_ERROR";
 

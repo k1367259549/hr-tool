@@ -1,5 +1,6 @@
 import { FeishuTenantAccessTokenProvider, createFeishuAuthConfigFromEnv } from "@/lib/feishu/feishuAuth";
 import { updateFeishuCandidateInterviewStatus } from "@/lib/feishu/feishuBitable";
+import { findFeishuBitableRecordMapping } from "@/lib/feishu/feishuBitableMapping";
 import {
   createFeishuCalendarEvent,
   listFeishuBusyTimes
@@ -28,7 +29,7 @@ export type ScheduleInterviewResult =
     }
   | {
       success: false;
-      code: "TIME_CONFLICT";
+      code: "TIME_CONFLICT" | "FEISHU_RECORD_MAPPING_NOT_FOUND";
       message: string;
     };
 
@@ -36,6 +37,7 @@ export type ScheduleInterviewDependencies = {
   getCandidate?: (candidateId: string) => Promise<CandidateDto>;
   listBusyTimes?: typeof listFeishuBusyTimes;
   createCalendarEvent?: typeof createFeishuCalendarEvent;
+  findBitableRecordMapping?: typeof findFeishuBitableRecordMapping;
   updateCandidateInterviewStatus?: typeof updateFeishuCandidateInterviewStatus;
   client?: Pick<FeishuClient, "request">;
   env?: NodeJS.ProcessEnv;
@@ -66,6 +68,8 @@ export async function scheduleInterview(
   const getCandidate = dependencies.getCandidate ?? candidateService.getCandidate;
   const listBusyTimes = dependencies.listBusyTimes ?? listFeishuBusyTimes;
   const createCalendarEvent = dependencies.createCalendarEvent ?? createFeishuCalendarEvent;
+  const findBitableRecordMapping =
+    dependencies.findBitableRecordMapping ?? findFeishuBitableRecordMapping;
   const updateCandidateInterviewStatus =
     dependencies.updateCandidateInterviewStatus ?? updateFeishuCandidateInterviewStatus;
   const now = dependencies.now ?? (() => new Date());
@@ -87,6 +91,20 @@ export async function scheduleInterview(
   const calendarId = readRequiredEnv(env, "FEISHU_DEFAULT_CALENDAR_ID");
   const baseAppToken = readRequiredEnv(env, "FEISHU_BASE_APP_TOKEN");
   const candidateTableId = readRequiredEnv(env, "FEISHU_CANDIDATE_TABLE_ID");
+  const bitableRecordMapping = await findBitableRecordMapping({
+    appToken: baseAppToken,
+    candidateId: input.candidateId,
+    tableId: candidateTableId
+  });
+
+  if (!bitableRecordMapping) {
+    return {
+      code: "FEISHU_RECORD_MAPPING_NOT_FOUND",
+      message: "未找到候选人与飞书多维表格记录的映射，无法安排面试。",
+      success: false
+    };
+  }
+
   const { calendarEventId } = await createCalendarEvent(client, {
     calendarId,
     description: createCalendarDescription(candidate, input),
@@ -94,7 +112,7 @@ export async function scheduleInterview(
     startTime: input.startTime,
     summary: `面试：${candidate.fullName}｜${input.round}`
   });
-  const bitableRecordId = input.candidateId;
+  const bitableRecordId = bitableRecordMapping.recordId;
 
   try {
     await updateCandidateInterviewStatus(client, {

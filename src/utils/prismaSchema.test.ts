@@ -347,6 +347,46 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toMatch(/^\s*UPDATE\s/im);
   });
 
+  it("adds Feishu Bitable record mapping without changing candidate lifecycle", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const mappingModel = extractPrismaBlock(schema, "model FeishuBitableRecordMapping");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260709110000_m10_a_feishu_bitable_record_mapping",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(mappingModel).toContain("candidateId  String");
+    expect(mappingModel).toContain("appToken     String");
+    expect(mappingModel).toContain("tableId      String");
+    expect(mappingModel).toContain("recordId     String");
+    expect(mappingModel).toContain("syncStatus   String?");
+    expect(mappingModel).toContain("lastSyncedAt DateTime?");
+    expect(mappingModel).toContain("lastError    String?");
+    expect(mappingModel).toContain(
+      "@@unique([candidateId, appToken, tableId], name: \"feishuBitableCandidateTableMapping\")"
+    );
+    expect(mappingModel).toContain("@@index([recordId])");
+    expect(schema).toContain("feishuBitableRecordMappings FeishuBitableRecordMapping[]");
+    expect(migration).toContain('CREATE TABLE "FeishuBitableRecordMapping"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "FeishuBitableRecordMapping_candidateId_appToken_tableId_key"'
+    );
+    expect(migration).toContain(
+      'CREATE INDEX "FeishuBitableRecordMapping_recordId_idx"'
+    );
+    expect(migration).toContain('REFERENCES "Candidate"("id")');
+    expect(migration).toContain("ON DELETE CASCADE");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
   it("keeps Evaluation Template versioning and assignment constraints in the migration", () => {
     const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
     const migration = readFileSync(
