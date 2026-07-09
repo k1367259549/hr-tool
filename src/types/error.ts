@@ -5,6 +5,8 @@ export type StandardErrorCode =
   | "DATABASE_ERROR"
   | "AI_ERROR"
   | "CONFIG_ERROR"
+  | "FEISHU_SYNC_ERROR"
+  | "TIME_CONFLICT"
   | "UNKNOWN_ERROR";
 
 export type LegacyErrorCode =

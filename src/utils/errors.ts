@@ -12,7 +12,9 @@ const fallbackMessages: Record<StandardErrorCode, string> = {
   CONFIG_ERROR: "系统配置无效。",
   CONFLICT: "资源冲突。",
   DATABASE_ERROR: "数据库请求失败。",
+  FEISHU_SYNC_ERROR: "飞书同步失败。",
   NOT_FOUND: "资源不存在。",
+  TIME_CONFLICT: "时间冲突。",
   UNKNOWN_ERROR: "请求失败。",
   VALIDATION_ERROR: "校验失败。"
 };
@@ -22,7 +24,9 @@ const statusByCode: Record<StandardErrorCode, number> = {
   CONFIG_ERROR: 500,
   CONFLICT: 409,
   DATABASE_ERROR: 500,
+  FEISHU_SYNC_ERROR: 502,
   NOT_FOUND: 404,
+  TIME_CONFLICT: 409,
   UNKNOWN_ERROR: 500,
   VALIDATION_ERROR: 400
 };
@@ -32,7 +36,9 @@ const categoryByCode: Record<StandardErrorCode, ErrorCategory> = {
   CONFIG_ERROR: "config",
   CONFLICT: "validation",
   DATABASE_ERROR: "database",
+  FEISHU_SYNC_ERROR: "unknown",
   NOT_FOUND: "not_found",
+  TIME_CONFLICT: "validation",
   UNKNOWN_ERROR: "unknown",
   VALIDATION_ERROR: "validation"
 };
@@ -89,6 +95,14 @@ export function normalizeErrorCode(code: AppErrorCode | string): StandardErrorCo
 
   if (code === "CONFIG_ERROR") {
     return "CONFIG_ERROR";
+  }
+
+  if (code === "FEISHU_SYNC_ERROR") {
+    return "FEISHU_SYNC_ERROR";
+  }
+
+  if (code === "TIME_CONFLICT") {
+    return "TIME_CONFLICT";
   }
 
   if (code.startsWith("AI_") || code === "JSON_PARSE_ERROR") {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useState } from "react";
 import { CandidateForm } from "@/features/candidate-crm/components/CandidateForm";
 import { CandidateResumeLinkPanel } from "@/features/candidate-crm/components/CandidateResumeLinkPanel";
 import { CandidateStatusBadge } from "@/features/candidate-crm/components/CandidateStatusBadge";
@@ -15,6 +16,29 @@ type CandidateDetailProps = {
   onUpdate: (input: CandidateUpdateInput) => Promise<void>;
   applicationState: ReturnType<typeof useCandidateApplications>;
   resumeLinkState: ReturnType<typeof useCandidateResumes>;
+};
+
+type ScheduleInterviewState = {
+  interviewerEmail: string;
+  startTime: string;
+  endTime: string;
+  round: string;
+  mode: string;
+};
+
+type ScheduleInterviewResponse = {
+  candidateId: string;
+  calendarEventId: string;
+  bitableRecordId: string;
+  syncStatus: "SUCCESS";
+};
+
+const initialScheduleInterviewState: ScheduleInterviewState = {
+  endTime: "",
+  interviewerEmail: "",
+  mode: "视频面试",
+  round: "一面",
+  startTime: ""
 };
 
 export function CandidateDetail({
@@ -101,6 +125,8 @@ export function CandidateDetail({
 
       <CandidateApplicationsPanel candidateId={candidate.id} applicationState={applicationState} />
 
+      <ScheduleInterviewPanel candidate={candidate} />
+
       <section className="rounded-md border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-950">审计时间线</h2>
         <div className="mt-4 space-y-3">
@@ -121,6 +147,154 @@ export function CandidateDetail({
         </div>
       </section>
     </div>
+  );
+}
+
+function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX.Element {
+  const [form, setForm] = useState<ScheduleInterviewState>(initialScheduleInterviewState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ScheduleInterviewResponse | null>(null);
+
+  async function submitSchedule(): Promise<void> {
+    setError(null);
+    setResult(null);
+
+    if (
+      !window.confirm(
+        "确认由 HR 手动触发飞书日程创建和多维表格状态更新？不会自动通知候选人。"
+      )
+    ) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/interviews/schedule", {
+        body: JSON.stringify({
+          candidateId: candidate.id,
+          ...form
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const json = (await response.json()) as {
+        success: boolean;
+        data: ScheduleInterviewResponse | null;
+        error: { code: string; message: string } | null;
+      };
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error?.message ?? "安排面试失败。");
+      }
+
+      setResult(json.data);
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "安排面试失败。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">安排面试</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+            仅在 HR 人工确认后调用飞书开放平台自建应用 API：先查询面试官忙闲，
+            无冲突时创建日历日程并更新多维表格状态。不会自动拒绝候选人，也不会自动给候选人发消息。
+          </p>
+        </div>
+        <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          人工确认触发
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <ScheduleField
+          label="面试官邮箱"
+          value={form.interviewerEmail}
+          type="email"
+          onChange={(value) => setForm((current) => ({ ...current, interviewerEmail: value }))}
+        />
+        <ScheduleField
+          label="面试轮次"
+          value={form.round}
+          onChange={(value) => setForm((current) => ({ ...current, round: value }))}
+        />
+        <ScheduleField
+          label="开始时间"
+          value={form.startTime}
+          type="datetime-local"
+          onChange={(value) => setForm((current) => ({ ...current, startTime: value }))}
+        />
+        <ScheduleField
+          label="结束时间"
+          value={form.endTime}
+          type="datetime-local"
+          onChange={(value) => setForm((current) => ({ ...current, endTime: value }))}
+        />
+        <ScheduleField
+          label="面试形式"
+          value={form.mode}
+          onChange={(value) => setForm((current) => ({ ...current, mode: value }))}
+        />
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+          面试已安排。飞书日程 ID：{result.calendarEventId}
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          disabled={isSubmitting}
+          onClick={() => void submitSchedule()}
+        >
+          {isSubmitting ? "正在安排..." : "确认安排面试"}
+        </button>
+        <p className="text-xs leading-5 text-slate-500">
+          App Secret 只由后端环境变量读取，前端不会接触飞书密钥。
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ScheduleField({
+  label,
+  onChange,
+  type = "text",
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  type?: string;
+  value: string;
+}): JSX.Element {
+  return (
+    <label className="block text-sm">
+      <span className="font-medium text-slate-700">{label}</span>
+      <input
+        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
   );
 }
 
