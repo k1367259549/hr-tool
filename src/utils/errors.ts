@@ -12,7 +12,9 @@ const fallbackMessages: Record<StandardErrorCode, string> = {
   CONFIG_ERROR: "系统配置无效。",
   CONFLICT: "资源冲突。",
   DATABASE_ERROR: "数据库请求失败。",
+  FEISHU_PARTIAL_SYNC_FAILED: "飞书日程已创建，但表格同步失败。",
   FEISHU_RECORD_MAPPING_NOT_FOUND: "飞书多维表格记录映射不存在。",
+  FEISHU_SYNC_RETRY_FAILED: "飞书表格重试同步失败。",
   FEISHU_SYNC_ERROR: "飞书同步失败。",
   NOT_FOUND: "资源不存在。",
   TIME_CONFLICT: "时间冲突。",
@@ -25,7 +27,9 @@ const statusByCode: Record<StandardErrorCode, number> = {
   CONFIG_ERROR: 500,
   CONFLICT: 409,
   DATABASE_ERROR: 500,
+  FEISHU_PARTIAL_SYNC_FAILED: 207,
   FEISHU_RECORD_MAPPING_NOT_FOUND: 409,
+  FEISHU_SYNC_RETRY_FAILED: 502,
   FEISHU_SYNC_ERROR: 502,
   NOT_FOUND: 404,
   TIME_CONFLICT: 409,
@@ -38,7 +42,9 @@ const categoryByCode: Record<StandardErrorCode, ErrorCategory> = {
   CONFIG_ERROR: "config",
   CONFLICT: "validation",
   DATABASE_ERROR: "database",
+  FEISHU_PARTIAL_SYNC_FAILED: "unknown",
   FEISHU_RECORD_MAPPING_NOT_FOUND: "validation",
+  FEISHU_SYNC_RETRY_FAILED: "unknown",
   FEISHU_SYNC_ERROR: "unknown",
   NOT_FOUND: "not_found",
   TIME_CONFLICT: "validation",
@@ -104,8 +110,16 @@ export function normalizeErrorCode(code: AppErrorCode | string): StandardErrorCo
     return "FEISHU_SYNC_ERROR";
   }
 
+  if (code === "FEISHU_PARTIAL_SYNC_FAILED") {
+    return "FEISHU_PARTIAL_SYNC_FAILED";
+  }
+
   if (code === "FEISHU_RECORD_MAPPING_NOT_FOUND") {
     return "FEISHU_RECORD_MAPPING_NOT_FOUND";
+  }
+
+  if (code === "FEISHU_SYNC_RETRY_FAILED") {
+    return "FEISHU_SYNC_RETRY_FAILED";
   }
 
   if (code === "TIME_CONFLICT") {

@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  scheduleInterview,
-  ScheduleInterviewError
-} from "@/lib/interviewScheduling/scheduleInterview";
+import { scheduleInterview } from "@/lib/interviewScheduling/scheduleInterview";
+import type { InterviewScheduleSyncRecord } from "@/lib/interviewScheduling/interviewScheduleSync";
 import type { CandidateDto } from "@/types/candidate";
 import type { FeishuBitableRecordMapping } from "@/lib/feishu/feishuBitableMapping";
 
@@ -50,9 +48,11 @@ const input = {
 describe("scheduleInterview", () => {
   it("does not create calendar event when interviewer is busy", async () => {
     const createCalendarEvent = vi.fn();
+    const createScheduleSync = vi.fn();
     const updateCandidateInterviewStatus = vi.fn();
 
     const result = await scheduleInterview(input, {
+      createScheduleSync,
       createCalendarEvent,
       env,
       findBitableRecordMapping: vi.fn(async () => createMapping()),
@@ -72,13 +72,20 @@ describe("scheduleInterview", () => {
       success: false
     });
     expect(createCalendarEvent).not.toHaveBeenCalled();
+    expect(createScheduleSync).not.toHaveBeenCalled();
     expect(updateCandidateInterviewStatus).not.toHaveBeenCalled();
   });
 
   it("creates calendar event and updates bitable when interviewer is available", async () => {
     const updateCandidateInterviewStatus = vi.fn(async () => undefined);
+    const markScheduleSyncBitableSynced = vi.fn(async () =>
+      createScheduleSyncRecord({
+        status: "BITABLE_SYNCED"
+      })
+    );
 
     const result = await scheduleInterview(input, {
+      createScheduleSync: vi.fn(async () => createScheduleSyncRecord()),
       createCalendarEvent: vi.fn(async () => ({
         calendarEventId: "event-1"
       })),
@@ -90,6 +97,7 @@ describe("scheduleInterview", () => {
       ),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => []),
+      markScheduleSyncBitableSynced,
       now: () => new Date("2026-07-09T12:00:00.000Z"),
       updateCandidateInterviewStatus
     });
@@ -98,9 +106,12 @@ describe("scheduleInterview", () => {
       bitableRecordId: "rec_real_1",
       calendarEventId: "event-1",
       candidateId: "candidate-1",
+      scheduleSyncStatus: "BITABLE_SYNCED",
       success: true,
+      syncId: "sync-1",
       syncStatus: "SUCCESS"
     });
+    expect(markScheduleSyncBitableSynced).toHaveBeenCalledWith("sync-1");
     expect(updateCandidateInterviewStatus).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -118,9 +129,11 @@ describe("scheduleInterview", () => {
 
   it("does not create event or update bitable when mapping is missing", async () => {
     const createCalendarEvent = vi.fn();
+    const createScheduleSync = vi.fn();
     const updateCandidateInterviewStatus = vi.fn();
 
     const result = await scheduleInterview(input, {
+      createScheduleSync,
       createCalendarEvent,
       env,
       findBitableRecordMapping: vi.fn(async () => null),
@@ -135,27 +148,51 @@ describe("scheduleInterview", () => {
       success: false
     });
     expect(createCalendarEvent).not.toHaveBeenCalled();
+    expect(createScheduleSync).not.toHaveBeenCalled();
     expect(updateCandidateInterviewStatus).not.toHaveBeenCalled();
   });
 
-  it("throws when bitable update fails after calendar event creation", async () => {
-    await expect(
-      scheduleInterview(input, {
-        createCalendarEvent: vi.fn(async () => ({
-          calendarEventId: "event-1"
-        })),
-        env,
-        findBitableRecordMapping: vi.fn(async () => createMapping()),
-        getCandidate: vi.fn(async () => candidate),
-        listBusyTimes: vi.fn(async () => []),
-        updateCandidateInterviewStatus: vi.fn(async () => {
-          throw new Error("bitable unavailable");
-        })
+  it("records partial failure when bitable update fails after calendar event creation", async () => {
+    const markScheduleSyncFailure = vi.fn(async () =>
+      createScheduleSyncRecord({
+        lastErrorCode: "FEISHU_SYNC_ERROR",
+        lastErrorMessage: "bitable unavailable",
+        status: "BITABLE_SYNC_FAILED"
       })
-    ).rejects.toMatchObject({
-      code: "FEISHU_SYNC_ERROR",
-      message: "飞书日程已创建，但多维表格更新失败：bitable unavailable"
-    } satisfies Partial<ScheduleInterviewError>);
+    );
+    const result = await scheduleInterview(input, {
+      createScheduleSync: vi.fn(async () => createScheduleSyncRecord()),
+      createCalendarEvent: vi.fn(async () => ({
+        calendarEventId: "event-1"
+      })),
+      env,
+      findBitableRecordMapping: vi.fn(async () => createMapping()),
+      getCandidate: vi.fn(async () => candidate),
+      listBusyTimes: vi.fn(async () => []),
+      markScheduleSyncFailure,
+      updateCandidateInterviewStatus: vi.fn(async () => {
+        throw new Error("bitable unavailable");
+      })
+    });
+
+    expect(result).toEqual({
+      bitableRecordId: "rec_real_default",
+      calendarEventId: "event-1",
+      candidateId: "candidate-1",
+      code: "FEISHU_PARTIAL_SYNC_FAILED",
+      message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
+      success: false,
+      syncId: "sync-1",
+      syncStatus: "BITABLE_SYNC_FAILED"
+    });
+    expect(markScheduleSyncFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "FEISHU_SYNC_ERROR",
+        errorMessage: "bitable unavailable",
+        status: "BITABLE_SYNC_FAILED",
+        syncId: "sync-1"
+      })
+    );
   });
 });
 
@@ -174,6 +211,32 @@ function createMapping(
     recordId: "rec_real_default",
     syncStatus: null,
     tableId: "tbl_test",
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function createScheduleSyncRecord(
+  overrides: Partial<InterviewScheduleSyncRecord> = {}
+): InterviewScheduleSyncRecord {
+  const now = new Date("2026-07-09T00:00:00.000Z");
+
+  return {
+    calendarEventId: "event-1",
+    candidateId: "candidate-1",
+    createdAt: now,
+    endTime: new Date(input.endTime),
+    feishuAppToken: "base-token",
+    feishuRecordId: "rec_real_default",
+    feishuTableId: "tbl_test",
+    id: "sync-1",
+    interviewerEmail: "interviewer@example.com",
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    retryCount: 0,
+    round: "一面",
+    startTime: new Date(input.startTime),
+    status: "CALENDAR_CREATED",
     updatedAt: now,
     ...overrides
   };

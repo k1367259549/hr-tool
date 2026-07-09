@@ -31,6 +31,28 @@ type ScheduleInterviewResponse = {
   calendarEventId: string;
   bitableRecordId: string;
   syncStatus: "SUCCESS";
+  scheduleSyncStatus: "BITABLE_SYNCED";
+  syncId: string;
+};
+
+type ScheduleInterviewPartialFailure = {
+  candidateId: string;
+  calendarEventId: string;
+  bitableRecordId: string;
+  code: "FEISHU_PARTIAL_SYNC_FAILED";
+  message: string;
+  syncId: string;
+  syncStatus: "BITABLE_SYNC_FAILED";
+  success: false;
+};
+
+type RetrySyncResponse = {
+  syncId: string;
+  candidateId: string;
+  calendarEventId: string;
+  bitableRecordId: string;
+  syncStatus: "BITABLE_SYNCED";
+  retryCount: number;
 };
 
 const initialScheduleInterviewState: ScheduleInterviewState = {
@@ -153,12 +175,18 @@ export function CandidateDetail({
 function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX.Element {
   const [form, setForm] = useState<ScheduleInterviewState>(initialScheduleInterviewState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRetryingSync, setIsRetryingSync] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScheduleInterviewResponse | null>(null);
+  const [partialFailure, setPartialFailure] =
+    useState<ScheduleInterviewPartialFailure | null>(null);
+  const [retryResult, setRetryResult] = useState<RetrySyncResponse | null>(null);
 
   async function submitSchedule(): Promise<void> {
     setError(null);
     setResult(null);
+    setPartialFailure(null);
+    setRetryResult(null);
 
     if (
       !window.confirm(
@@ -183,19 +211,78 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
       });
       const json = (await response.json()) as {
         success: boolean;
-        data: ScheduleInterviewResponse | null;
+        data: ScheduleInterviewResponse | ScheduleInterviewPartialFailure | null;
         error: { code: string; message: string } | null;
       };
+
+      if (
+        !json.success &&
+        json.error?.code === "FEISHU_PARTIAL_SYNC_FAILED" &&
+        json.data
+      ) {
+        setPartialFailure(json.data as ScheduleInterviewPartialFailure);
+        return;
+      }
 
       if (!json.success || !json.data) {
         throw new Error(json.error?.message ?? "安排面试失败。");
       }
 
-      setResult(json.data);
+      setResult(json.data as ScheduleInterviewResponse);
     } catch (scheduleError) {
       setError(scheduleError instanceof Error ? scheduleError.message : "安排面试失败。");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function retryBitableSync(): Promise<void> {
+    if (!partialFailure) {
+      return;
+    }
+
+    if (!window.confirm("确认只重试飞书表格同步？不会重复创建面试日程。")) {
+      return;
+    }
+
+    setError(null);
+    setRetryResult(null);
+    setIsRetryingSync(true);
+
+    try {
+      const response = await fetch("/api/interviews/schedule/retry-sync", {
+        body: JSON.stringify({
+          syncId: partialFailure.syncId
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const json = (await response.json()) as {
+        success: boolean;
+        data: RetrySyncResponse | null;
+        error: { code: string; message: string } | null;
+      };
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error?.message ?? "飞书表格重试同步失败。");
+      }
+
+      setRetryResult(json.data);
+      setResult({
+        bitableRecordId: json.data.bitableRecordId,
+        calendarEventId: json.data.calendarEventId,
+        candidateId: json.data.candidateId,
+        scheduleSyncStatus: "BITABLE_SYNCED",
+        syncId: json.data.syncId,
+        syncStatus: "SUCCESS"
+      });
+      setPartialFailure(null);
+    } catch (retryError) {
+      setError(retryError instanceof Error ? retryError.message : "飞书表格重试同步失败。");
+    } finally {
+      setIsRetryingSync(false);
     }
   }
 
@@ -254,6 +341,27 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
       {result ? (
         <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
           面试已安排。飞书日程 ID：{result.calendarEventId}
+        </div>
+      ) : null}
+
+      {partialFailure ? (
+        <div className="mt-4 space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p>面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。</p>
+          <p className="break-all">飞书日程 ID：{partialFailure.calendarEventId}</p>
+          <button
+            type="button"
+            className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+            disabled={isRetryingSync}
+            onClick={() => void retryBitableSync()}
+          >
+            {isRetryingSync ? "正在重试同步..." : "重试同步表格"}
+          </button>
+        </div>
+      ) : null}
+
+      {retryResult ? (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+          飞书表格已重新同步。同步记录 ID：{retryResult.syncId}
         </div>
       ) : null}
 

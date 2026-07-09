@@ -387,6 +387,42 @@ describe("Prisma schema safeguards", () => {
     expect(migration).not.toMatch(/^\s*UPDATE\s/im);
   });
 
+  it("adds InterviewScheduleSync for Feishu partial failure recovery without destructive changes", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const syncModel = extractPrismaBlock(schema, "model InterviewScheduleSync");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260709123000_m10_b_interview_schedule_sync",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(schema).toContain("enum InterviewScheduleSyncStatus");
+    expect(schema).toContain("BITABLE_SYNC_FAILED");
+    expect(schema).toContain("BITABLE_SYNCED");
+    expect(syncModel).toContain("candidateId       String");
+    expect(syncModel).toContain("calendarEventId   String?");
+    expect(syncModel).toContain("feishuAppToken    String");
+    expect(syncModel).toContain("feishuTableId     String");
+    expect(syncModel).toContain("feishuRecordId    String");
+    expect(syncModel).toContain("retryCount        Int");
+    expect(syncModel).toContain("@@index([calendarEventId])");
+    expect(syncModel).toContain("@@index([status])");
+    expect(schema).toContain("interviewScheduleSyncs InterviewScheduleSync[]");
+    expect(migration).toContain('CREATE TYPE "InterviewScheduleSyncStatus"');
+    expect(migration).toContain('CREATE TABLE "InterviewScheduleSync"');
+    expect(migration).toContain('CREATE INDEX "InterviewScheduleSync_status_idx"');
+    expect(migration).toContain('REFERENCES "Candidate"("id")');
+    expect(migration).toContain("ON DELETE CASCADE");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
   it("keeps Evaluation Template versioning and assignment constraints in the migration", () => {
     const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
     const migration = readFileSync(

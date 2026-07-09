@@ -6,6 +6,7 @@ import type {
   ScheduleInterviewInput,
   ScheduleInterviewResult
 } from "@/lib/interviewScheduling/scheduleInterview";
+import { NextResponse } from "next/server";
 import { errorResponse, handleApiError, readJsonBody, successResponse } from "@/utils/apiResponse";
 
 export async function POST(request: Request): Promise<Response> {
@@ -13,6 +14,10 @@ export async function POST(request: Request): Promise<Response> {
     const body = await readJsonBody(request);
     const input = parseScheduleInterviewPayload(body);
     const result = await scheduleInterview(input);
+
+    if (!result.success && result.code === "FEISHU_PARTIAL_SYNC_FAILED") {
+      return partialFailureResponse(result);
+    }
 
     if (!result.success) {
       return errorResponse(result.code, result.message, 409);
@@ -58,3 +63,20 @@ function readRequiredString(source: Record<string, unknown>, field: string): str
   return value.trim();
 }
 
+function partialFailureResponse(
+  result: Extract<ScheduleInterviewResult, { code: "FEISHU_PARTIAL_SYNC_FAILED" }>
+): NextResponse {
+  return NextResponse.json(
+    {
+      data: result,
+      error: {
+        code: result.code,
+        message: result.message
+      },
+      success: false
+    },
+    {
+      status: 207
+    }
+  );
+}

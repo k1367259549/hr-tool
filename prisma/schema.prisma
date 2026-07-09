@@ -105,6 +105,14 @@ enum ResumeParsingStatus {
   FAILED
 }
 
+enum InterviewScheduleSyncStatus {
+  PENDING
+  CALENDAR_CREATED
+  BITABLE_SYNCED
+  BITABLE_SYNC_FAILED
+  FAILED
+}
+
 model RecruitLog {
   id             String   @id @default(uuid())
   date           DateTime @unique
@@ -391,6 +399,7 @@ model Candidate {
   audits       CandidateAudit[]
   applications CandidateApplication[]
   feishuBitableRecordMappings FeishuBitableRecordMapping[]
+  interviewScheduleSyncs InterviewScheduleSync[]
 
   @@index([fullName])
   @@index([status])
@@ -417,6 +426,32 @@ model FeishuBitableRecordMapping {
   @@unique([candidateId, appToken, tableId], name: "feishuBitableCandidateTableMapping")
   @@index([candidateId])
   @@index([recordId])
+}
+
+model InterviewScheduleSync {
+  id                String                      @id @default(cuid())
+  candidateId       String
+  calendarEventId   String?
+  feishuAppToken    String
+  feishuTableId     String
+  feishuRecordId    String
+  interviewerEmail  String
+  round             String
+  startTime         DateTime
+  endTime           DateTime
+  status            InterviewScheduleSyncStatus @default(PENDING)
+  lastErrorCode     String?
+  lastErrorMessage  String?
+  retryCount        Int                         @default(0)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([calendarEventId])
+  @@index([status])
+  @@index([updatedAt])
 }
 
 model CandidateAudit {

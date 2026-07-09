@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJsonRequest, readApiJson } from "../setup/testDb";
 
 const scheduleInterviewMock = vi.hoisted(() => vi.fn());
+const retryInterviewScheduleSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/interviewScheduling/scheduleInterview", () => ({
   ScheduleInterviewError: class ScheduleInterviewError extends Error {
@@ -20,6 +21,10 @@ vi.mock("@/lib/interviewScheduling/scheduleInterview", () => ({
     }
   },
   scheduleInterview: scheduleInterviewMock
+}));
+
+vi.mock("@/lib/interviewScheduling/retryInterviewScheduleSync", () => ({
+  retryInterviewScheduleSync: retryInterviewScheduleSyncMock
 }));
 
 describe("POST /api/interviews/schedule", () => {
@@ -86,6 +91,32 @@ describe("POST /api/interviews/schedule", () => {
     expect(JSON.stringify(json)).not.toContain("app-secret");
   });
 
+  it("returns partial sync failure with syncId and calendar event without leaking secrets", async () => {
+    scheduleInterviewMock.mockResolvedValueOnce({
+      bitableRecordId: "rec_real_1",
+      calendarEventId: "event-1",
+      candidateId: "candidate-1",
+      code: "FEISHU_PARTIAL_SYNC_FAILED",
+      message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
+      success: false,
+      syncId: "sync-1",
+      syncStatus: "BITABLE_SYNC_FAILED"
+    });
+
+    const { POST } = await import("@/app/api/interviews/schedule/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/interviews/schedule", createSchedulePayload())
+    );
+    const json = await readApiJson<{ syncId: string; calendarEventId: string }>(response);
+
+    expect(response.status).toBe(207);
+    expect(json.error?.code).toBe("FEISHU_PARTIAL_SYNC_FAILED");
+    expect(json.data?.syncId).toBe("sync-1");
+    expect(json.data?.calendarEventId).toBe("event-1");
+    expect(JSON.stringify(json)).not.toContain("tenant_access_token");
+    expect(JSON.stringify(json)).not.toContain("app-secret");
+  });
+
   it("rejects invalid payload before calling service", async () => {
     const { POST } = await import("@/app/api/interviews/schedule/route");
     const response = await POST(
@@ -95,6 +126,62 @@ describe("POST /api/interviews/schedule", () => {
     );
 
     expect(response.status).toBe(400);
+    expect(scheduleInterviewMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/interviews/schedule/retry-sync", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("retries bitable sync through the service layer without leaking secrets", async () => {
+    retryInterviewScheduleSyncMock.mockResolvedValueOnce({
+      bitableRecordId: "rec_real_1",
+      calendarEventId: "event-1",
+      candidateId: "candidate-1",
+      retryCount: 1,
+      success: true,
+      syncId: "sync-1",
+      syncStatus: "BITABLE_SYNCED"
+    });
+
+    const { POST } = await import("@/app/api/interviews/schedule/retry-sync/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/interviews/schedule/retry-sync", {
+        syncId: "sync-1"
+      })
+    );
+    const json = await readApiJson<{ syncId: string; calendarEventId: string }>(response);
+
+    expect(response.status).toBe(200);
+    expect(retryInterviewScheduleSyncMock).toHaveBeenCalledWith({ syncId: "sync-1" });
+    expect(scheduleInterviewMock).not.toHaveBeenCalled();
+    expect(json.data?.syncId).toBe("sync-1");
+    expect(json.data?.calendarEventId).toBe("event-1");
+    expect(JSON.stringify(json)).not.toContain("tenant_access_token");
+    expect(JSON.stringify(json)).not.toContain("app-secret");
+  });
+
+  it("returns retry failure without creating a schedule", async () => {
+    retryInterviewScheduleSyncMock.mockResolvedValueOnce({
+      code: "FEISHU_SYNC_RETRY_FAILED",
+      message: "飞书表格重试同步失败：retry unavailable",
+      retryCount: 2,
+      success: false,
+      syncId: "sync-1"
+    });
+
+    const { POST } = await import("@/app/api/interviews/schedule/retry-sync/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/interviews/schedule/retry-sync", {
+        syncId: "sync-1"
+      })
+    );
+    const json = await readApiJson<null>(response);
+
+    expect(response.status).toBe(502);
+    expect(json.error?.code).toBe("FEISHU_SYNC_RETRY_FAILED");
     expect(scheduleInterviewMock).not.toHaveBeenCalled();
   });
 });
