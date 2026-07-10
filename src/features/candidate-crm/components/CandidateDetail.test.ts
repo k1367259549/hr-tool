@@ -11,6 +11,9 @@ describe("CandidateDetail interview scheduling entry", () => {
 
     expect(source).toContain("安排面试");
     expect(source).toContain("确认安排面试");
+    expect(source).toContain("idempotencyKey");
+    expect(source).toContain("createScheduleIdempotencyKey");
+    expect(source).toContain("if (isSubmitting)");
     expect(source).toContain("面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。");
     expect(source).toContain("重试同步表格");
     expect(source).toContain("/api/interviews/schedule/retry-sync");

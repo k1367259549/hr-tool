@@ -27,7 +27,11 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof ScheduleInterviewError) {
       const status =
-        error.code === "VALIDATION_ERROR" ? 400 : error.code === "CONFIG_ERROR" ? 500 : 502;
+        error.code === "VALIDATION_ERROR" || error.code === "INVALID_IDEMPOTENCY_KEY"
+          ? 400
+          : error.code === "CONFIG_ERROR"
+            ? 500
+            : 502;
 
       return errorResponse(error.code, error.message, status);
     }
@@ -46,6 +50,7 @@ function parseScheduleInterviewPayload(payload: unknown): ScheduleInterviewInput
   return {
     candidateId: readRequiredString(source, "candidateId"),
     endTime: readRequiredString(source, "endTime"),
+    idempotencyKey: readRequiredString(source, "idempotencyKey"),
     interviewerEmail: readRequiredString(source, "interviewerEmail"),
     mode: readRequiredString(source, "mode"),
     round: readRequiredString(source, "round"),

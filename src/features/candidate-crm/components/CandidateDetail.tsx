@@ -33,6 +33,7 @@ type ScheduleInterviewResponse = {
   syncStatus: "SUCCESS";
   scheduleSyncStatus: "BITABLE_SYNCED";
   syncId: string;
+  deduplicated: boolean;
 };
 
 type ScheduleInterviewPartialFailure = {
@@ -44,6 +45,7 @@ type ScheduleInterviewPartialFailure = {
   syncId: string;
   syncStatus: "BITABLE_SYNC_FAILED";
   success: false;
+  deduplicated: boolean;
 };
 
 type RetrySyncResponse = {
@@ -174,6 +176,7 @@ export function CandidateDetail({
 
 function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX.Element {
   const [form, setForm] = useState<ScheduleInterviewState>(initialScheduleInterviewState);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createScheduleIdempotencyKey());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetryingSync, setIsRetryingSync] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +186,10 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
   const [retryResult, setRetryResult] = useState<RetrySyncResponse | null>(null);
 
   async function submitSchedule(): Promise<void> {
+    if (isSubmitting) {
+      return;
+    }
+
     setError(null);
     setResult(null);
     setPartialFailure(null);
@@ -202,6 +209,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
       const response = await fetch("/api/interviews/schedule", {
         body: JSON.stringify({
           candidateId: candidate.id,
+          idempotencyKey,
           ...form
         }),
         headers: {
@@ -229,6 +237,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
       }
 
       setResult(json.data as ScheduleInterviewResponse);
+      setIdempotencyKey(createScheduleIdempotencyKey());
     } catch (scheduleError) {
       setError(scheduleError instanceof Error ? scheduleError.message : "安排面试失败。");
     } finally {
@@ -274,6 +283,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
         bitableRecordId: json.data.bitableRecordId,
         calendarEventId: json.data.calendarEventId,
         candidateId: json.data.candidateId,
+        deduplicated: false,
         scheduleSyncStatus: "BITABLE_SYNCED",
         syncId: json.data.syncId,
         syncStatus: "SUCCESS"
@@ -428,4 +438,12 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function createScheduleIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `schedule:${crypto.randomUUID()}`;
+  }
+
+  return `schedule:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }

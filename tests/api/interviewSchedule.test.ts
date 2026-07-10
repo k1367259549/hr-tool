@@ -37,6 +37,7 @@ describe("POST /api/interviews/schedule", () => {
       bitableRecordId: "candidate-1",
       calendarEventId: "event-1",
       candidateId: "candidate-1",
+      deduplicated: false,
       success: true,
       syncStatus: "SUCCESS"
     });
@@ -97,6 +98,7 @@ describe("POST /api/interviews/schedule", () => {
       calendarEventId: "event-1",
       candidateId: "candidate-1",
       code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: true,
       message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
       success: false,
       syncId: "sync-1",
@@ -113,6 +115,7 @@ describe("POST /api/interviews/schedule", () => {
     expect(json.error?.code).toBe("FEISHU_PARTIAL_SYNC_FAILED");
     expect(json.data?.syncId).toBe("sync-1");
     expect(json.data?.calendarEventId).toBe("event-1");
+    expect(json.data).toMatchObject({ deduplicated: true });
     expect(JSON.stringify(json)).not.toContain("tenant_access_token");
     expect(JSON.stringify(json)).not.toContain("app-secret");
   });
@@ -190,6 +193,7 @@ function createSchedulePayload() {
   return {
     candidateId: "candidate-1",
     endTime: "2026-07-10T11:00",
+    idempotencyKey: "schedule:test-key-1",
     interviewerEmail: "interviewer@example.com",
     mode: "视频面试",
     round: "一面",

@@ -404,6 +404,7 @@ describe("Prisma schema safeguards", () => {
     expect(schema).toContain("enum InterviewScheduleSyncStatus");
     expect(schema).toContain("BITABLE_SYNC_FAILED");
     expect(schema).toContain("BITABLE_SYNCED");
+    expect(syncModel).toContain("idempotencyKey    String?");
     expect(syncModel).toContain("candidateId       String");
     expect(syncModel).toContain("calendarEventId   String?");
     expect(syncModel).toContain("feishuAppToken    String");
@@ -411,6 +412,7 @@ describe("Prisma schema safeguards", () => {
     expect(syncModel).toContain("feishuRecordId    String");
     expect(syncModel).toContain("retryCount        Int");
     expect(syncModel).toContain("@@index([calendarEventId])");
+    expect(syncModel).toContain("@@unique([idempotencyKey])");
     expect(syncModel).toContain("@@index([status])");
     expect(schema).toContain("interviewScheduleSyncs InterviewScheduleSync[]");
     expect(migration).toContain('CREATE TYPE "InterviewScheduleSyncStatus"');
@@ -418,6 +420,30 @@ describe("Prisma schema safeguards", () => {
     expect(migration).toContain('CREATE INDEX "InterviewScheduleSync_status_idx"');
     expect(migration).toContain('REFERENCES "Candidate"("id")');
     expect(migration).toContain("ON DELETE CASCADE");
+    expect(migration).not.toContain("DROP TABLE");
+    expect(migration).not.toContain("DROP COLUMN");
+    expect(migration).not.toMatch(/^\s*UPDATE\s/im);
+  });
+
+  it("adds InterviewScheduleSync idempotency key without forcing historical records", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+    const syncModel = extractPrismaBlock(schema, "model InterviewScheduleSync");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "prisma",
+        "migrations",
+        "20260710090000_m10_c_interview_schedule_idempotency",
+        "migration.sql"
+      ),
+      "utf8"
+    );
+
+    expect(syncModel).toContain("idempotencyKey    String?");
+    expect(syncModel).toContain("@@unique([idempotencyKey])");
+    expect(migration).toContain('ADD COLUMN "idempotencyKey" TEXT');
+    expect(migration).toContain('CREATE UNIQUE INDEX "InterviewScheduleSync_idempotencyKey_key"');
+    expect(migration).not.toContain("SET NOT NULL");
     expect(migration).not.toContain("DROP TABLE");
     expect(migration).not.toContain("DROP COLUMN");
     expect(migration).not.toMatch(/^\s*UPDATE\s/im);

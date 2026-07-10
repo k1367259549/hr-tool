@@ -113,6 +113,7 @@ function createSyncRecord(
     feishuRecordId: "rec_real_1",
     feishuTableId: "tbl_test",
     id: "sync-1",
+    idempotencyKey: "schedule:test-key-1",
     interviewerEmail: "interviewer@example.com",
     lastErrorCode: null,
     lastErrorMessage: null,

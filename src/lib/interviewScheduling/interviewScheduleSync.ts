@@ -9,6 +9,7 @@ export type InterviewScheduleSyncStatus =
 
 export type InterviewScheduleSyncRecord = {
   id: string;
+  idempotencyKey: string | null;
   candidateId: string;
   calendarEventId: string | null;
   feishuAppToken: string;
@@ -27,8 +28,9 @@ export type InterviewScheduleSyncRecord = {
 };
 
 export type CreateInterviewScheduleSyncInput = {
+  idempotencyKey?: string | null;
   candidateId: string;
-  calendarEventId: string;
+  calendarEventId?: string | null;
   feishuAppToken: string;
   feishuTableId: string;
   feishuRecordId: string;
@@ -37,6 +39,11 @@ export type CreateInterviewScheduleSyncInput = {
   startTime: Date;
   endTime: Date;
   status?: InterviewScheduleSyncStatus;
+};
+
+export type MarkInterviewScheduleCalendarCreatedInput = {
+  syncId: string;
+  calendarEventId: string;
 };
 
 export type MarkInterviewScheduleSyncFailureInput = {
@@ -52,16 +59,31 @@ export async function createInterviewScheduleSync(
 ): Promise<InterviewScheduleSyncRecord> {
   return prisma.interviewScheduleSync.create({
     data: {
-      calendarEventId: input.calendarEventId,
+      calendarEventId: input.calendarEventId ?? null,
       candidateId: input.candidateId,
       endTime: input.endTime,
       feishuAppToken: input.feishuAppToken,
       feishuRecordId: input.feishuRecordId,
       feishuTableId: input.feishuTableId,
+      idempotencyKey: input.idempotencyKey ?? null,
       interviewerEmail: input.interviewerEmail,
       round: input.round,
       startTime: input.startTime,
       status: input.status ?? "CALENDAR_CREATED"
+    }
+  });
+}
+
+export async function markInterviewScheduleCalendarCreated(
+  input: MarkInterviewScheduleCalendarCreatedInput
+): Promise<InterviewScheduleSyncRecord> {
+  return prisma.interviewScheduleSync.update({
+    data: {
+      calendarEventId: input.calendarEventId,
+      status: "CALENDAR_CREATED"
+    },
+    where: {
+      id: input.syncId
     }
   });
 }
@@ -103,6 +125,16 @@ export async function findInterviewScheduleSyncById(
   return prisma.interviewScheduleSync.findUnique({
     where: {
       id: syncId
+    }
+  });
+}
+
+export async function findInterviewScheduleSyncByIdempotencyKey(
+  idempotencyKey: string
+): Promise<InterviewScheduleSyncRecord | null> {
+  return prisma.interviewScheduleSync.findUnique({
+    where: {
+      idempotencyKey
     }
   });
 }

@@ -39,6 +39,7 @@ const candidate = {
 const input = {
   candidateId: "candidate-1",
   endTime: "2026-07-10T11:00:00.000+08:00",
+  idempotencyKey: "schedule:test-key-1",
   interviewerEmail: "interviewer@example.com",
   mode: "视频面试",
   round: "一面",
@@ -56,6 +57,7 @@ describe("scheduleInterview", () => {
       createCalendarEvent,
       env,
       findBitableRecordMapping: vi.fn(async () => createMapping()),
+      findScheduleSyncByIdempotencyKey: vi.fn(async () => null),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => [
         {
@@ -95,8 +97,10 @@ describe("scheduleInterview", () => {
           recordId: "rec_real_1"
         })
       ),
+      findScheduleSyncByIdempotencyKey: vi.fn(async () => null),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => []),
+      markScheduleCalendarCreated: vi.fn(async () => createScheduleSyncRecord()),
       markScheduleSyncBitableSynced,
       now: () => new Date("2026-07-09T12:00:00.000Z"),
       updateCandidateInterviewStatus
@@ -106,6 +110,7 @@ describe("scheduleInterview", () => {
       bitableRecordId: "rec_real_1",
       calendarEventId: "event-1",
       candidateId: "candidate-1",
+      deduplicated: false,
       scheduleSyncStatus: "BITABLE_SYNCED",
       success: true,
       syncId: "sync-1",
@@ -137,6 +142,7 @@ describe("scheduleInterview", () => {
       createCalendarEvent,
       env,
       findBitableRecordMapping: vi.fn(async () => null),
+      findScheduleSyncByIdempotencyKey: vi.fn(async () => null),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => []),
       updateCandidateInterviewStatus
@@ -167,8 +173,10 @@ describe("scheduleInterview", () => {
       })),
       env,
       findBitableRecordMapping: vi.fn(async () => createMapping()),
+      findScheduleSyncByIdempotencyKey: vi.fn(async () => null),
       getCandidate: vi.fn(async () => candidate),
       listBusyTimes: vi.fn(async () => []),
+      markScheduleCalendarCreated: vi.fn(async () => createScheduleSyncRecord()),
       markScheduleSyncFailure,
       updateCandidateInterviewStatus: vi.fn(async () => {
         throw new Error("bitable unavailable");
@@ -180,6 +188,7 @@ describe("scheduleInterview", () => {
       calendarEventId: "event-1",
       candidateId: "candidate-1",
       code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: false,
       message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
       success: false,
       syncId: "sync-1",
@@ -193,6 +202,65 @@ describe("scheduleInterview", () => {
         syncId: "sync-1"
       })
     );
+  });
+
+  it("returns existing success for repeated idempotency key without creating another calendar event", async () => {
+    const createCalendarEvent = vi.fn();
+    const result = await scheduleInterview(input, {
+      createCalendarEvent,
+      env,
+      findScheduleSyncByIdempotencyKey: vi.fn(async () =>
+        createScheduleSyncRecord({
+          calendarEventId: "event-existing",
+          status: "BITABLE_SYNCED"
+        })
+      ),
+      getCandidate: vi.fn(async () => candidate),
+      listBusyTimes: vi.fn(async () => []),
+      updateCandidateInterviewStatus: vi.fn()
+    });
+
+    expect(result).toEqual({
+      bitableRecordId: "rec_real_default",
+      calendarEventId: "event-existing",
+      candidateId: "candidate-1",
+      deduplicated: true,
+      scheduleSyncStatus: "BITABLE_SYNCED",
+      success: true,
+      syncId: "sync-1",
+      syncStatus: "SUCCESS"
+    });
+    expect(createCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns existing partial failure for repeated idempotency key without creating another calendar event", async () => {
+    const createCalendarEvent = vi.fn();
+    const result = await scheduleInterview(input, {
+      createCalendarEvent,
+      env,
+      findScheduleSyncByIdempotencyKey: vi.fn(async () =>
+        createScheduleSyncRecord({
+          calendarEventId: "event-existing",
+          status: "BITABLE_SYNC_FAILED"
+        })
+      ),
+      getCandidate: vi.fn(async () => candidate),
+      listBusyTimes: vi.fn(async () => []),
+      updateCandidateInterviewStatus: vi.fn()
+    });
+
+    expect(result).toEqual({
+      bitableRecordId: "rec_real_default",
+      calendarEventId: "event-existing",
+      candidateId: "candidate-1",
+      code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: true,
+      message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
+      success: false,
+      syncId: "sync-1",
+      syncStatus: "BITABLE_SYNC_FAILED"
+    });
+    expect(createCalendarEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -230,6 +298,7 @@ function createScheduleSyncRecord(
     feishuRecordId: "rec_real_default",
     feishuTableId: "tbl_test",
     id: "sync-1",
+    idempotencyKey: "schedule:test-key-1",
     interviewerEmail: "interviewer@example.com",
     lastErrorCode: null,
     lastErrorMessage: null,

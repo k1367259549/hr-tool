@@ -8,14 +8,18 @@ import {
 import { FeishuClient } from "@/lib/feishu/feishuClient";
 import {
   createInterviewScheduleSync,
+  findInterviewScheduleSyncByIdempotencyKey,
+  markInterviewScheduleCalendarCreated,
   markInterviewScheduleSyncBitableSynced,
   markInterviewScheduleSyncFailure
 } from "@/lib/interviewScheduling/interviewScheduleSync";
+import type { InterviewScheduleSyncRecord } from "@/lib/interviewScheduling/interviewScheduleSync";
 import { logger } from "@/lib/logger";
 import { candidateService } from "@/services/candidate.service";
 import type { CandidateDto } from "@/types/candidate";
 
 export type ScheduleInterviewInput = {
+  idempotencyKey: string;
   candidateId: string;
   interviewerEmail: string;
   startTime: string;
@@ -33,10 +37,11 @@ export type ScheduleInterviewResult =
       syncStatus: "SUCCESS";
       scheduleSyncStatus: "BITABLE_SYNCED";
       syncId: string;
+      deduplicated: boolean;
     }
   | {
       success: false;
-      code: "TIME_CONFLICT" | "FEISHU_RECORD_MAPPING_NOT_FOUND";
+      code: "TIME_CONFLICT" | "FEISHU_RECORD_MAPPING_NOT_FOUND" | "INVALID_IDEMPOTENCY_KEY";
       message: string;
     }
   | {
@@ -48,6 +53,7 @@ export type ScheduleInterviewResult =
       bitableRecordId: string;
       syncId: string;
       syncStatus: "BITABLE_SYNC_FAILED";
+      deduplicated: boolean;
     };
 
 export type ScheduleInterviewDependencies = {
@@ -55,7 +61,9 @@ export type ScheduleInterviewDependencies = {
   listBusyTimes?: typeof listFeishuBusyTimes;
   createCalendarEvent?: typeof createFeishuCalendarEvent;
   findBitableRecordMapping?: typeof findFeishuBitableRecordMapping;
+  findScheduleSyncByIdempotencyKey?: typeof findInterviewScheduleSyncByIdempotencyKey;
   createScheduleSync?: typeof createInterviewScheduleSync;
+  markScheduleCalendarCreated?: typeof markInterviewScheduleCalendarCreated;
   markScheduleSyncBitableSynced?: typeof markInterviewScheduleSyncBitableSynced;
   markScheduleSyncFailure?: typeof markInterviewScheduleSyncFailure;
   updateCandidateInterviewStatus?: typeof updateFeishuCandidateInterviewStatus;
@@ -65,10 +73,18 @@ export type ScheduleInterviewDependencies = {
 };
 
 export class ScheduleInterviewError extends Error {
-  readonly code: "VALIDATION_ERROR" | "CONFIG_ERROR" | "FEISHU_SYNC_ERROR";
+  readonly code:
+    | "VALIDATION_ERROR"
+    | "CONFIG_ERROR"
+    | "FEISHU_SYNC_ERROR"
+    | "INVALID_IDEMPOTENCY_KEY";
 
   constructor(
-    code: "VALIDATION_ERROR" | "CONFIG_ERROR" | "FEISHU_SYNC_ERROR",
+    code:
+      | "VALIDATION_ERROR"
+      | "CONFIG_ERROR"
+      | "FEISHU_SYNC_ERROR"
+      | "INVALID_IDEMPOTENCY_KEY",
     message: string
   ) {
     super(message);
@@ -90,7 +106,11 @@ export async function scheduleInterview(
   const createCalendarEvent = dependencies.createCalendarEvent ?? createFeishuCalendarEvent;
   const findBitableRecordMapping =
     dependencies.findBitableRecordMapping ?? findFeishuBitableRecordMapping;
+  const findScheduleSyncByIdempotencyKey =
+    dependencies.findScheduleSyncByIdempotencyKey ?? findInterviewScheduleSyncByIdempotencyKey;
   const createScheduleSync = dependencies.createScheduleSync ?? createInterviewScheduleSync;
+  const markScheduleCalendarCreated =
+    dependencies.markScheduleCalendarCreated ?? markInterviewScheduleCalendarCreated;
   const markScheduleSyncBitableSynced =
     dependencies.markScheduleSyncBitableSynced ?? markInterviewScheduleSyncBitableSynced;
   const markScheduleSyncFailure =
@@ -98,6 +118,13 @@ export async function scheduleInterview(
   const updateCandidateInterviewStatus =
     dependencies.updateCandidateInterviewStatus ?? updateFeishuCandidateInterviewStatus;
   const now = dependencies.now ?? (() => new Date());
+  const existingSync = await findScheduleSyncByIdempotencyKey(input.idempotencyKey);
+  const existingResult = createExistingScheduleResult(existingSync);
+
+  if (existingResult) {
+    return existingResult;
+  }
+
   const candidate = await getCandidate(input.candidateId);
   const busyTimes = await listBusyTimes(client, {
     endTime: input.endTime,
@@ -130,6 +157,21 @@ export async function scheduleInterview(
     };
   }
 
+  const bitableRecordId = bitableRecordMapping.recordId;
+  const scheduleSync =
+    existingSync ??
+    (await createScheduleSync({
+      candidateId: input.candidateId,
+      endTime: new Date(input.endTime),
+      feishuAppToken: baseAppToken,
+      feishuRecordId: bitableRecordId,
+      feishuTableId: candidateTableId,
+      idempotencyKey: input.idempotencyKey,
+      interviewerEmail: input.interviewerEmail,
+      round: input.round,
+      startTime: new Date(input.startTime),
+      status: "PENDING"
+    }));
   const { calendarEventId } = await createCalendarEvent(client, {
     calendarId,
     description: createCalendarDescription(candidate, input),
@@ -137,18 +179,9 @@ export async function scheduleInterview(
     startTime: input.startTime,
     summary: `面试：${candidate.fullName}｜${input.round}`
   });
-  const bitableRecordId = bitableRecordMapping.recordId;
-  const scheduleSync = await createScheduleSync({
+  await markScheduleCalendarCreated({
     calendarEventId,
-    candidateId: input.candidateId,
-    endTime: new Date(input.endTime),
-    feishuAppToken: baseAppToken,
-    feishuRecordId: bitableRecordId,
-    feishuTableId: candidateTableId,
-    interviewerEmail: input.interviewerEmail,
-    round: input.round,
-    startTime: new Date(input.startTime),
-    status: "CALENDAR_CREATED"
+    syncId: scheduleSync.id
   });
 
   try {
@@ -186,6 +219,7 @@ export async function scheduleInterview(
       calendarEventId,
       candidateId: input.candidateId,
       code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: false,
       message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
       success: false,
       syncId: failedSync.id,
@@ -197,6 +231,7 @@ export async function scheduleInterview(
     bitableRecordId,
     calendarEventId,
     candidateId: input.candidateId,
+    deduplicated: false,
     scheduleSyncStatus: "BITABLE_SYNCED",
     success: true,
     syncId: scheduleSync.id,
@@ -216,6 +251,7 @@ function createDefaultFeishuClient(env: NodeJS.ProcessEnv): FeishuClient {
 
 function validateScheduleInterviewInput(input: ScheduleInterviewInput): void {
   const requiredFields: Array<keyof ScheduleInterviewInput> = [
+    "idempotencyKey",
     "candidateId",
     "interviewerEmail",
     "startTime",
@@ -234,12 +270,70 @@ function validateScheduleInterviewInput(input: ScheduleInterviewInput): void {
     throw new ScheduleInterviewError("VALIDATION_ERROR", "interviewerEmail must be valid.");
   }
 
+  if (!/^[a-zA-Z0-9:_-]{12,128}$/.test(input.idempotencyKey)) {
+    throw new ScheduleInterviewError(
+      "INVALID_IDEMPOTENCY_KEY",
+      "idempotencyKey must be 12-128 URL-safe characters."
+    );
+  }
+
   const startMs = Date.parse(input.startTime);
   const endMs = Date.parse(input.endTime);
 
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
     throw new ScheduleInterviewError("VALIDATION_ERROR", "Interview time range is invalid.");
   }
+}
+
+function createExistingScheduleResult(
+  sync: InterviewScheduleSyncRecord | null
+): ScheduleInterviewResult | null {
+  if (!sync?.calendarEventId) {
+    return null;
+  }
+
+  if (sync.status === "BITABLE_SYNCED") {
+    return {
+      bitableRecordId: sync.feishuRecordId,
+      calendarEventId: sync.calendarEventId,
+      candidateId: sync.candidateId,
+      deduplicated: true,
+      scheduleSyncStatus: "BITABLE_SYNCED",
+      success: true,
+      syncId: sync.id,
+      syncStatus: "SUCCESS"
+    };
+  }
+
+  if (sync.status === "BITABLE_SYNC_FAILED") {
+    return {
+      bitableRecordId: sync.feishuRecordId,
+      calendarEventId: sync.calendarEventId,
+      candidateId: sync.candidateId,
+      code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: true,
+      message: "面试日程已创建，但飞书表格同步失败。请不要重复预约，可重试同步。",
+      success: false,
+      syncId: sync.id,
+      syncStatus: "BITABLE_SYNC_FAILED"
+    };
+  }
+
+  if (sync.status === "CALENDAR_CREATED") {
+    return {
+      bitableRecordId: sync.feishuRecordId,
+      calendarEventId: sync.calendarEventId,
+      candidateId: sync.candidateId,
+      code: "FEISHU_PARTIAL_SYNC_FAILED",
+      deduplicated: true,
+      message: "面试日程已创建，表格同步状态仍在确认中。请不要重复预约，可稍后重试同步。",
+      success: false,
+      syncId: sync.id,
+      syncStatus: "BITABLE_SYNC_FAILED"
+    };
+  }
+
+  return null;
 }
 
 function readRequiredEnv(env: NodeJS.ProcessEnv, key: string): string {

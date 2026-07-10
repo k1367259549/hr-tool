@@ -430,6 +430,7 @@ model FeishuBitableRecordMapping {
 
 model InterviewScheduleSync {
   id                String                      @id @default(cuid())
+  idempotencyKey    String?
   candidateId       String
   calendarEventId   String?
   feishuAppToken    String
@@ -448,6 +449,7 @@ model InterviewScheduleSync {
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
+  @@unique([idempotencyKey])
   @@index([candidateId])
   @@index([calendarEventId])
   @@index([status])

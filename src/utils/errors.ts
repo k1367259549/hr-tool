@@ -16,6 +16,7 @@ const fallbackMessages: Record<StandardErrorCode, string> = {
   FEISHU_RECORD_MAPPING_NOT_FOUND: "飞书多维表格记录映射不存在。",
   FEISHU_SYNC_RETRY_FAILED: "飞书表格重试同步失败。",
   FEISHU_SYNC_ERROR: "飞书同步失败。",
+  INVALID_IDEMPOTENCY_KEY: "幂等键无效。",
   NOT_FOUND: "资源不存在。",
   TIME_CONFLICT: "时间冲突。",
   UNKNOWN_ERROR: "请求失败。",
@@ -31,6 +32,7 @@ const statusByCode: Record<StandardErrorCode, number> = {
   FEISHU_RECORD_MAPPING_NOT_FOUND: 409,
   FEISHU_SYNC_RETRY_FAILED: 502,
   FEISHU_SYNC_ERROR: 502,
+  INVALID_IDEMPOTENCY_KEY: 400,
   NOT_FOUND: 404,
   TIME_CONFLICT: 409,
   UNKNOWN_ERROR: 500,
@@ -46,6 +48,7 @@ const categoryByCode: Record<StandardErrorCode, ErrorCategory> = {
   FEISHU_RECORD_MAPPING_NOT_FOUND: "validation",
   FEISHU_SYNC_RETRY_FAILED: "unknown",
   FEISHU_SYNC_ERROR: "unknown",
+  INVALID_IDEMPOTENCY_KEY: "validation",
   NOT_FOUND: "not_found",
   TIME_CONFLICT: "validation",
   UNKNOWN_ERROR: "unknown",
@@ -120,6 +123,10 @@ export function normalizeErrorCode(code: AppErrorCode | string): StandardErrorCo
 
   if (code === "FEISHU_SYNC_RETRY_FAILED") {
     return "FEISHU_SYNC_RETRY_FAILED";
+  }
+
+  if (code === "INVALID_IDEMPOTENCY_KEY") {
+    return "INVALID_IDEMPOTENCY_KEY";
   }
 
   if (code === "TIME_CONFLICT") {
