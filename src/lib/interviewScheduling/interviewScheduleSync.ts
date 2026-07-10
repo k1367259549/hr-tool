@@ -54,6 +54,29 @@ export type MarkInterviewScheduleSyncFailureInput = {
   incrementRetryCount?: boolean;
 };
 
+export type InterviewScheduleSyncHistoryItem = {
+  syncId: string;
+  candidateId: string;
+  calendarEventId: string | null;
+  bitableRecordId: string | null;
+  status: InterviewScheduleSyncStatus;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ListInterviewScheduleSyncsDependencies = {
+  findMany?: (query: {
+    where: {
+      candidateId: string;
+    };
+    orderBy: {
+      createdAt: "desc";
+    };
+  }) => Promise<InterviewScheduleSyncRecord[]>;
+};
+
 export async function createInterviewScheduleSync(
   input: CreateInterviewScheduleSyncInput
 ): Promise<InterviewScheduleSyncRecord> {
@@ -137,4 +160,45 @@ export async function findInterviewScheduleSyncByIdempotencyKey(
       idempotencyKey
     }
   });
+}
+
+export async function listInterviewScheduleSyncsByCandidate(
+  candidateId: string,
+  dependencies: ListInterviewScheduleSyncsDependencies = {}
+): Promise<InterviewScheduleSyncHistoryItem[]> {
+  const normalizedCandidateId = candidateId.trim();
+
+  if (!normalizedCandidateId) {
+    return [];
+  }
+
+  const findMany =
+    dependencies.findMany ??
+    ((query) => prisma.interviewScheduleSync.findMany(query));
+  const records = await findMany({
+    orderBy: {
+      createdAt: "desc"
+    },
+    where: {
+      candidateId: normalizedCandidateId
+    }
+  });
+
+  return records.map(toInterviewScheduleSyncHistoryItem);
+}
+
+export function toInterviewScheduleSyncHistoryItem(
+  record: InterviewScheduleSyncRecord
+): InterviewScheduleSyncHistoryItem {
+  return {
+    bitableRecordId: record.feishuRecordId,
+    calendarEventId: record.calendarEventId,
+    candidateId: record.candidateId,
+    createdAt: record.createdAt.toISOString(),
+    errorCode: record.lastErrorCode,
+    errorMessage: record.lastErrorMessage,
+    status: record.status,
+    syncId: record.id,
+    updatedAt: record.updatedAt.toISOString()
+  };
 }

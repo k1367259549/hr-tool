@@ -3,6 +3,7 @@ import { createJsonRequest, readApiJson } from "../setup/testDb";
 
 const scheduleInterviewMock = vi.hoisted(() => vi.fn());
 const retryInterviewScheduleSyncMock = vi.hoisted(() => vi.fn());
+const listInterviewScheduleSyncsByCandidateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/interviewScheduling/scheduleInterview", () => ({
   ScheduleInterviewError: class ScheduleInterviewError extends Error {
@@ -25,6 +26,10 @@ vi.mock("@/lib/interviewScheduling/scheduleInterview", () => ({
 
 vi.mock("@/lib/interviewScheduling/retryInterviewScheduleSync", () => ({
   retryInterviewScheduleSync: retryInterviewScheduleSyncMock
+}));
+
+vi.mock("@/lib/interviewScheduling/interviewScheduleSync", () => ({
+  listInterviewScheduleSyncsByCandidate: listInterviewScheduleSyncsByCandidateMock
 }));
 
 describe("POST /api/interviews/schedule", () => {
@@ -130,6 +135,73 @@ describe("POST /api/interviews/schedule", () => {
 
     expect(response.status).toBe(400);
     expect(scheduleInterviewMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/interviews/schedule/history", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns interview schedule history items through the service layer", async () => {
+    listInterviewScheduleSyncsByCandidateMock.mockResolvedValueOnce([
+      {
+        bitableRecordId: "rec_real_1",
+        calendarEventId: "event-1",
+        candidateId: "candidate-1",
+        createdAt: "2026-07-10T02:00:00.000Z",
+        errorCode: null,
+        errorMessage: null,
+        status: "BITABLE_SYNCED",
+        syncId: "sync-1",
+        updatedAt: "2026-07-10T02:05:00.000Z"
+      }
+    ]);
+
+    const { GET } = await import("@/app/api/interviews/schedule/history/route");
+    const response = await GET(
+      new Request("http://localhost/api/interviews/schedule/history?candidateId=candidate-1")
+    );
+    const json = await readApiJson<{
+      items: Array<{ syncId: string; status: string; calendarEventId: string | null }>;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(listInterviewScheduleSyncsByCandidateMock).toHaveBeenCalledWith("candidate-1");
+    expect(json.data?.items).toHaveLength(1);
+    expect(json.data?.items[0]).toMatchObject({
+      calendarEventId: "event-1",
+      status: "BITABLE_SYNCED",
+      syncId: "sync-1"
+    });
+    expect(JSON.stringify(json)).not.toContain("idempotencyKey");
+    expect(JSON.stringify(json)).not.toContain("tenant_access_token");
+    expect(JSON.stringify(json)).not.toContain("app-secret");
+  });
+
+  it("returns 400 when candidateId is missing", async () => {
+    const { GET } = await import("@/app/api/interviews/schedule/history/route");
+    const response = await GET(
+      new Request("http://localhost/api/interviews/schedule/history")
+    );
+    const json = await readApiJson<null>(response);
+
+    expect(response.status).toBe(400);
+    expect(json.error?.code).toBe("VALIDATION_ERROR");
+    expect(listInterviewScheduleSyncsByCandidateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty history list when no records exist", async () => {
+    listInterviewScheduleSyncsByCandidateMock.mockResolvedValueOnce([]);
+
+    const { GET } = await import("@/app/api/interviews/schedule/history/route");
+    const response = await GET(
+      new Request("http://localhost/api/interviews/schedule/history?candidateId=candidate-1")
+    );
+    const json = await readApiJson<{ items: unknown[] }>(response);
+
+    expect(response.status).toBe(200);
+    expect(json.data?.items).toEqual([]);
   });
 });
 

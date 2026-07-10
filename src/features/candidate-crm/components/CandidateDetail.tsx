@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CandidateForm } from "@/features/candidate-crm/components/CandidateForm";
 import { CandidateResumeLinkPanel } from "@/features/candidate-crm/components/CandidateResumeLinkPanel";
 import { CandidateStatusBadge } from "@/features/candidate-crm/components/CandidateStatusBadge";
@@ -55,6 +55,18 @@ type RetrySyncResponse = {
   bitableRecordId: string;
   syncStatus: "BITABLE_SYNCED";
   retryCount: number;
+};
+
+type InterviewScheduleHistoryItem = {
+  syncId: string;
+  candidateId: string;
+  calendarEventId: string | null;
+  bitableRecordId: string | null;
+  status: "PENDING" | "CALENDAR_CREATED" | "BITABLE_SYNCED" | "BITABLE_SYNC_FAILED" | "FAILED";
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const initialScheduleInterviewState: ScheduleInterviewState = {
@@ -179,11 +191,48 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
   const [idempotencyKey, setIdempotencyKey] = useState(() => createScheduleIdempotencyKey());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetryingSync, setIsRetryingSync] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [result, setResult] = useState<ScheduleInterviewResponse | null>(null);
   const [partialFailure, setPartialFailure] =
     useState<ScheduleInterviewPartialFailure | null>(null);
   const [retryResult, setRetryResult] = useState<RetrySyncResponse | null>(null);
+  const [historyItems, setHistoryItems] = useState<InterviewScheduleHistoryItem[]>([]);
+
+  const loadScheduleHistory = useCallback(async (): Promise<void> => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+
+    try {
+      const response = await fetch(
+        `/api/interviews/schedule/history?candidateId=${encodeURIComponent(candidate.id)}`
+      );
+      const json = (await response.json()) as {
+        success: boolean;
+        data: { items: InterviewScheduleHistoryItem[] } | null;
+        error: { code: string; message: string } | null;
+      };
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error?.message ?? "读取面试安排记录失败。");
+      }
+
+      setHistoryItems(json.data.items);
+    } catch (historyFetchError) {
+      setHistoryError(
+        historyFetchError instanceof Error
+          ? historyFetchError.message
+          : "读取面试安排记录失败。"
+      );
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [candidate.id]);
+
+  useEffect(() => {
+    void loadScheduleHistory();
+  }, [loadScheduleHistory]);
 
   async function submitSchedule(): Promise<void> {
     if (isSubmitting) {
@@ -229,6 +278,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
         json.data
       ) {
         setPartialFailure(json.data as ScheduleInterviewPartialFailure);
+        await loadScheduleHistory();
         return;
       }
 
@@ -238,6 +288,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
 
       setResult(json.data as ScheduleInterviewResponse);
       setIdempotencyKey(createScheduleIdempotencyKey());
+      await loadScheduleHistory();
     } catch (scheduleError) {
       setError(scheduleError instanceof Error ? scheduleError.message : "安排面试失败。");
     } finally {
@@ -245,8 +296,10 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
     }
   }
 
-  async function retryBitableSync(): Promise<void> {
-    if (!partialFailure) {
+  async function retryBitableSync(syncId?: string): Promise<void> {
+    const targetSyncId = syncId ?? partialFailure?.syncId;
+
+    if (!targetSyncId) {
       return;
     }
 
@@ -261,7 +314,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
     try {
       const response = await fetch("/api/interviews/schedule/retry-sync", {
         body: JSON.stringify({
-          syncId: partialFailure.syncId
+          syncId: targetSyncId
         }),
         headers: {
           "Content-Type": "application/json"
@@ -289,6 +342,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
         syncStatus: "SUCCESS"
       });
       setPartialFailure(null);
+      await loadScheduleHistory();
     } catch (retryError) {
       setError(retryError instanceof Error ? retryError.message : "飞书表格重试同步失败。");
     } finally {
@@ -362,7 +416,7 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
             type="button"
             className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
             disabled={isRetryingSync}
-            onClick={() => void retryBitableSync()}
+            onClick={() => void retryBitableSync(partialFailure.syncId)}
           >
             {isRetryingSync ? "正在重试同步..." : "重试同步表格"}
           </button>
@@ -388,8 +442,117 @@ function ScheduleInterviewPanel({ candidate }: { candidate: CandidateDto }): JSX
           App Secret 只由后端环境变量读取，前端不会接触飞书密钥。
         </p>
       </div>
+
+      <InterviewScheduleHistoryPanel
+        historyError={historyError}
+        isLoadingHistory={isLoadingHistory}
+        isRetryingSync={isRetryingSync}
+        items={historyItems}
+        onRetrySync={(syncId) => void retryBitableSync(syncId)}
+      />
     </section>
   );
+}
+
+function InterviewScheduleHistoryPanel({
+  historyError,
+  isLoadingHistory,
+  isRetryingSync,
+  items,
+  onRetrySync
+}: {
+  historyError: string | null;
+  isLoadingHistory: boolean;
+  isRetryingSync: boolean;
+  items: InterviewScheduleHistoryItem[];
+  onRetrySync: (syncId: string) => void;
+}): JSX.Element {
+  return (
+    <div className="mt-6 border-t border-slate-200 pt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-slate-950">面试安排记录</h3>
+        {isLoadingHistory ? <p className="text-xs text-slate-500">正在读取记录...</p> : null}
+      </div>
+
+      {historyError ? (
+        <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          {historyError}
+        </div>
+      ) : null}
+
+      {!isLoadingHistory && items.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">暂无面试安排记录</p>
+      ) : null}
+
+      {items.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {items.map((item) => (
+            <div key={item.syncId} className="rounded-md border border-slate-200 p-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-slate-950">
+                    {formatInterviewScheduleStatus(item.status)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    创建时间：{formatDateTime(item.createdAt)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    日程状态：{item.calendarEventId ? "已创建" : "未创建"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    表格同步状态：{formatBitableSyncStatus(item.status)}
+                  </p>
+                </div>
+                {item.status === "BITABLE_SYNC_FAILED" && item.calendarEventId ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+                    disabled={isRetryingSync}
+                    onClick={() => onRetrySync(item.syncId)}
+                  >
+                    {isRetryingSync ? "正在重试同步..." : "重试同步表格"}
+                  </button>
+                ) : null}
+              </div>
+              {item.errorMessage ? (
+                <p className="mt-2 rounded-md bg-rose-50 p-2 text-xs text-rose-700">
+                  错误提示：{item.errorMessage}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatInterviewScheduleStatus(status: InterviewScheduleHistoryItem["status"]): string {
+  switch (status) {
+    case "BITABLE_SYNCED":
+      return "日程已创建，表格已同步";
+    case "BITABLE_SYNC_FAILED":
+      return "日程已创建，表格同步失败";
+    case "CALENDAR_CREATED":
+      return "日程已创建，等待表格同步";
+    case "PENDING":
+      return "等待创建日程";
+    default:
+      return "状态待确认";
+  }
+}
+
+function formatBitableSyncStatus(status: InterviewScheduleHistoryItem["status"]): string {
+  switch (status) {
+    case "BITABLE_SYNCED":
+      return "已同步";
+    case "BITABLE_SYNC_FAILED":
+      return "同步失败";
+    case "CALENDAR_CREATED":
+      return "等待同步";
+    default:
+      return "未知";
+  }
 }
 
 function ScheduleField({
