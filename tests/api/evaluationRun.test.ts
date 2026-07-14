@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createGetRequest, createJsonRequest, readApiJson } from "../setup/testDb";
+import { QuickScreeningResultSchema } from "@/lib/resume-screening/schema";
 import type { ResumeEvaluationRunDto } from "@/types/resumeEvaluationRun";
+import type { QuickScreeningResult } from "@/types/resume-screening";
 
 const serviceMock = vi.hoisted(() => ({
   createMockEvaluationRun: vi.fn(),
@@ -274,18 +276,19 @@ describe("POST /api/evaluations/[id]/quick-screening", () => {
     vi.mocked(serviceMock.createQuickScreeningRun).mockResolvedValueOnce({
       result: {
         evidence: ["Resume matched backend api keywords."],
-        nextStep: "建议进入详细分析或电话筛选，并由招聘者人工确认。",
+        nextStep: quickScreeningResult.nextStep,
         reasons: ["Keyword evidence present: Matched backend api."],
-        recommendation: "POTENTIAL_FIT",
+        recommendation: quickScreeningResult.recommendation,
         risks: ["Some job-description keywords were not clearly present."],
-        score: 72,
-        summary: "Rule-based quick screening summary."
+        score: quickScreeningResult.overallScore,
+        summary: quickScreeningResult.summary
       },
+      screeningResult: quickScreeningResult,
       run: {
         ...baseRun,
         modelName: "0.1.0",
         modelProvider: "RULE_BASED",
-        rating: "POTENTIAL_FIT",
+        rating: "PROCEED_TO_NEXT_STEP",
         runType: "RULE_BASED",
         score: 72,
         summary: "Rule-based quick screening summary."
@@ -310,20 +313,31 @@ describe("POST /api/evaluations/[id]/quick-screening", () => {
         evidence: string[];
         nextStep: string;
       };
+      screeningResult: QuickScreeningResult;
     }>(response);
 
     expect(response.status).toBe(201);
     expect(serviceMock.createQuickScreeningRun).toHaveBeenCalledWith("eval-1");
     expect(json.data).toMatchObject({
       result: {
-        recommendation: "POTENTIAL_FIT",
+        recommendation: "PROCEED_TO_NEXT_STEP",
         score: 72
+      },
+      screeningResult: {
+        recommendation: "PROCEED_TO_NEXT_STEP",
+        overallScore: 72,
+        screeningMode: "QUICK"
       },
       run: {
         runType: "RULE_BASED",
         status: "SUCCEEDED"
       }
     });
+    expect(json.data?.result.score).toBe(json.data?.screeningResult.overallScore);
+    expect(json.data?.result.recommendation).toBe(
+      json.data?.screeningResult.recommendation
+    );
+    expect(QuickScreeningResultSchema.safeParse(json.data?.screeningResult).success).toBe(true);
     expect(JSON.stringify(json.data)).not.toContain("rawOutputJson");
     expect(JSON.stringify(json.data)).not.toContain("parsedText");
     expect(JSON.stringify(json.data)).not.toContain("promptBody");
@@ -353,6 +367,60 @@ describe("POST /api/evaluations/[id]/quick-screening", () => {
     expect(serviceMock.createQuickScreeningRun).toHaveBeenCalledWith("eval-1");
   });
 });
+
+const quickScreeningResult: QuickScreeningResult = {
+  dimensions: [
+    {
+      conclusion: "岗位要求存在明确证据。",
+      evidence: [
+        {
+          id: "ev_1",
+          relatedRequirement: "backend api",
+          source: "RESUME",
+          text: "Resume matched backend api keywords."
+        }
+      ],
+      key: "job_match",
+      matchLevel: "high",
+      missingInformation: [],
+      name: "岗位要求匹配",
+      risks: [],
+      score: 72
+    }
+  ],
+  educationPass: "unclear",
+  evidence: [
+    {
+      id: "ev_1",
+      relatedRequirement: "backend api",
+      source: "RESUME",
+      text: "Resume matched backend api keywords."
+    }
+  ],
+  fullTimeBachelor: "unclear",
+  interviewQuestions: ["请说明 backend api 项目的具体职责。"],
+  mainRisk: "当前证据仍需招聘者人工确认。",
+  missingInformation: [],
+  nextStep: "建议进入详细分析或电话筛选，并由招聘者人工确认。",
+  notes: null,
+  overallScore: 72,
+  priority: "B",
+  reasons: ["Keyword evidence present: Matched backend api."],
+  recommendation: "PROCEED_TO_NEXT_STEP",
+  risks: [
+    {
+      description: "Some job-description keywords were not clearly present.",
+      severity: "low",
+      title: "仍需人工确认"
+    }
+  ],
+  robotArmRelevance: "high",
+  schemaVersion: "m11-a.quick.v1",
+  screeningMode: "QUICK",
+  shouldEnterDetailedAnalysis: "yes",
+  strengths: ["Resume matched backend api keywords."],
+  summary: "Rule-based quick screening summary."
+};
 
 describe("EvaluationRun API route boundaries", () => {
   it("does not import Prisma, AI providers, prompts, or selected/latest run writes", () => {

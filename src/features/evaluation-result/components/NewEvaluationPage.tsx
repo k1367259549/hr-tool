@@ -4,6 +4,10 @@ import React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  quickScreeningEvidenceSourceLabels,
+  quickScreeningRecommendationLabels
+} from "@/lib/resume-screening/quick-screening-contract";
 import type { ApiResponse } from "@/types/api";
 import type { QuickScreeningRunDto } from "@/types/resumeEvaluationRun";
 import type {
@@ -376,7 +380,7 @@ export function QuickScreeningStatusPanel({
     <section className="rounded-md border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-semibold text-slate-950">快速初筛结果</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        填写表单并点击“创建并运行快速初筛”后，这里会显示 recommendation、score、summary、reasons、risks、evidence 和 next step。
+        填写表单并点击“创建并运行快速初筛”后，这里会显示建议、分数、摘要、维度、证据、缺失信息和面试问题。
       </p>
     </section>
   );
@@ -387,6 +391,8 @@ export function QuickScreeningResultPanel({
 }: {
   result: QuickScreeningRunDto;
 }): JSX.Element {
+  const screeningResult = result.screeningResult;
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -398,7 +404,7 @@ export function QuickScreeningResultPanel({
             快速初筛已完成
           </h2>
           <p className="mt-2 break-words text-sm text-slate-500">
-            Run ID: {result.run.id}
+            {result.run.modelProvider ?? "RULE_BASED"} · {result.run.modelName ?? "local-rule"}
           </p>
         </div>
         <Link
@@ -410,17 +416,35 @@ export function QuickScreeningResultPanel({
       </div>
 
       <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
-        <ResultMetric label="初筛建议" value={result.result.recommendation} />
-        <ResultMetric label="分数" value={String(result.result.score)} />
+        <ResultMetric
+          label="初筛建议"
+          value={quickScreeningRecommendationLabels[screeningResult.recommendation]}
+        />
+        <ResultMetric label="规则分数" value={`${screeningResult.overallScore}/100`} />
         <ResultMetric label="Run 状态" value={result.run.status} />
       </div>
 
+      <p className="mt-3 text-xs leading-5 text-slate-500">
+        分数是规则型辅助匹配信号，不是录用概率，也不用于候选人排名。
+      </p>
+
       <div className="mt-5 space-y-5">
-        <ResultSection title="摘要" items={[result.result.summary]} />
-        <ResultSection title="主要理由" items={result.result.reasons} />
-        <ResultSection title="风险" items={result.result.risks} />
-        <ResultSection title="证据" items={result.result.evidence} />
-        <ResultSection title="下一步建议" items={[result.result.nextStep]} />
+        <ResultSection title="摘要" items={[screeningResult.summary]} />
+        <ResultSection title="主要理由" items={screeningResult.reasons} />
+        <ResultSection title="维度结果" items={formatDimensions(screeningResult.dimensions)} />
+        <ResultSection title="亮点" items={screeningResult.strengths} />
+        <ResultSection
+          title="风险"
+          items={screeningResult.risks.map((item) => item.description)}
+        />
+        <ResultSection
+          title="缺失信息"
+          items={screeningResult.missingInformation}
+          emptyText="暂无明确缺失信息，仍需人工复核。"
+        />
+        <ResultSection title="证据" items={formatEvidence(screeningResult.evidence)} />
+        <ResultSection title="面试问题" items={screeningResult.interviewQuestions} />
+        <ResultSection title="下一步建议" items={[screeningResult.nextStep]} />
       </div>
 
       <p className="mt-5 text-xs leading-5 text-slate-500">
@@ -439,7 +463,15 @@ function ResultMetric({ label, value }: { label: string; value: string }): JSX.E
   );
 }
 
-function ResultSection({ title, items }: { title: string; items: string[] }): JSX.Element {
+function ResultSection({
+  emptyText = "暂无记录，需人工补充确认。",
+  items,
+  title
+}: {
+  emptyText?: string;
+  items: string[];
+  title: string;
+}): JSX.Element {
   return (
     <div className="border-t border-slate-200 pt-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
@@ -452,8 +484,25 @@ function ResultSection({ title, items }: { title: string; items: string[] }): JS
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-sm text-slate-500">暂无记录，需人工补充确认。</p>
+        <p className="mt-2 text-sm text-slate-500">{emptyText}</p>
       )}
     </div>
+  );
+}
+
+function formatDimensions(
+  dimensions: QuickScreeningRunDto["screeningResult"]["dimensions"]
+): string[] {
+  return dimensions.map(
+    (dimension) =>
+      `${dimension.name}：${dimension.score}/100，${dimension.conclusion}`
+  );
+}
+
+function formatEvidence(
+  evidence: QuickScreeningRunDto["screeningResult"]["evidence"]
+): string[] {
+  return evidence.map(
+    (item) => `${quickScreeningEvidenceSourceLabels[item.source]}：${item.text}`
   );
 }

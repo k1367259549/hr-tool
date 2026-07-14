@@ -15,6 +15,7 @@ const runSafeSelect = {
   id: true,
   modelName: true,
   modelProvider: true,
+  parsedOutputJson: true,
   parsedSnapshotId: true,
   promptVersion: true,
   rating: true,

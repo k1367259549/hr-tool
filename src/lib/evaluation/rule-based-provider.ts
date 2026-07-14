@@ -50,6 +50,7 @@ export class RuleBasedEvaluationProvider implements EvaluationProvider {
       return {
         success: true,
         output: bound.output,
+        quickScreeningResult,
         metadata: this.createMetadata(startedAt, completedAt)
       };
     } catch (error) {

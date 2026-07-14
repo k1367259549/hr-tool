@@ -3,7 +3,10 @@ import type {
   ResumeEvaluationRunStatus,
   ResumeEvaluationRunType
 } from "@prisma/client";
-import type { EvaluationRecommendation } from "@/types/evaluation-output";
+import type {
+  QuickScreeningResult,
+  ScreeningRecommendation
+} from "@/types/resume-screening";
 
 export type { ResumeEvaluationRunStatus, ResumeEvaluationRunType };
 
@@ -27,7 +30,7 @@ export type ResumeEvaluationRunDto = {
 };
 
 export type QuickScreeningResultDto = {
-  recommendation: EvaluationRecommendation;
+  recommendation: ScreeningRecommendation;
   score: number;
   summary: string;
   reasons: string[];
@@ -38,6 +41,7 @@ export type QuickScreeningResultDto = {
 
 export type QuickScreeningRunDto = {
   run: ResumeEvaluationRunDto;
+  screeningResult: QuickScreeningResult;
   result: QuickScreeningResultDto;
 };
 
@@ -55,6 +59,7 @@ export type ResumeEvaluationRunSafeRecord = Prisma.ResumeEvaluationRunGetPayload
     modelProvider: true;
     modelName: true;
     promptVersion: true;
+    parsedOutputJson: true;
     resumeRevisionId: true;
     parsedSnapshotId: true;
     errorCode: true;

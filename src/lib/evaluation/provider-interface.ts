@@ -1,6 +1,7 @@
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import type { JsonValue } from "@/types/ai";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
+import type { QuickScreeningResult } from "@/types/resume-screening";
 import type {
   EvaluationRunFailureReason,
   EvaluationRunLifecycleSnapshot
@@ -49,6 +50,7 @@ export type EvaluationProviderResult =
   | {
       success: true;
       output: ResumeEvaluationResult;
+      quickScreeningResult?: QuickScreeningResult;
       metadata: EvaluationProviderMetadata;
     }
   | {

@@ -95,6 +95,8 @@ describe("RuleBasedEvaluationProvider", () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
+      expect(result.quickScreeningResult?.schemaVersion).toBe("m11-a.quick.v1");
+      expect(result.quickScreeningResult?.screeningMode).toBe("QUICK");
       expect(result.output.overallScore).toBeGreaterThan(0);
       expect(result.output.overallSummary).toContain("Rule-based signal only");
       expect(result.output.evidence.length).toBeGreaterThanOrEqual(1);

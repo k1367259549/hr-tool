@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
 import { prisma } from "@/lib/prisma";
+import { QuickScreeningResultSchema } from "@/lib/resume-screening/schema";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
@@ -95,6 +96,7 @@ function makeRun(overrides?: Partial<ResumeEvaluationRunSafeRecord>): ResumeEval
     id: "run-1",
     modelName: null,
     modelProvider: null,
+    parsedOutputJson: null,
     parsedSnapshotId: "snapshot-1",
     promptVersion: null,
     rating: null,
@@ -376,15 +378,21 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
       resumeId: "resume-1"
     } as never);
     vi.mocked(jobProfileRepository.findById).mockResolvedValue(makeJobProfile() as never);
-    vi.mocked(resumeEvaluationRunRepository.createRun).mockResolvedValue(
-      makeRun({
-        modelName: "0.1.0",
-        modelProvider: "RULE_BASED",
-        rating: "POTENTIAL_FIT",
-        runType: "RULE_BASED",
-        score: 67,
-        summary: "Rule-based signal only: matched keywords."
-      })
+    vi.mocked(resumeEvaluationRunRepository.createRun).mockImplementation(
+      async (input) =>
+        makeRun({
+          completedAt: input.completedAt ?? null,
+          modelName: input.modelName ?? null,
+          modelProvider: input.modelProvider ?? null,
+          parsedOutputJson:
+            (input.parsedOutputJson as ResumeEvaluationRunSafeRecord["parsedOutputJson"]) ??
+            null,
+          rating: input.rating ?? null,
+          runType: input.runType,
+          score: input.score ?? null,
+          status: input.status,
+          summary: input.summary ?? null
+        })
     );
   });
 
@@ -402,10 +410,14 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
     expect(result.result).toMatchObject({
       recommendation: expect.any(String),
       score: expect.any(Number),
-      summary: expect.stringContaining("Rule-based signal only")
+      summary: expect.any(String)
     });
+    expect(QuickScreeningResultSchema.safeParse(result.screeningResult).success).toBe(true);
+    expect(result.result.recommendation).toBe(result.screeningResult.recommendation);
+    expect(result.result.score).toBe(result.screeningResult.overallScore);
+    expect(result.result.summary).toBe(result.screeningResult.summary);
     expect(result.result.evidence.length).toBeGreaterThan(0);
-    expect(result.result.nextStep).toContain("招聘者人工确认");
+    expect(result.result.nextStep).toContain("人工复核");
     expect(resumeEvaluationRepository.findDetailById).toHaveBeenCalledWith(
       "eval-1",
       transactionClient
@@ -441,6 +453,10 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
         jobProfileVersion: "2026-07-04T00:00:00.000Z",
         modelName: "0.1.0",
         modelProvider: "RULE_BASED",
+        parsedOutputJson: expect.objectContaining({
+          schemaVersion: "m11-a.quick.v1",
+          screeningMode: "QUICK"
+        }),
         parsedSnapshotId: "snapshot-1",
         resumeId: "resume-1",
         resumeRevisionId: "revision-1",
@@ -472,7 +488,7 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
     );
     expect(result.result.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
     expect(result.result.score).toBeLessThan(35);
-    expect(result.result.summary).toContain("Rule-based signal only");
+    expect(result.screeningResult.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
   });
 
   it("does not update selected/latest, CandidateResume, or pipeline state", async () => {

@@ -1,15 +1,18 @@
 import { Prisma } from "@prisma/client";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
 import { prisma } from "@/lib/prisma";
+import {
+  resolveQuickScreeningResult,
+  toQuickScreeningCompatibilityFields
+} from "@/lib/resume-screening/quick-screening-contract";
+import { adaptQuickScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/rule-based-quick-screening-engine";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
 import type { EvaluationProviderResult } from "@/lib/evaluation/provider-interface";
 import type { JsonValue } from "@/types/ai";
-import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type {
-  QuickScreeningResultDto,
   QuickScreeningRunDto,
   ResumeEvaluationRunDto,
   ResumeEvaluationRunSafeRecord
@@ -118,9 +121,19 @@ export const resumeEvaluationRunService = {
         );
       }
 
+      const screeningResult = resolveQuickScreeningResult(run.parsedOutputJson);
+
+      if (!screeningResult.success) {
+        throw new ResumeEvaluationRunServiceError(
+          "VALIDATION_ERROR",
+          screeningResult.message
+        );
+      }
+
       return {
         run: toDto(run),
-        result: toQuickScreeningResult(providerResult.output)
+        screeningResult: screeningResult.result,
+        result: toQuickScreeningCompatibilityFields(screeningResult.result)
       };
     } catch (error) {
       throw normalizeError(error, "创建快速初筛 run 失败。");
@@ -285,7 +298,16 @@ async function createRunFromProviderResult(
     });
   }
 
-  const output = providerResult.output;
+  const quickScreeningResult = providerResult.quickScreeningResult;
+
+  if (!quickScreeningResult) {
+    throw new ResumeEvaluationRunServiceError(
+      "VALIDATION_ERROR",
+      "Rule-based provider did not return a canonical quick screening result."
+    );
+  }
+
+  const output = adaptQuickScreeningResultToLegacyEvaluationResult(quickScreeningResult);
 
   return resumeEvaluationRunRepository.createRun({
     completedAt,
@@ -296,7 +318,7 @@ async function createRunFromProviderResult(
     jobProfileVersion: context.evaluation.jobProfileVersion,
     modelName: providerVersion,
     modelProvider: "RULE_BASED",
-    parsedOutputJson: output as unknown as Prisma.InputJsonValue,
+    parsedOutputJson: quickScreeningResult as unknown as Prisma.InputJsonValue,
     parsedSnapshotId: context.evaluation.parsedSnapshotId,
     phoneScreenQuestionsJson: output.interviewQuestions as unknown as Prisma.InputJsonValue,
     rating: output.recommendation,
@@ -339,33 +361,6 @@ function createJobDescription(jobProfile: {
     ...(jobProfile.missingInformation ?? []),
     ...(jobProfile.suggestedFollowUpQuestions ?? [])
   ].join("\n");
-}
-
-function toQuickScreeningResult(output: ResumeEvaluationResult): QuickScreeningResultDto {
-  return {
-    evidence: output.evidence.map((item) => item.text),
-    nextStep: createNextStep(output.recommendation),
-    reasons: [
-      ...output.strengths.map((item) => `${item.title}: ${item.description}`),
-      ...output.weaknesses.map((item) => `${item.title}: ${item.description}`)
-    ],
-    recommendation: output.recommendation,
-    risks: output.risks.map((item) => item.description),
-    score: output.overallScore,
-    summary: output.overallSummary
-  };
-}
-
-function createNextStep(recommendation: ResumeEvaluationResult["recommendation"]): string {
-  if (recommendation === "POTENTIAL_FIT" || recommendation === "STRONG_FIT") {
-    return "建议进入详细分析或电话筛选，并由招聘者人工确认。";
-  }
-
-  if (recommendation === "UNCERTAIN") {
-    return "建议补充关键信息后，再由招聘者人工确认是否进入详细分析。";
-  }
-
-  return "建议先电话确认缺失信息；不要自动拒绝或推进流程。";
 }
 
 function createMockParsedOutput(): Prisma.InputJsonObject {

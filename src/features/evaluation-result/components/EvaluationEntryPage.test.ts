@@ -99,12 +99,21 @@ describe("formal evaluation entry UI", () => {
     expect(loadingText).toContain("正在运行快速初筛");
     expect(successText).toContain("快速初筛已完成");
     expect(readNewEvaluationPageSource()).toContain("初筛建议");
-    expect(readNewEvaluationPageSource()).toContain("分数");
+    expect(readNewEvaluationPageSource()).toContain("规则分数");
     expect(readNewEvaluationPageSource()).toContain("摘要");
     expect(readNewEvaluationPageSource()).toContain("主要理由");
+    expect(readNewEvaluationPageSource()).toContain("维度结果");
     expect(readNewEvaluationPageSource()).toContain("风险");
+    expect(readNewEvaluationPageSource()).toContain("缺失信息");
     expect(readNewEvaluationPageSource()).toContain("证据");
+    expect(readNewEvaluationPageSource()).toContain("面试问题");
     expect(readNewEvaluationPageSource()).toContain("下一步建议");
+    expect(readNewEvaluationPageSource()).toContain("quickScreeningRecommendationLabels");
+    expect(readNewEvaluationPageSource()).toContain("quickScreeningEvidenceSourceLabels");
+    expect(successText).toContain("规则型辅助匹配信号，不是录用概率");
+    expect(readNewEvaluationPageSource()).toContain("screeningResult.dimensions");
+    expect(readNewEvaluationPageSource()).toContain("screeningResult.missingInformation");
+    expect(readNewEvaluationPageSource()).toContain("screeningResult.interviewQuestions");
     expect(errorText).toContain("快速初筛失败");
     expect(errorText).toContain("重试快速初筛");
     expect(timeoutText).toContain("快速初筛超时");
@@ -126,11 +135,70 @@ describe("formal evaluation entry UI", () => {
 const quickScreeningResult = {
   result: {
     evidence: ["Resume matched backend api keywords."],
-    nextStep: "建议进入详细分析或电话筛选，并由招聘者人工确认。",
+    nextStep: "建议补充关键信息后，再由招聘者人工确认是否进入详细分析。",
     reasons: ["Keyword evidence present: Matched backend api."],
-    recommendation: "POTENTIAL_FIT" as const,
-    risks: ["Some job-description keywords were not clearly present."],
-    score: 72,
+    recommendation: "MANUAL_REVIEW" as const,
+    risks: ["简历中未找到明确证据：Docker 部署"],
+    score: 52,
+    summary: "Rule-based quick screening summary."
+  },
+  screeningResult: {
+    dimensions: [
+      {
+        conclusion: "API 经验存在证据，Docker 部署仍需确认。",
+        evidence: [
+          {
+            id: "ev_1",
+            relatedRequirement: "backend api",
+            source: "RESUME" as const,
+            text: "Resume matched backend api keywords."
+          }
+        ],
+        key: "job_match" as const,
+        matchLevel: "medium" as const,
+        missingInformation: ["简历中未找到明确证据：Docker 部署"],
+        name: "岗位要求匹配",
+        risks: ["简历中未找到明确证据：Docker 部署"],
+        score: 52
+      }
+    ],
+    educationPass: "unclear" as const,
+    evidence: [
+      {
+        id: "ev_1",
+        relatedRequirement: "backend api",
+        source: "RESUME" as const,
+        text: "Resume matched backend api keywords."
+      },
+      {
+        id: "ev_2",
+        relatedRequirement: "Docker 部署",
+        source: "MISSING_INFORMATION" as const,
+        text: "简历中未找到明确证据：Docker 部署"
+      }
+    ],
+    fullTimeBachelor: "unclear" as const,
+    interviewQuestions: ["请说明 API 项目的具体职责。"],
+    mainRisk: "简历中未找到明确证据：Docker 部署",
+    missingInformation: ["简历中未找到明确证据：Docker 部署"],
+    nextStep: "建议补充关键信息后，再由招聘者人工确认是否进入详细分析。",
+    notes: null,
+    overallScore: 52,
+    priority: "B" as const,
+    reasons: ["Keyword evidence present: Matched backend api."],
+    recommendation: "MANUAL_REVIEW" as const,
+    risks: [
+      {
+        description: "简历中未找到明确证据：Docker 部署",
+        severity: "medium" as const,
+        title: "Docker 部署"
+      }
+    ],
+    robotArmRelevance: "medium" as const,
+    schemaVersion: "m11-a.quick.v1" as const,
+    screeningMode: "QUICK" as const,
+    shouldEnterDetailedAnalysis: "manual_review" as const,
+    strengths: ["Resume matched backend api keywords."],
     summary: "Rule-based quick screening summary."
   },
   run: {
@@ -144,10 +212,10 @@ const quickScreeningResult = {
     modelProvider: "RULE_BASED",
     parsedSnapshotId: "snapshot-1",
     promptVersion: null,
-    rating: "POTENTIAL_FIT",
+    rating: "MANUAL_REVIEW",
     resumeRevisionId: "revision-1",
     runType: "RULE_BASED" as const,
-    score: 72,
+    score: 52,
     status: "SUCCEEDED" as const,
     summary: "Rule-based quick screening summary."
   }

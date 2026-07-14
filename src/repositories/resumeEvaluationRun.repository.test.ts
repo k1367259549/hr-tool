@@ -25,6 +25,7 @@ function makeRun(overrides?: Partial<ResumeEvaluationRunSafeRecord>): ResumeEval
     id: "run-1",
     modelName: null,
     modelProvider: null,
+    parsedOutputJson: null,
     parsedSnapshotId: "snapshot-1",
     promptVersion: null,
     rating: null,
