@@ -1,7 +1,10 @@
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import type { JsonValue } from "@/types/ai";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
-import type { QuickScreeningResult } from "@/types/resume-screening";
+import type {
+  DetailedScreeningResult,
+  QuickScreeningResult
+} from "@/types/resume-screening";
 import type {
   EvaluationRunFailureReason,
   EvaluationRunLifecycleSnapshot
@@ -39,6 +42,8 @@ export type EvaluationProviderMetadata = {
   completedAt: string;
   durationMs: number;
   model?: string;
+  promptFile?: string;
+  promptVersion?: string;
 };
 
 export type EvaluationProviderError = {
@@ -50,6 +55,7 @@ export type EvaluationProviderResult =
   | {
       success: true;
       output: ResumeEvaluationResult;
+      detailedScreeningResult?: DetailedScreeningResult;
       quickScreeningResult?: QuickScreeningResult;
       metadata: EvaluationProviderMetadata;
     }

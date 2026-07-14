@@ -1,5 +1,9 @@
-import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
-import { validateEvaluationOutputQuality } from "@/lib/evaluation/output-quality-guard";
+import { parseJsonOutput, JsonParserError } from "@/ai/parser/jsonParser";
+import { promptRegistry } from "@/ai/prompts/promptRegistry";
+import {
+  adaptDetailedScreeningResultToLegacyEvaluationResult,
+  resolveDetailedScreeningResult
+} from "@/lib/resume-screening/detailed-screening-contract";
 import type {
   EvaluationProvider,
   EvaluationProviderInput,
@@ -42,20 +46,7 @@ type ChatCompletionResponse = {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions";
-const detailedAnalysisInstruction = [
-  "Return only JSON that conforms to the resume evaluation output schema.",
-  "Analyze only the CURRENT job description and CURRENT resume text in this request.",
-  "Use the structured job understanding context first when it is provided, then use the raw job description as supporting context.",
-  "Do not reuse facts, names, scores, or evidence from any other candidate.",
-  "Do not make automatic hiring, rejection, ranking, or pipeline movement decisions.",
-  "Output must be detailed, evidence-based, and distinguishable across candidates.",
-  "Every conclusion should map to resume or job-description evidence whenever possible.",
-  "If evidence is missing, say what specific information is missing instead of writing empty placeholders.",
-  "Include concrete matches, weaknesses, risks, missing information, phone screen questions, and interview questions.",
-  "Use schema-compatible dimension keys: jd-match, experience-relevance, skill-match, communication-signal, risk-and-missing-info.",
-  "Include at least two strengths, two weaknesses, one risk, two evidence items, five dimension scores, and five interview questions.",
-  "Question coverage must include relevant experience, role understanding, skills or tools, availability or internship duration, and missing or risky information."
-].join(" ");
+const DETAILED_ANALYSIS_PROMPT_FILE = "detailed-analysis.md";
 
 export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
   readonly name = "OPENAI_COMPATIBLE";
@@ -83,9 +74,24 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
     const startedAt = this.now();
 
     try {
+      const inputValidationError = validateProviderInput(input);
+
+      if (inputValidationError) {
+        const completedAt = this.now();
+        const prompt = await promptRegistry.getPrompt(DETAILED_ANALYSIS_PROMPT_FILE);
+
+        return this.failure(
+          "VALIDATION_ERROR",
+          "openai-compatible-input-invalid",
+          inputValidationError,
+          this.createMetadata(startedAt, completedAt, prompt)
+        );
+      }
+
+      const prompt = await promptRegistry.getPrompt(DETAILED_ANALYSIS_PROMPT_FILE);
       const response = await withTimeout(
         this.fetchImpl(this.createUrl(), {
-          body: JSON.stringify(this.createRequestBody(input)),
+          body: JSON.stringify(this.createRequestBody(input, prompt.template)),
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json"
@@ -95,12 +101,12 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
         this.timeoutMs
       );
       const completedAt = this.now();
-      const metadata = this.createMetadata(startedAt, completedAt);
+      const metadata = this.createMetadata(startedAt, completedAt, prompt);
 
       if (!response.ok) {
         return this.failure(
           "PROVIDER_ERROR",
-          "openai-compatible-http-error",
+          "openai-compatible-provider-response-error",
           `OpenAI-compatible provider returned HTTP ${response.status}.`,
           metadata
         );
@@ -118,42 +124,40 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
         );
       }
 
-      const parsed = parseJsonContent(content);
+      let parsedJson: unknown;
 
-      if (!parsed.success) {
+      try {
+        parsedJson = parseJsonOutput(content);
+      } catch (parseError) {
         return this.failure(
           "VALIDATION_ERROR",
-          "openai-compatible-json-parse-failed",
-          parsed.error,
+          "openai-compatible-invalid-json",
+          parseError instanceof JsonParserError
+            ? parseError.message
+            : "OpenAI-compatible response content must be valid JSON.",
           metadata
         );
       }
 
-      const bound = bindEvaluationRunOutput(parsed.value);
+      const detailed = resolveDetailedScreeningResult(parsedJson);
 
-      if (!bound.success) {
+      if (!detailed.success) {
         return this.failure(
           "VALIDATION_ERROR",
-          "openai-compatible-output-binding-failed",
-          bound.error,
+          `openai-compatible-${detailed.code.toLowerCase().replaceAll("_", "-")}`,
+          detailed.message,
           metadata
         );
       }
 
-      const quality = validateEvaluationOutputQuality(bound.output);
-
-      if (!quality.success) {
-        return this.failure(
-          "VALIDATION_ERROR",
-          "openai-compatible-output-quality-failed",
-          quality.error,
-          metadata
-        );
-      }
+      const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(
+        detailed.result
+      );
 
       return {
         success: true,
-        output: bound.output,
+        detailedScreeningResult: detailed.result,
+        output: legacyOutput,
         metadata
       };
     } catch (error) {
@@ -163,7 +167,10 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
       return this.failure(
         isTimeout ? "TIMEOUT" : "PROVIDER_ERROR",
         isTimeout ? "openai-compatible-timeout" : "openai-compatible-network-error",
-        error instanceof Error ? error.message : "OpenAI-compatible provider failed.",
+        sanitizeErrorMessage(
+          error instanceof Error ? error.message : "OpenAI-compatible provider failed.",
+          this.apiKey
+        ),
         this.createMetadata(startedAt, completedAt)
       );
     }
@@ -185,25 +192,31 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
 
   private createMetadata(
     startedAt: Date,
-    completedAt: Date
+    completedAt: Date,
+    prompt?: Awaited<ReturnType<typeof promptRegistry.getPrompt>>
   ): EvaluationProviderMetadata {
     return {
       completedAt: completedAt.toISOString(),
       durationMs: Math.max(0, completedAt.getTime() - startedAt.getTime()),
       model: this.model,
+      promptFile: prompt?.path,
+      promptVersion: prompt?.version,
       providerName: this.name,
       providerVersion: this.version,
       startedAt: startedAt.toISOString()
     };
   }
 
-  private createRequestBody(input: EvaluationProviderInput) {
+  private createRequestBody(input: EvaluationProviderInput, promptTemplate: string) {
     return {
       model: this.model,
       messages: [
         {
           role: "system",
-          content: detailedAnalysisInstruction
+          content: promptTemplate.replace(
+            "{{INPUT}}",
+            "The user message contains the delimited evaluation input blocks."
+          )
         },
         {
           role: "user",
@@ -286,22 +299,6 @@ function getChatMessageContent(payload: unknown): unknown {
   return response.choices?.[0]?.message?.content;
 }
 
-function parseJsonContent(
-  content: string
-): { success: true; value: unknown } | { success: false; error: string } {
-  try {
-    return {
-      success: true,
-      value: JSON.parse(content)
-    };
-  } catch {
-    return {
-      success: false,
-      error: "OpenAI-compatible response content must be valid JSON."
-    };
-  }
-}
-
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -317,4 +314,20 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
       clearTimeout(timeoutId);
     }
   }
+}
+
+function validateProviderInput(input: EvaluationProviderInput): string | null {
+  if (!input.resumeText.trim()) {
+    return "resumeText is required for detailed analysis.";
+  }
+
+  if (!input.jobDescription.trim()) {
+    return "jobDescription is required for detailed analysis.";
+  }
+
+  return null;
+}
+
+function sanitizeErrorMessage(message: string, apiKey: string): string {
+  return apiKey ? message.replaceAll(apiKey, "[redacted]") : message;
 }

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import { OpenAICompatibleEvaluationProvider } from "@/lib/evaluation/openai-compatible-provider";
-import type { ResumeEvaluationResult } from "@/types/evaluation-output";
+import type { DetailedScreeningResult } from "@/types/resume-screening";
 
 const startedAt = "2026-07-05T13:00:00.000Z";
 const completedAt = "2026-07-05T13:00:00.050Z";
@@ -47,149 +47,158 @@ function createProviderInput() {
   };
 }
 
-function createValidEvaluationOutput(
-  overrides?: Partial<ResumeEvaluationResult>
-): ResumeEvaluationResult {
+function createValidDetailedOutput(
+  overrides?: Partial<DetailedScreeningResult>
+): DetailedScreeningResult {
   return {
-    confidence: "HIGH",
-    dimensionScores: [
+    dimensions: [
       {
-        evidenceIds: ["ev_backend_api"],
-        key: "jd-match",
-        label: "JD Match",
-        rationale:
+        conclusion:
           "The resume explicitly describes TypeScript API services, which maps to the backend API requirement in the JD.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "TypeScript backend API experience",
+            source: "RESUME",
+            text: "Built and maintained TypeScript backend APIs."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "JD Match",
+        risks: [],
         score: 88
       },
       {
-        evidenceIds: ["ev_backend_api"],
-        key: "experience-relevance",
-        label: "Experience Relevance",
-        rationale:
+        conclusion:
           "The recruiting workflow service experience is relevant to the job context and expected backend ownership.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Backend service ownership",
+            source: "RESUME",
+            text: "Built and maintained TypeScript backend APIs."
+          }
+        ],
+        key: "experience_quality",
+        matchLevel: "high",
+        missingInformation: ["Availability and internship duration are not visible."],
+        name: "Experience Relevance",
+        risks: ["Ownership depth still needs interview confirmation."],
         score: 84
       },
       {
-        evidenceIds: ["ev_typescript"],
-        key: "skill-match",
-        label: "Skill Match",
-        rationale:
+        conclusion:
           "The resume names TypeScript and API service work, matching the technical stack requested by the JD.",
+        evidence: [
+          {
+            id: "ev_typescript_requirement",
+            relatedRequirement: "TypeScript",
+            source: "JOB_REQUIREMENT",
+            text: "The job description asks for TypeScript and API experience."
+          }
+        ],
+        key: "core_capability",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "Skill Match",
+        risks: [],
         score: 86
       },
       {
-        evidenceIds: ["ev_backend_api"],
-        key: "communication-signal",
-        label: "Communication Signal",
-        rationale:
+        conclusion:
           "The resume gives a concise project description but still needs an interview follow-up to confirm collaboration and written communication quality.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Project communication",
+            source: "RESUME",
+            text: "Built and maintained TypeScript backend APIs."
+          }
+        ],
+        key: "company_background",
+        matchLevel: "medium",
+        missingInformation: ["Collaboration and communication context are not explicit."],
+        name: "Communication Signal",
+        risks: ["Communication evidence is indirect."],
         score: 68
       },
       {
-        evidenceIds: ["ev_missing_availability"],
-        key: "risk-and-missing-info",
-        label: "Risk And Missing Info",
-        rationale:
+        conclusion:
           "Availability, internship duration, and weekly attendance are not visible in the resume and must be confirmed before moving forward.",
+        evidence: [
+          {
+            id: "ev_missing_availability",
+            relatedRequirement: "Internship availability",
+            source: "MISSING_INFORMATION",
+            text: "The resume does not state availability, internship duration, or weekly attendance."
+          }
+        ],
+        key: "risk_control",
+        matchLevel: "medium",
+        missingInformation: [
+          "Availability, internship duration, and weekly attendance are not visible."
+        ],
+        name: "Risk And Missing Info",
+        risks: ["Operational availability is not confirmed."],
         score: 52
       }
     ],
     evidence: [
       {
         id: "ev_backend_api",
-        relevance: "HIGH",
+        relatedRequirement: "TypeScript backend API experience",
         source: "RESUME",
         text: "Built and maintained TypeScript backend APIs."
       },
       {
-        id: "ev_typescript",
-        relevance: "HIGH",
-        source: "JOB_PROFILE",
+        id: "ev_typescript_requirement",
+        relatedRequirement: "TypeScript",
+        source: "JOB_REQUIREMENT",
         text: "The job description asks for TypeScript and API experience."
       },
       {
         id: "ev_missing_availability",
-        relevance: "MEDIUM",
-        source: "RESUME",
+        relatedRequirement: "Internship availability",
+        source: "MISSING_INFORMATION",
         text: "The resume does not state availability, internship duration, or weekly attendance."
       }
     ],
     interviewQuestions: [
-      {
-        category: "TECHNICAL",
-        evidenceIds: ["ev_backend_api"],
-        purpose: "Validate depth of backend API ownership.",
-        question: "Which API design trade-offs did you own?"
-      },
-      {
-        category: "EXPERIENCE",
-        evidenceIds: ["ev_backend_api"],
-        purpose: "Confirm whether the listed backend work was hands-on and recent.",
-        question: "Please walk through the recruiting workflow API project and your direct responsibilities."
-      },
-      {
-        category: "MOTIVATION",
-        evidenceIds: ["ev_typescript"],
-        purpose: "Check role understanding against the backend internship JD.",
-        question: "How do you understand the core work of this backend internship role?"
-      },
-      {
-        category: "TECHNICAL",
-        evidenceIds: ["ev_typescript"],
-        purpose: "Validate practical TypeScript and API tooling experience.",
-        question: "Which TypeScript patterns or testing tools did you use when building the API services?"
-      },
-      {
-        category: "RISK_FOLLOW_UP",
-        evidenceIds: ["ev_missing_availability"],
-        purpose: "Clarify missing availability and internship commitment information.",
-        question: "What is your earliest start date, internship duration, and weekly availability?"
-      }
+      "Which API design trade-offs did you own?",
+      "Please walk through the recruiting workflow API project and your direct responsibilities.",
+      "How do you understand the core work of this backend internship role?",
+      "Which TypeScript patterns or testing tools did you use when building the API services?",
+      "What is your earliest start date, internship duration, and weekly availability?"
     ],
+    missingInformation: [
+      "Availability, internship duration, and weekly attendance are not visible."
+    ],
+    nextStep:
+      "Recruiter should manually confirm ownership depth and availability before deciding whether to proceed.",
     notes: null,
     overallScore: 82,
-    overallSummary:
-      "The candidate is a credible potential fit for the backend internship because the resume mentions TypeScript API service work that maps directly to the JD's backend and API expectations. The strongest evidence is the recruiting workflow service experience, but the evaluation still needs recruiter follow-up on project depth, collaboration scope, availability, internship duration, and weekly attendance before any human decision is made.",
-    recommendation: "POTENTIAL_FIT",
+    recommendation: "PROCEED_TO_NEXT_STEP",
     risks: [
       {
         description:
           "The resume does not show availability, internship duration, or weekly attendance, which are important practical constraints for an internship role.",
-        evidenceIds: ["ev_missing_availability"],
-        severity: "MEDIUM",
-        type: "MISSING_REQUIREMENT"
-      }
-    ],
-    schemaVersion: "m07-b3-a.v1",
-    strengths: [
-      {
-        description:
-          "The resume states TypeScript API service experience, which maps to the JD's backend API requirement.",
-        evidenceIds: ["ev_backend_api", "ev_typescript"],
-        title: "Relevant backend API signal"
-      },
-      {
-        description:
-          "The recruiting workflow project context is close to the HR tooling domain, making the experience easier to discuss against this role.",
-        evidenceIds: ["ev_backend_api"],
-        title: "Domain-adjacent project context"
-      }
-    ],
-    weaknesses: [
-      {
-        description:
-          "The resume does not explain the candidate's exact ownership level, so the interviewer should verify whether they designed, implemented, tested, or only assisted the APIs.",
-        evidenceIds: ["ev_backend_api"],
-        severity: "MEDIUM",
-        title: "Ownership depth unclear"
-      },
-      {
-        description:
-          "The resume does not mention availability or internship duration, which must be confirmed before treating the match as operationally viable.",
-        evidenceIds: ["ev_missing_availability"],
-        severity: "MEDIUM",
+        severity: "medium",
         title: "Availability missing"
       }
+    ],
+    schemaVersion: "m11-a.detailed.v1",
+    screeningMode: "DETAILED",
+    strengths: [
+      "The resume states TypeScript API service experience, which maps to the JD's backend API requirement.",
+      "The recruiting workflow project context is close to the HR tooling domain, making the experience easier to discuss against this role."
+    ],
+    summary:
+      "The candidate is a credible potential fit for the backend internship because the resume mentions TypeScript API service work that maps directly to the JD's backend and API expectations. The strongest evidence is the recruiting workflow service experience, but the evaluation still needs recruiter follow-up on project depth, collaboration scope, availability, internship duration, and weekly attendance before any human decision is made.",
+    weaknesses: [
+      "The resume does not explain the candidate's exact ownership level, so the interviewer should verify whether they designed, implemented, tested, or only assisted the APIs.",
+      "The resume does not mention availability or internship duration, which must be confirmed before treating the match as operationally viable."
     ],
     ...overrides
   };
@@ -214,7 +223,7 @@ function createChatResponse(content: string) {
 }
 
 function createProvider(fetchImpl: FetchImpl = async () =>
-  createChatResponse(JSON.stringify(createValidEvaluationOutput()))
+  createChatResponse(JSON.stringify(createValidDetailedOutput()))
 ) {
   return new OpenAICompatibleEvaluationProvider({
     apiKey: "explicit-test-key",
@@ -238,7 +247,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     const fetchImpl: FetchImpl = async () => {
       callCount += 1;
 
-      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
     };
 
     createProvider(fetchImpl);
@@ -247,7 +256,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
   });
 
   it("returns legal output from a successful mock response", async () => {
-    const output = createValidEvaluationOutput();
+    const output = createValidDetailedOutput();
     let requestUrl: string | null = null;
     let requestInit: FetchInit;
     const fetchImpl: FetchImpl = async (url, init) => {
@@ -263,11 +272,14 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.output).toEqual(output);
-      expect(bindEvaluationRunOutput(result.output)).toEqual({
-        success: true,
-        output
+      expect(result.detailedScreeningResult).toEqual(output);
+      expect(result.output).toMatchObject({
+        overallScore: output.overallScore,
+        overallSummary: output.summary,
+        recommendation: "POTENTIAL_FIT",
+        schemaVersion: "m07-b3-a.v1"
       });
+      expect(bindEvaluationRunOutput(result.output).success).toBe(true);
     }
 
     expect(requestUrl).toBe("https://provider.test/v1/chat/completions");
@@ -280,12 +292,34 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     });
   });
 
+  it("extracts detailed output from a markdown JSON code fence", async () => {
+    const output = createValidDetailedOutput({
+      overallScore: 79,
+      recommendation: "MANUAL_REVIEW"
+    });
+    const provider = createProvider(
+      async () => createChatResponse(`\`\`\`json\n${JSON.stringify(output)}\n\`\`\``)
+    );
+
+    const result = await provider.evaluate(createProviderInput());
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.detailedScreeningResult).toEqual(output);
+      expect(result.output).toMatchObject({
+        overallScore: 79,
+        recommendation: "UNCERTAIN"
+      });
+    }
+  });
+
   it("sends an OpenAI-compatible chat completions request body", async () => {
     let requestInit: FetchInit;
     const fetchImpl: FetchImpl = async (_url, init) => {
       requestInit = init;
 
-      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
     };
     const provider = createProvider(fetchImpl);
 
@@ -307,9 +341,10 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(body.messages[1]).toMatchObject({
       role: "user"
     });
-    expect(body.messages[0].content).toContain("Do not make automatic hiring");
-    expect(body.messages[0].content).toContain("jd-match");
+    expect(body.messages[0].content).toContain("Do not automatically hire");
+    expect(body.messages[0].content).toContain("job_match");
     expect(body.messages[0].content).toContain("structured job understanding");
+    expect(body.messages[0].content).toContain("screeningMode must be DETAILED");
     expect(body.messages[1].content).toContain("<JOB_UNDERSTANDING>");
     expect(body.messages[1].content).toContain("</JOB_UNDERSTANDING>");
     expect(body.messages[1].content).toContain("mustHaveRequirements");
@@ -333,7 +368,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     const fetchImpl: FetchImpl = async (_url, init) => {
       requestInit = init;
 
-      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
     };
     const provider = createProvider(fetchImpl);
     const input = createProviderInput();
@@ -356,7 +391,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     const fetchImpl: FetchImpl = async (_url, init) => {
       requestBodies.push(String(init?.body));
 
-      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
     };
     const provider = createProvider(fetchImpl);
 
@@ -375,6 +410,31 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(requestBodies[1]).toContain("Resume B");
   });
 
+  it("rejects empty detailed analysis input before calling fetch", async () => {
+    let callCount = 0;
+    const fetchImpl: FetchImpl = async () => {
+      callCount += 1;
+
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
+    };
+    const provider = createProvider(fetchImpl);
+
+    const result = await provider.evaluate({
+      ...createProviderInput(),
+      resumeText: "   "
+    });
+
+    expect(result).toMatchObject({
+      error: {
+        code: "openai-compatible-input-invalid",
+        message: "resumeText is required for detailed analysis."
+      },
+      failureReason: "VALIDATION_ERROR",
+      success: false
+    });
+    expect(callCount).toBe(0);
+  });
+
   it("fails when response content is invalid JSON", async () => {
     const provider = createProvider(async () => createChatResponse("{bad-json"));
 
@@ -382,14 +442,14 @@ describe("OpenAICompatibleEvaluationProvider", () => {
 
     expect(result).toMatchObject({
       error: {
-        code: "openai-compatible-json-parse-failed"
+        code: "openai-compatible-invalid-json"
       },
       failureReason: "VALIDATION_ERROR",
       success: false
     });
   });
 
-  it("fails when parsed output does not bind to ResumeEvaluationResult", async () => {
+  it("fails when parsed output does not match DetailedScreeningResult", async () => {
     const provider = createProvider(
       async () =>
         createChatResponse(
@@ -403,48 +463,22 @@ describe("OpenAICompatibleEvaluationProvider", () => {
 
     expect(result).toMatchObject({
       error: {
-        code: "openai-compatible-output-binding-failed"
+        code: "openai-compatible-schema-validation-failed"
       },
       failureReason: "VALIDATION_ERROR",
       success: false
     });
   });
 
-  it("fails when parsed output is valid JSON but too generic", async () => {
+  it("fails when parsed output omits required detailed evidence", async () => {
     const provider = createProvider(
       async () =>
         createChatResponse(
           JSON.stringify(
-            createValidEvaluationOutput({
-              dimensionScores: [
-                {
-                  evidenceIds: ["ev_backend_api"],
-                  key: "jd-match",
-                  label: "JD Match",
-                  rationale: "Some match exists.",
-                  score: 60
-                }
-              ],
-              evidence: [
-                {
-                  id: "ev_backend_api",
-                  relevance: "LOW",
-                  source: "RESUME",
-                  text: "No evidence provided."
-                }
-              ],
-              interviewQuestions: [
-                {
-                  category: "OTHER",
-                  evidenceIds: ["ev_backend_api"],
-                  purpose: "Clarify.",
-                  question: "Tell me about yourself."
-                }
-              ],
-              overallSummary: "No evaluation summary provided.",
-              risks: [],
-              strengths: [],
-              weaknesses: []
+            createValidDetailedOutput({
+              dimensions: [],
+              evidence: [],
+              summary: "No evaluation summary provided."
             })
           )
         )
@@ -454,8 +488,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
 
     expect(result).toMatchObject({
       error: {
-        code: "openai-compatible-output-quality-failed",
-        message: "AI evaluation output is too generic or lacks evidence."
+        code: "openai-compatible-schema-validation-failed"
       },
       failureReason: "VALIDATION_ERROR",
       success: false
@@ -478,7 +511,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
 
     expect(result).toMatchObject({
       error: {
-        code: "openai-compatible-http-error"
+        code: "openai-compatible-provider-response-error"
       },
       failureReason: "PROVIDER_ERROR",
       success: false
@@ -504,22 +537,34 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     });
   });
 
-  it("maps timeout to TIMEOUT", async () => {
-    vi.useFakeTimers();
+  it("redacts apiKey values from provider error messages", async () => {
+    const provider = createProvider(
+      async () => {
+        throw new Error("Network failed for explicit-test-key.");
+      }
+    );
 
+    const result = await provider.evaluate(createProviderInput());
+
+    expect(result).toMatchObject({
+      error: {
+        message: "Network failed for [redacted]."
+      },
+      success: false
+    });
+  });
+
+  it("maps timeout to TIMEOUT", async () => {
     const provider = new OpenAICompatibleEvaluationProvider({
       apiKey: "explicit-test-key",
       baseUrl: "https://provider.test",
       fetchImpl: () => new Promise(() => undefined),
       model: "gpt-5.5-compatible",
       now: createSequentialClock([startedAt, completedAt]),
-      timeoutMs: 5
+      timeoutMs: 1
     });
-    const resultPromise = provider.evaluate(createProviderInput());
 
-    await vi.advanceTimersByTimeAsync(6);
-
-    const result = await resultPromise;
+    const result = await provider.evaluate(createProviderInput());
 
     expect(result).toMatchObject({
       error: {
@@ -539,6 +584,8 @@ describe("OpenAICompatibleEvaluationProvider", () => {
       completedAt,
       durationMs: 50,
       model: "gpt-5.5-compatible",
+      promptFile: "prompts/detailed-analysis.md",
+      promptVersion: "1.0",
       providerName: "OPENAI_COMPATIBLE",
       providerVersion: "openai-compatible-test-v1",
       startedAt
@@ -552,7 +599,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     const fetchImpl: FetchImpl = async (_url, init) => {
       requestInit = init;
 
-      return createChatResponse(JSON.stringify(createValidEvaluationOutput()));
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
     };
     const provider = createProvider(fetchImpl);
 

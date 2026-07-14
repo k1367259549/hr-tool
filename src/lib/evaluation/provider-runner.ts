@@ -17,6 +17,10 @@ import type {
 } from "@/lib/evaluation/run-persistence-contract";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type {
+  DetailedScreeningResult,
+  QuickScreeningResult
+} from "@/types/resume-screening";
+import type {
   EvaluationRunFailureReason,
   EvaluationRunLifecycleEvent,
   EvaluationRunLifecycleSnapshot
@@ -36,6 +40,8 @@ type RunEvaluationProviderResult =
       success: true;
       runId: string;
       output: ResumeEvaluationResult;
+      detailedScreeningResult?: DetailedScreeningResult;
+      quickScreeningResult?: QuickScreeningResult;
       metadata: EvaluationProviderMetadata;
     }
   | {
@@ -161,6 +167,8 @@ export async function runEvaluationProvider(
     success: true,
     runId,
     output: bound.output,
+    detailedScreeningResult: providerResult.detailedScreeningResult,
+    quickScreeningResult: providerResult.quickScreeningResult,
     metadata: providerResult.metadata
   };
 }

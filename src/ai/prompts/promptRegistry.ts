@@ -6,6 +6,7 @@ const promptDefinitions: Record<string, { category: PromptCategory; version: str
   "candidate-understanding.md": { category: "candidate-understanding", version: "1.0" },
   "daily-insights.md": { category: "daily-workspace", version: "1.0" },
   "daily-summary.md": { category: "daily-workspace", version: "1.0" },
+  "detailed-analysis.md": { category: "resume-evaluation", version: "1.0" },
   "improvement-suggestions.md": { category: "daily-workspace", version: "1.0" },
   "interview-preparation.md": { category: "recruit-together", version: "1.0" },
   "job-understanding.md": { category: "job-understanding", version: "1.0" },

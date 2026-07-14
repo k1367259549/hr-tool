@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryEvaluationRunRepository } from "@/lib/evaluation/memory-run-repository";
+import { adaptDetailedScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/detailed-screening-contract";
 import {
   MockEvaluationProvider,
   type EvaluationProvider,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/evaluation/provider-interface";
 import { runEvaluationProvider } from "@/lib/evaluation/provider-runner";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
+import type { DetailedScreeningResult } from "@/types/resume-screening";
 
 const createdAt = "2026-07-05T14:00:00.000Z";
 const nextAt = "2026-07-05T14:00:01.000Z";
@@ -122,6 +124,49 @@ describe("runEvaluationProvider", () => {
     }
 
     expect(run?.status).toBe("COMPLETED");
+  });
+
+  it("preserves canonical detailed screening results returned by the provider", async () => {
+    const repository = createRepository();
+    const detailedResult = createDetailedResult();
+    const provider: EvaluationProvider = {
+      name: "OPENAI_COMPATIBLE",
+      version: "detailed-provider-v1",
+      async evaluate() {
+        return {
+          detailedScreeningResult: detailedResult,
+          metadata: {
+            completedAt: nextAt,
+            durationMs: 1,
+            model: "gpt-5.5",
+            promptFile: "prompts/detailed-analysis.md",
+            promptVersion: "1.0",
+            providerName: "OPENAI_COMPATIBLE",
+            providerVersion: "detailed-provider-v1",
+            startedAt: createdAt
+          },
+          output: adaptDetailedScreeningResultToLegacyEvaluationResult(detailedResult),
+          success: true
+        };
+      }
+    };
+
+    const result = await runEvaluationProvider({
+      idGenerator: createIdGenerator(),
+      input: createProviderInput({
+        runId: "run-detailed"
+      }),
+      now: createClock(),
+      provider,
+      repository
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.detailedScreeningResult).toEqual(detailedResult);
+      expect(result.output.overallScore).toBe(detailedResult.overallScore);
+    }
   });
 
   it("marks the run as FAILED when provider returns failure", async () => {
@@ -262,3 +307,56 @@ describe("runEvaluationProvider", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+function createDetailedResult(): DetailedScreeningResult {
+  return {
+    dimensions: [
+      {
+        conclusion: "Resume evidence maps to the backend role.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Backend API experience",
+            source: "RESUME",
+            text: "Built backend APIs in TypeScript."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: ["Availability is not explicit."],
+        name: "Job match",
+        risks: ["Ownership depth needs confirmation."],
+        score: 80
+      }
+    ],
+    evidence: [
+      {
+        id: "ev_backend_api",
+        relatedRequirement: "Backend API experience",
+        source: "RESUME",
+        text: "Built backend APIs in TypeScript."
+      }
+    ],
+    interviewQuestions: [
+      "Please describe the backend API work you personally owned.",
+      "What is your availability and internship duration?"
+    ],
+    missingInformation: ["Availability is not explicit."],
+    nextStep: "Recruiter should confirm availability and ownership depth.",
+    notes: null,
+    overallScore: 80,
+    recommendation: "PROCEED_TO_NEXT_STEP",
+    risks: [
+      {
+        description: "Ownership depth needs confirmation.",
+        severity: "medium",
+        title: "Ownership depth unclear"
+      }
+    ],
+    schemaVersion: "m11-a.detailed.v1",
+    screeningMode: "DETAILED",
+    strengths: ["Backend API experience is clearly evidenced."],
+    summary: "Relevant backend API evidence is present, but availability still needs confirmation.",
+    weaknesses: ["Availability is not explicit."]
+  };
+}
