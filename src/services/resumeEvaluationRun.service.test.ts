@@ -405,7 +405,7 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
       summary: expect.stringContaining("Rule-based signal only")
     });
     expect(result.result.evidence.length).toBeGreaterThan(0);
-    expect(result.result.nextStep).toContain("人工确认");
+    expect(result.result.nextStep).toContain("招聘者人工确认");
     expect(resumeEvaluationRepository.findDetailById).toHaveBeenCalledWith(
       "eval-1",
       transactionClient
@@ -451,7 +451,7 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
     );
   });
 
-  it("persists a FAILED run when rule-based input validation fails", async () => {
+  it("persists a low-confidence run when rule-based input is insufficient", async () => {
     vi.mocked(resumeRevisionRepository.findRevisionWithSnapshotById).mockResolvedValueOnce({
       id: "revision-1",
       parsedSnapshot: {
@@ -460,32 +460,19 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
       },
       resumeId: "resume-1"
     } as never);
-    vi.mocked(resumeEvaluationRunRepository.createRun).mockResolvedValueOnce(
-      makeRun({
-        errorCode: "rule-based-input-validation-failed",
-        errorMessage: "resumeText must contain enough text for rule-based evaluation.",
-        modelName: "0.1.0",
-        modelProvider: "RULE_BASED",
-        runType: "RULE_BASED",
-        status: "FAILED"
-      })
-    );
 
-    await expect(
-      resumeEvaluationRunService.createQuickScreeningRun("eval-1")
-    ).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      message: "resumeText must contain enough text for rule-based evaluation."
-    });
+    const result = await resumeEvaluationRunService.createQuickScreeningRun("eval-1");
 
     expect(resumeEvaluationRunRepository.createRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        errorCode: "rule-based-input-validation-failed",
-        errorMessage: "resumeText must contain enough text for rule-based evaluation.",
+        rating: "NOT_ENOUGH_EVIDENCE",
         runType: "RULE_BASED",
-        status: "FAILED"
+        status: "SUCCEEDED"
       })
     );
+    expect(result.result.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+    expect(result.result.score).toBeLessThan(35);
+    expect(result.result.summary).toContain("Rule-based signal only");
   });
 
   it("does not update selected/latest, CandidateResume, or pipeline state", async () => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import { MemoryEvaluationRunRepository } from "@/lib/evaluation/memory-run-repository";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
+import * as quickScreeningEngine from "@/lib/resume-screening/rule-based-quick-screening-engine";
 import type { EvaluationRunCreateInput } from "@/lib/evaluation/run-persistence-contract";
 import type {
   EvaluationRunLifecycleSnapshot
@@ -80,6 +81,7 @@ function createRunInput(
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("RuleBasedEvaluationProvider", () => {
@@ -101,6 +103,26 @@ describe("RuleBasedEvaluationProvider", () => {
     }
   });
 
+  it("delegates rule calculation to the quick screening engine", async () => {
+    const engineSpy = vi.spyOn(
+      quickScreeningEngine,
+      "createRuleBasedQuickScreeningResult"
+    );
+    const provider = new RuleBasedEvaluationProvider({
+      now: createSequentialClock([startedAt, completedAt])
+    });
+    const input = createProviderInput();
+
+    await provider.evaluate(input);
+
+    expect(engineSpy).toHaveBeenCalledTimes(1);
+    expect(engineSpy).toHaveBeenCalledWith(expect.objectContaining({
+      jobDescription: input.jobDescription,
+      resumeText: input.resumeText,
+      runId: input.runId
+    }));
+  });
+
   it("returns output that can pass bindEvaluationRunOutput", async () => {
     const provider = new RuleBasedEvaluationProvider({
       now: createSequentialClock([startedAt, completedAt])
@@ -118,7 +140,7 @@ describe("RuleBasedEvaluationProvider", () => {
     }
   });
 
-  it("fails when resumeText is empty or too short", async () => {
+  it("safely degrades when resumeText is empty or too short", async () => {
     const provider = new RuleBasedEvaluationProvider({
       now: createSequentialClock([startedAt, completedAt, startedAt, completedAt])
     });
@@ -134,17 +156,17 @@ describe("RuleBasedEvaluationProvider", () => {
       })
     );
 
-    expect(empty).toMatchObject({
-      failureReason: "VALIDATION_ERROR",
-      success: false
-    });
-    expect(tooShort).toMatchObject({
-      failureReason: "VALIDATION_ERROR",
-      success: false
-    });
+    expect(empty.success).toBe(true);
+    expect(tooShort.success).toBe(true);
+
+    if (empty.success && tooShort.success) {
+      expect(empty.output.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+      expect(tooShort.output.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+      expect(empty.output.overallScore).toBeLessThan(35);
+    }
   });
 
-  it("fails when jobDescription is empty or too short", async () => {
+  it("safely degrades when jobDescription is empty or too short", async () => {
     const provider = new RuleBasedEvaluationProvider({
       now: createSequentialClock([startedAt, completedAt, startedAt, completedAt])
     });
@@ -160,14 +182,14 @@ describe("RuleBasedEvaluationProvider", () => {
       })
     );
 
-    expect(empty).toMatchObject({
-      failureReason: "VALIDATION_ERROR",
-      success: false
-    });
-    expect(tooShort).toMatchObject({
-      failureReason: "VALIDATION_ERROR",
-      success: false
-    });
+    expect(empty.success).toBe(true);
+    expect(tooShort.success).toBe(true);
+
+    if (empty.success && tooShort.success) {
+      expect(empty.output.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+      expect(tooShort.output.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+      expect(empty.output.overallScore).toBeLessThan(35);
+    }
   });
 
   it("does not call fetch or external services", async () => {
