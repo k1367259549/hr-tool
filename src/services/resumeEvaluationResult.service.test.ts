@@ -73,6 +73,7 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
     list: vi.fn(),
     listEvaluationOptions: vi.fn(),
     reopenWithEvent: vi.fn(),
+    recordDetailedAnalysisReview: vi.fn(),
     reviewWithEvent: vi.fn(),
     updateReview: vi.fn(),
     updateSelectedRun: vi.fn(),
@@ -82,6 +83,7 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
 
 vi.mock("@/repositories/resumeEvaluationRun.repository", () => ({
   resumeEvaluationRunRepository: {
+    findRunById: vi.fn(),
     findLatestSuccessfulRun: vi.fn(),
     findRunForSelection: vi.fn()
   }
@@ -214,10 +216,56 @@ function makeSelectableRun(overrides?: object) {
     id: "run-1",
     jobProfileId: "jp-1",
     jobProfileVersion: "2026-07-01T00:00:00.000Z",
+    parsedOutputJson: makeDetailedScreeningResult(),
     resumeId: "resume-1",
+    runType: "AI",
     status: "SUCCEEDED",
     templateVersionId: "tv-1",
     ...overrides
+  };
+}
+
+function makeDetailedScreeningResult() {
+  return {
+    dimensions: [
+      {
+        conclusion: "The resume names TypeScript API work relevant to the role.",
+        evidence: [
+          {
+            id: "ev_api",
+            relatedRequirement: "Backend API experience",
+            source: "RESUME",
+            text: "Built TypeScript API services."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "JD Match",
+        risks: [],
+        score: 82
+      }
+    ],
+    evidence: [
+      {
+        id: "ev_api",
+        relatedRequirement: "Backend API experience",
+        source: "RESUME",
+        text: "Built TypeScript API services."
+      }
+    ],
+    interviewQuestions: ["Please describe your API ownership."],
+    missingInformation: [],
+    nextStep: "Recruiter should manually confirm the project scope.",
+    notes: null,
+    overallScore: 82,
+    recommendation: "MANUAL_REVIEW",
+    risks: [],
+    schemaVersion: "m11-a.detailed.v1",
+    screeningMode: "DETAILED",
+    strengths: ["Relevant TypeScript API experience."],
+    summary: "The resume includes relevant TypeScript API experience that should be verified by a recruiter.",
+    weaknesses: ["Project scope is not fully specified."]
   };
 }
 
@@ -716,7 +764,205 @@ describe("resumeEvaluationResultService.selectRunForReview", () => {
   });
 });
 
-describe("resumeEvaluationResultService.submitReview", () => {
+  describe("resumeEvaluationResultService.reviewDetailedAnalysisRun", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValue(
+        makeEvaluation() as never
+      );
+      vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValue(
+        makeSelectableRun() as never
+      );
+      vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValue(
+        makeSelectableRun() as never
+      );
+      vi.mocked(resumeEvaluationRepository.recordDetailedAnalysisReview).mockResolvedValue(
+        1 as never
+      );
+    });
+
+    it("accepts a completed canonical detailed run as a human evaluation reference", async () => {
+      const result = await resumeEvaluationResultService.reviewDetailedAnalysisRun(
+        "eval-1",
+        "run-1",
+        {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 0,
+          reviewer: "Recruiter A"
+        }
+      );
+
+      expect(result.criterionResults).toMatchObject(makeCriterionResults());
+      expect(result.overallNote).toBe("整体评估摘要");
+      expect(result.status).toBe("DRAFT");
+      expect(resumeEvaluationRepository.recordDetailedAnalysisReview).toHaveBeenCalledWith(
+        "eval-1",
+        0,
+        expect.objectContaining({
+          reviewer: "Recruiter A",
+          selectedRunId: "run-1"
+        }),
+        transactionClient
+      );
+      expect(resumeEvaluationRepository.updateReview).not.toHaveBeenCalled();
+      expect(resumeEvaluationRepository.reviewWithEvent).not.toHaveBeenCalled();
+    });
+
+    it("requires a reviewer and notes for revision or rejection", async () => {
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 0,
+          reviewer: " "
+        })
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "NEEDS_REVISION",
+          expectedRevision: 0,
+          reviewer: "Recruiter A"
+        })
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "REJECTED",
+          expectedRevision: 0,
+          note: "Evidence does not support the conclusion.",
+          reviewer: "Recruiter A"
+        })
+      ).resolves.toMatchObject({ id: "eval-1" });
+    });
+
+    it("rejects quick, unfinished, foreign, and malformed detailed runs", async () => {
+      const invalidRuns = [
+        makeSelectableRun({ status: "PENDING" }),
+        makeSelectableRun({ status: "FAILED" }),
+        makeSelectableRun({ evaluationId: "other-evaluation" })
+      ];
+
+      for (const run of invalidRuns) {
+        vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+          run as never
+        );
+
+        await expect(
+          resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+            decision: "ACCEPTED_AS_REFERENCE",
+            expectedRevision: 0,
+            reviewer: "Recruiter A"
+          })
+        ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+      }
+
+      expect(resumeEvaluationRepository.recordDetailedAnalysisReview).not.toHaveBeenCalled();
+
+      vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+        makeSelectableRun({ runType: "RULE_BASED" }) as never
+      );
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 0,
+          reviewer: "Recruiter A"
+        })
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+      vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+        makeSelectableRun({ parsedOutputJson: { screeningMode: "DETAILED" } }) as never
+      );
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 0,
+          reviewer: "Recruiter A"
+        })
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    });
+
+    it("treats an identical stale request as idempotent but rejects conflicting stale review", async () => {
+      const auditFields = [
+        "detailed-analysis-review",
+        "runId:run-1",
+        "decision:ACCEPTED_AS_REFERENCE",
+        "reference:selected",
+        "selectedRunId"
+      ];
+      vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+        makeEvaluation({
+          events: [
+            {
+              actor: "Recruiter A",
+              changedFields: auditFields,
+              createdAt: new Date("2026-07-05T00:00:00.000Z"),
+              evaluationId: "eval-1",
+              eventType: "UPDATED",
+              id: "event-1",
+              note: null
+            }
+          ],
+          revision: 1,
+          selectedRunId: "run-1"
+        })
+      );
+
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 0,
+          reviewer: "Recruiter A"
+        })
+      ).resolves.toMatchObject({ selectedRunId: "run-1" });
+
+      expect(resumeEvaluationRepository.recordDetailedAnalysisReview).not.toHaveBeenCalled();
+
+      vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+        makeEvaluation({
+          events: [
+            {
+              actor: "Recruiter A",
+              changedFields: auditFields,
+              createdAt: new Date("2026-07-05T00:00:00.000Z"),
+              evaluationId: "eval-1",
+              eventType: "UPDATED",
+              id: "event-1",
+              note: null
+            }
+          ],
+          revision: 1,
+          selectedRunId: "run-1"
+        })
+      );
+
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "REJECTED",
+          expectedRevision: 0,
+          note: "Different action.",
+          reviewer: "Recruiter A"
+        })
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
+    it("does not allow changing a reference after the human evaluation is REVIEWED", async () => {
+      vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+        makeEvaluation({ status: "REVIEWED", revision: 1 })
+      );
+
+      await expect(
+        resumeEvaluationResultService.reviewDetailedAnalysisRun("eval-1", "run-1", {
+          decision: "ACCEPTED_AS_REFERENCE",
+          expectedRevision: 1,
+          reviewer: "Recruiter A"
+        })
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+
+      expect(resumeEvaluationRunRepository.findRunForSelection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resumeEvaluationResultService.submitReview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     transactionClient.candidateResume.update.mockClear();

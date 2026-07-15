@@ -218,6 +218,45 @@ export const resumeEvaluationRepository = {
     });
   },
 
+  async recordDetailedAnalysisReview(
+    evaluationId: string,
+    expectedRevision: number,
+    input: {
+      auditFields: string[];
+      note: string | null;
+      reviewer: string;
+      selectedRunId: string | null | undefined;
+    },
+    client: CandidateDbClient = prisma
+  ): Promise<number> {
+    const data: Prisma.ResumeEvaluationResultUncheckedUpdateManyInput = {
+      revision: { increment: 1 }
+    };
+
+    if (input.selectedRunId !== undefined) {
+      data.selectedRunId = input.selectedRunId;
+    }
+
+    const result = await client.resumeEvaluationResult.updateMany({
+      data,
+      where: { id: evaluationId, revision: expectedRevision, status: "DRAFT" }
+    });
+
+    if (result.count > 0) {
+      await client.resumeEvaluationEvent.create({
+        data: {
+          actor: input.reviewer,
+          changedFields: input.auditFields,
+          eventType: "UPDATED",
+          evaluationId,
+          note: input.note
+        }
+      });
+    }
+
+    return result.count;
+  },
+
   async updateDraftWithEvent(
     id: string,
     revision: number,

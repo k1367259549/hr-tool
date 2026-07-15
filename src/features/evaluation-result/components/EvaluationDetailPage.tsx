@@ -15,12 +15,17 @@ import {
   quickScreeningEvidenceSourceLabels,
   quickScreeningRecommendationLabels
 } from "@/lib/resume-screening/quick-screening-contract";
+import { parseDetailedAnalysisReviewAudit } from "@/lib/resume-screening/detailed-analysis-review";
 import type { ApiResponse } from "@/types/api";
 import type {
+  DetailedAnalysisReviewAction,
   DetailedAnalysisRunDto,
   ResumeEvaluationRunDto
 } from "@/types/resumeEvaluationRun";
-import type { ResumeEvaluationCriterionResultDto } from "@/types/resumeEvaluationResult";
+import type {
+  ResumeEvaluationCriterionResultDto,
+  ResumeEvaluationEventDto
+} from "@/types/resumeEvaluationResult";
 import type {
   DetailedScreeningResult,
   ScreeningRecommendation
@@ -33,7 +38,7 @@ export function EvaluationDetailPage({
 }: {
   evaluationId: string;
 }): JSX.Element {
-  const { error, evaluation, isLoading, isSaving, review, reopen } =
+  const { error, evaluation, isLoading, isSaving, reload, review, reopen } =
     useEvaluationDetail(evaluationId);
   const [detailedAnalysis, setDetailedAnalysis] =
     useState<DetailedAnalysisRunDto | null>(null);
@@ -41,6 +46,11 @@ export function EvaluationDetailPage({
   const [detailedAnalysisTimedOut, setDetailedAnalysisTimedOut] = useState(false);
   const [isDetailedAnalysisLoading, setIsDetailedAnalysisLoading] = useState(false);
   const [isDetailedAnalysisRunning, setIsDetailedAnalysisRunning] = useState(false);
+  const [isDetailedAnalysisReviewing, setIsDetailedAnalysisReviewing] = useState(false);
+  const [detailedAnalysisReviewError, setDetailedAnalysisReviewError] = useState<string | null>(
+    null
+  );
+  const [detailedAnalysisReviewNote, setDetailedAnalysisReviewNote] = useState("");
   const [runHistory, setRunHistory] = useState<ResumeEvaluationRunDto[]>([]);
 
   const reloadDetailedAnalysis = useCallback(async () => {
@@ -126,6 +136,51 @@ export function EvaluationDetailPage({
     }
   }, [evaluationId, reloadDetailedAnalysis]);
 
+  const reviewDetailedAnalysis = useCallback(
+    async (runId: string, decision: DetailedAnalysisReviewAction) => {
+      if (!evaluation) {
+        return;
+      }
+
+      const note = detailedAnalysisReviewNote.trim();
+
+      if ((decision === "NEEDS_REVISION" || decision === "REJECTED") && !note) {
+        setDetailedAnalysisReviewError("要求重新分析或拒绝结果时，请填写审核说明。");
+        return;
+      }
+
+      setDetailedAnalysisReviewError(null);
+      setIsDetailedAnalysisReviewing(true);
+
+      try {
+        const response = await fetch(
+          `/api/evaluations/${evaluationId}/detailed-analysis/${runId}/review`,
+          {
+            body: JSON.stringify({
+              decision,
+              expectedRevision: evaluation.revision,
+              note: note || null,
+              reviewer: evaluation.evaluatedBy?.trim() || "Recruiter"
+            }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST"
+          }
+        );
+
+        await readApiData(response, "详细分析审核提交失败。");
+        setDetailedAnalysisReviewNote("");
+        await Promise.all([reload(), reloadDetailedAnalysis()]);
+      } catch (reviewError) {
+        setDetailedAnalysisReviewError(
+          reviewError instanceof Error ? reviewError.message : "详细分析审核提交失败。"
+        );
+      } finally {
+        setIsDetailedAnalysisReviewing(false);
+      }
+    },
+    [detailedAnalysisReviewNote, evaluation, evaluationId, reload, reloadDetailedAnalysis]
+  );
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-5">
@@ -181,10 +236,17 @@ export function EvaluationDetailPage({
             error={detailedAnalysisError}
             isLoading={isDetailedAnalysisLoading}
             isRunning={isDetailedAnalysisRunning}
+            isReviewing={isDetailedAnalysisReviewing}
             latestDetailedAnalysis={detailedAnalysis}
             onReload={() => void reloadDetailedAnalysis()}
+            onReview={(runId, decision) => void reviewDetailedAnalysis(runId, decision)}
+            onReviewNoteChange={setDetailedAnalysisReviewNote}
             onStart={() => void startDetailedAnalysis()}
+            reviewError={detailedAnalysisReviewError}
+            reviewEvents={evaluation.events}
+            reviewNote={detailedAnalysisReviewNote}
             runHistory={runHistory}
+            selectedRunId={evaluation.selectedRunId}
             timedOut={detailedAnalysisTimedOut}
           />
 
@@ -275,10 +337,17 @@ type DetailedAnalysisWorkspaceProps = {
   error: string | null;
   isLoading: boolean;
   isRunning: boolean;
+  isReviewing?: boolean;
   latestDetailedAnalysis: DetailedAnalysisRunDto | null;
   onReload: () => void;
+  onReview?: (runId: string, decision: DetailedAnalysisReviewAction) => void;
+  onReviewNoteChange?: (note: string) => void;
   onStart: () => void;
+  reviewError?: string | null;
+  reviewEvents?: ResumeEvaluationEventDto[];
+  reviewNote?: string;
   runHistory: ResumeEvaluationRunDto[];
+  selectedRunId?: string | null;
   timedOut: boolean;
 };
 
@@ -293,10 +362,17 @@ export function DetailedAnalysisWorkspace({
   error,
   isLoading,
   isRunning,
+  isReviewing = false,
   latestDetailedAnalysis,
   onReload,
+  onReview,
+  onReviewNoteChange,
   onStart,
+  reviewError = null,
+  reviewEvents = [],
+  reviewNote = "",
   runHistory,
+  selectedRunId = null,
   timedOut
 }: DetailedAnalysisWorkspaceProps): JSX.Element {
   const readiness = deriveDetailedAnalysisState(runHistory);
@@ -393,14 +469,27 @@ export function DetailedAnalysisWorkspace({
       ) : null}
 
       {latestDetailedAnalysis ? (
-        <DetailedAnalysisResultPanel analysis={latestDetailedAnalysis} />
+        <DetailedAnalysisResultPanel
+          analysis={latestDetailedAnalysis}
+          isReviewing={isReviewing}
+          onReview={onReview}
+          onReviewNoteChange={onReviewNoteChange}
+          reviewError={reviewError}
+          reviewNote={reviewNote}
+          reviewState={
+            latestDetailedAnalysis.success
+              ? findDetailedAnalysisReviewState(reviewEvents, latestDetailedAnalysis.runId)
+              : null
+          }
+          selectedRunId={selectedRunId}
+        />
       ) : !isLoading ? (
         <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
           暂无成功的详细分析结果。满足快速初筛前置条件后，可以点击“开始详细分析”生成 canonical DetailedScreeningResult。
         </div>
       ) : null}
 
-      <DetailedAnalysisHistoryPanel runs={runHistory} />
+      <DetailedAnalysisHistoryPanel reviewEvents={reviewEvents} runs={runHistory} />
     </section>
   );
 }
@@ -468,9 +557,23 @@ export function deriveDetailedAnalysisState(
 }
 
 export function DetailedAnalysisResultPanel({
-  analysis
+  analysis,
+  isReviewing = false,
+  onReview,
+  onReviewNoteChange,
+  reviewError = null,
+  reviewNote = "",
+  reviewState = null,
+  selectedRunId = null
 }: {
   analysis: DetailedAnalysisRunDto;
+  isReviewing?: boolean;
+  onReview?: (runId: string, decision: DetailedAnalysisReviewAction) => void;
+  onReviewNoteChange?: (note: string) => void;
+  reviewError?: string | null;
+  reviewNote?: string;
+  reviewState?: DetailedAnalysisReviewState | null;
+  selectedRunId?: string | null;
 }): JSX.Element {
   if (!analysis.success) {
     return (
@@ -515,6 +618,17 @@ export function DetailedAnalysisResultPanel({
         该分数是岗位匹配辅助信号，不代表录用概率，也不用于候选人排名。
       </p>
 
+      <DetailedAnalysisReviewPanel
+        isReviewing={isReviewing}
+        onReview={onReview}
+        onReviewNoteChange={onReviewNoteChange}
+        reviewError={reviewError}
+        reviewNote={reviewNote}
+        reviewState={reviewState}
+        runId={analysis.runId}
+        selectedRunId={selectedRunId}
+      />
+
       <div className="mt-5 space-y-5">
         <DetailedListSection title="总结" items={[result.summary]} />
         <DetailedDimensionSection dimensions={result.dimensions} />
@@ -542,8 +656,10 @@ export function DetailedAnalysisResultPanel({
 }
 
 export function DetailedAnalysisHistoryPanel({
+  reviewEvents = [],
   runs
 }: {
+  reviewEvents?: ResumeEvaluationEventDto[];
   runs: ResumeEvaluationRunDto[];
 }): JSX.Element {
   const relevantRuns = runs.filter(
@@ -578,6 +694,13 @@ export function DetailedAnalysisHistoryPanel({
                   错误：{run.errorMessage}
                 </p>
               ) : null}
+              {run.runType === "AI" ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  审核状态：{formatDetailedAnalysisReviewState(
+                    findDetailedAnalysisReviewState(reviewEvents, run.id)
+                  )}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -586,6 +709,138 @@ export function DetailedAnalysisHistoryPanel({
       )}
     </div>
   );
+}
+
+type DetailedAnalysisReviewState = {
+  decision: DetailedAnalysisReviewAction;
+  note: string | null;
+  reviewedAt: string;
+  reviewer: string | null;
+};
+
+function DetailedAnalysisReviewPanel({
+  isReviewing,
+  onReview,
+  onReviewNoteChange,
+  reviewError,
+  reviewNote,
+  reviewState,
+  runId,
+  selectedRunId
+}: {
+  isReviewing: boolean;
+  onReview?: (runId: string, decision: DetailedAnalysisReviewAction) => void;
+  onReviewNoteChange?: (note: string) => void;
+  reviewError: string | null;
+  reviewNote: string;
+  reviewState: DetailedAnalysisReviewState | null;
+  runId: string;
+  selectedRunId: string | null;
+}): JSX.Element {
+  const isReference =
+    selectedRunId === runId && reviewState?.decision === "ACCEPTED_AS_REFERENCE";
+
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4">
+      <h4 className="text-sm font-semibold text-slate-950">人工审核</h4>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        AI 详细分析仅作为评估参考。最终评价内容需要由招聘人员核对、编辑并确认。
+      </p>
+      {reviewState ? (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          <p className="font-medium">{formatDetailedAnalysisReviewState(reviewState)}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            审核人：{reviewState.reviewer ?? "未记录"} · {formatDateTime(reviewState.reviewedAt)}
+          </p>
+          {reviewState.note ? <p className="mt-2 leading-6">{reviewState.note}</p> : null}
+          {isReference ? (
+            <p className="mt-2 text-xs font-medium text-emerald-700">已设为人工评估参考</p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">尚未审核该详细分析结果。</p>
+      )}
+      {onReview ? (
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-slate-700" htmlFor={`review-note-${runId}`}>
+            审核说明
+          </label>
+          <textarea
+            id={`review-note-${runId}`}
+            className="mt-2 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+            onChange={(event) => onReviewNoteChange?.(event.target.value)}
+            placeholder="要求重新分析或拒绝结果时必须填写说明。"
+            value={reviewNote}
+          />
+          {reviewError ? <p className="mt-2 text-sm text-rose-700">{reviewError}</p> : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={isReviewing}
+              onClick={() => onReview(runId, "ACCEPTED_AS_REFERENCE")}
+            >
+              {isReviewing ? "提交中…" : "采用为人工评估参考"}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 disabled:opacity-50"
+              disabled={isReviewing}
+              onClick={() => onReview(runId, "NEEDS_REVISION")}
+            >
+              要求重新分析
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 disabled:opacity-50"
+              disabled={isReviewing}
+              onClick={() => onReview(runId, "REJECTED")}
+            >
+              拒绝该结果
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function findDetailedAnalysisReviewState(
+  events: ResumeEvaluationEventDto[],
+  runId: string
+): DetailedAnalysisReviewState | null {
+  for (const event of events) {
+    const audit = parseDetailedAnalysisReviewAudit(event);
+
+    if (audit?.runId === runId) {
+      return {
+        decision: audit.decision,
+        note: event.note,
+        reviewedAt: event.createdAt,
+        reviewer: event.actor
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatDetailedAnalysisReviewState(
+  state: DetailedAnalysisReviewState | null
+): string {
+  if (!state) {
+    return "未审核";
+  }
+
+  if (state.decision === "ACCEPTED_AS_REFERENCE") {
+    return "已设为人工评估参考";
+  }
+
+  if (state.decision === "NEEDS_REVISION") {
+    return "需要重新分析";
+  }
+
+  return "该结果未被采用";
 }
 
 function DetailedDimensionSection({

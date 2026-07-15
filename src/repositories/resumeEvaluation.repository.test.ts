@@ -7,7 +7,11 @@ vi.mock("@/lib/prisma", () => ({
     resumeEvaluationResult: {
       create: vi.fn(),
       findUnique: vi.fn(),
-      update: vi.fn()
+      update: vi.fn(),
+      updateMany: vi.fn()
+    },
+    resumeEvaluationEvent: {
+      create: vi.fn()
     }
   }
 }));
@@ -225,5 +229,50 @@ describe("resumeEvaluationRepository", () => {
     expect(updateCall?.data).not.toHaveProperty("selectedRunId");
     expect(updateCall?.data).not.toHaveProperty("status");
     expect(updateCall?.data).not.toHaveProperty("latestRunId");
+  });
+
+  it("records detailed analysis review audit without changing manual evaluation fields", async () => {
+    vi.mocked(prisma.resumeEvaluationResult.updateMany).mockResolvedValueOnce({
+      count: 1
+    } as never);
+
+    await resumeEvaluationRepository.recordDetailedAnalysisReview(
+      "eval-1",
+      3,
+      {
+        auditFields: [
+          "detailed-analysis-review",
+          "runId:run-1",
+          "decision:ACCEPTED_AS_REFERENCE",
+          "reference:selected",
+          "selectedRunId"
+        ],
+        note: "Checked key evidence.",
+        reviewer: "Recruiter A",
+        selectedRunId: "run-1"
+      }
+    );
+
+    expect(prisma.resumeEvaluationResult.updateMany).toHaveBeenCalledWith({
+      data: {
+        revision: { increment: 1 },
+        selectedRunId: "run-1"
+      },
+      where: { id: "eval-1", revision: 3, status: "DRAFT" }
+    });
+    expect(prisma.resumeEvaluationEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actor: "Recruiter A",
+        eventType: "UPDATED",
+        evaluationId: "eval-1",
+        note: "Checked key evidence."
+      })
+    });
+
+    const update = vi.mocked(prisma.resumeEvaluationResult.updateMany).mock.calls[0]?.[0];
+    expect(update?.data).not.toHaveProperty("criterionResults");
+    expect(update?.data).not.toHaveProperty("overallNote");
+    expect(update?.data).not.toHaveProperty("status");
+    expect(update?.data).not.toHaveProperty("reviewerDecision");
   });
 });

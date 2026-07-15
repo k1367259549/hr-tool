@@ -85,6 +85,23 @@ export type DetailedAnalysisRunDto =
   | DetailedAnalysisRunSuccessDto
   | DetailedAnalysisRunFailureDto;
 
+/**
+ * Actions taken on immutable Detailed Analysis output. These are deliberately
+ * separate from ResumeReviewerDecision, which remains the final human
+ * evaluation decision on the evaluation master.
+ */
+export type DetailedAnalysisReviewAction =
+  | "ACCEPTED_AS_REFERENCE"
+  | "NEEDS_REVISION"
+  | "REJECTED";
+
+export type DetailedAnalysisReviewInput = {
+  decision: DetailedAnalysisReviewAction;
+  expectedRevision: number;
+  note?: string | null;
+  reviewer: string;
+};
+
 export type ResumeEvaluationRunSafeRecord = Prisma.ResumeEvaluationRunGetPayload<{
   select: {
     id: true;

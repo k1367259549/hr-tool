@@ -7,6 +7,11 @@ import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
+import {
+  createDetailedAnalysisReviewAuditFields,
+  parseDetailedAnalysisReviewAudit
+} from "@/lib/resume-screening/detailed-analysis-review";
+import { DetailedScreeningResultSchema } from "@/lib/resume-screening/schema";
 import type {
   EvaluationCriterion
 } from "@/types/evaluationTemplate";
@@ -26,6 +31,7 @@ import type {
   ResumeCriterionResult,
   ResumeEvaluationCriterionResultDto
 } from "@/types/resumeEvaluationResult";
+import type { DetailedAnalysisReviewInput } from "@/types/resumeEvaluationRun";
 import {
   EvaluationTemplateValidationError,
   parseEvaluationCriteriaJson
@@ -411,6 +417,131 @@ export const resumeEvaluationResultService = {
     }
   },
 
+  async reviewDetailedAnalysisRun(
+    evaluationId: string,
+    runId: string,
+    input: DetailedAnalysisReviewInput
+  ): Promise<ResumeEvaluationDetailDto> {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        if (!isDetailedAnalysisReviewAction(input.decision)) {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "详细分析审核 decision 参数无效。"
+          );
+        }
+
+        const reviewer = input.reviewer?.trim();
+
+        if (!reviewer) {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "reviewer 不能为空。"
+          );
+        }
+
+        const evaluation = await resumeEvaluationRepository.findDetailById(evaluationId, tx);
+
+        if (!evaluation) {
+          throw new ResumeEvaluationResultServiceError("NOT_FOUND", "评估记录不存在。");
+        }
+
+        if (evaluation.status === "REVIEWED") {
+          throw new ResumeEvaluationResultServiceError(
+            "CONFLICT",
+            "人工评估已审阅，请先重新开放人工评估后再更换详细分析参考。"
+          );
+        }
+
+        if (evaluation.revision !== input.expectedRevision) {
+          const duplicate = findLatestDetailedAnalysisReview(evaluation.events, runId);
+
+          if (isIdempotentDetailedAnalysisReview(evaluation, duplicate, input)) {
+            return toDetailDto(evaluation);
+          }
+
+          throw new ResumeEvaluationResultServiceError(
+            "CONFLICT",
+            "评估已被其他操作修改，请刷新后再提交详细分析审核。"
+          );
+        }
+
+        const run = await resumeEvaluationRunRepository.findRunForSelection(runId, tx);
+
+        if (!run) {
+          throw new ResumeEvaluationResultServiceError("NOT_FOUND", "详细分析 run 不存在。");
+        }
+
+        assertRunSelectableForEvaluation(evaluation, run);
+
+        const detailedRun = await resumeEvaluationRunRepository.findRunById(runId, tx);
+
+        if (!detailedRun || detailedRun.runType !== "AI") {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "只有 Detailed Analysis run 可以进入此审核流程。"
+          );
+        }
+
+        if (!DetailedScreeningResultSchema.safeParse(detailedRun.parsedOutputJson).success) {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "详细分析结果格式不完整，请重新运行详细分析。"
+          );
+        }
+
+        const note = input.note?.trim() || null;
+
+        if (
+          (input.decision === "NEEDS_REVISION" || input.decision === "REJECTED") &&
+          !note
+        ) {
+          throw new ResumeEvaluationResultServiceError(
+            "VALIDATION_ERROR",
+            "要求重新分析或拒绝结果时必须填写审核说明。"
+          );
+        }
+
+        const becameReference = input.decision === "ACCEPTED_AS_REFERENCE";
+        const updatedCount = await resumeEvaluationRepository.recordDetailedAnalysisReview(
+          evaluationId,
+          input.expectedRevision,
+          {
+            auditFields: createDetailedAnalysisReviewAuditFields(
+              runId,
+              input.decision,
+              becameReference
+            ),
+            note,
+            reviewer,
+            selectedRunId: becameReference ? runId : undefined
+          },
+          tx
+        );
+
+        if (updatedCount === 0) {
+          throw new ResumeEvaluationResultServiceError(
+            "CONFLICT",
+            "评估已被其他操作修改，请刷新后再提交详细分析审核。"
+          );
+        }
+
+        const updated = await resumeEvaluationRepository.findDetailById(evaluationId, tx);
+
+        if (!updated) {
+          throw new ResumeEvaluationResultServiceError(
+            "DATABASE_ERROR",
+            "记录详细分析审核后读取失败。"
+          );
+        }
+
+        return toDetailDto(updated);
+      });
+    } catch (error) {
+      throw normalizeError(error, "提交详细分析审核失败。");
+    }
+  },
+
   async submitReview(
     evaluationId: string,
     input: ResumeEvaluationSubmitReviewInput
@@ -608,6 +739,49 @@ function assertRunSelectableForEvaluation(
       "选择的评估 run 与当前评估上下文不匹配。"
     );
   }
+}
+
+function findLatestDetailedAnalysisReview(
+  events: ResumeEvaluationResultDetailRecord["events"],
+  runId: string
+) {
+  for (const event of events) {
+    const audit = parseDetailedAnalysisReviewAudit(event);
+
+    if (audit?.runId === runId) {
+      return { audit, event };
+    }
+  }
+
+  return null;
+}
+
+function isIdempotentDetailedAnalysisReview(
+  evaluation: ResumeEvaluationResultDetailRecord,
+  existing: ReturnType<typeof findLatestDetailedAnalysisReview>,
+  input: DetailedAnalysisReviewInput
+): boolean {
+  if (!existing || existing.audit.decision !== input.decision) {
+    return false;
+  }
+
+  if (existing.event.actor !== input.reviewer?.trim()) {
+    return false;
+  }
+
+  if ((existing.event.note ?? null) !== (input.note?.trim() || null)) {
+    return false;
+  }
+
+  return input.decision !== "ACCEPTED_AS_REFERENCE" || evaluation.selectedRunId === existing.audit.runId;
+}
+
+function isDetailedAnalysisReviewAction(value: unknown): value is DetailedAnalysisReviewInput["decision"] {
+  return (
+    value === "ACCEPTED_AS_REFERENCE" ||
+    value === "NEEDS_REVISION" ||
+    value === "REJECTED"
+  );
 }
 
 async function resolveEvaluationRevisionContext(

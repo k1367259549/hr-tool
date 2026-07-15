@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import {
   deriveDetailedAnalysisState,
+  DetailedAnalysisHistoryPanel,
   DetailedAnalysisResultPanel,
   DetailedAnalysisWorkspace
 } from "@/features/evaluation-result/components/EvaluationDetailPage";
@@ -139,6 +140,54 @@ describe("formal detailed analysis UI", () => {
     expect(text).toContain("Run 历史");
     expect(text).toContain("Detailed Analysis · 失败");
     expect(text).toContain("Provider timeout.");
+  });
+
+  it("shows detailed review states without filling manual criterion fields", () => {
+    const text = extractText(
+      DetailedAnalysisResultPanel({
+        analysis: createDetailedAnalysisRunDto(),
+        reviewState: {
+          decision: "ACCEPTED_AS_REFERENCE",
+          note: "Evidence checked.",
+          reviewedAt: "2026-07-04T14:00:00.000Z",
+          reviewer: "Recruiter A"
+        },
+        selectedRunId: "detailed-run-1"
+      })
+    );
+
+    expect(text).toContain("AI 详细分析仅作为评估参考");
+    expect(text).toContain("已设为人工评估参考");
+    expect(text).toContain("Recruiter A");
+    expect(text).toContain("Evidence checked.");
+    expect(text).not.toContain("人工逐项记录评价标准证据");
+  });
+
+  it("shows revision and rejection history states", () => {
+    const text = extractText(
+      DetailedAnalysisHistoryPanel({
+        reviewEvents: [
+          {
+            actor: "Recruiter A",
+            changedFields: [
+              "detailed-analysis-review",
+              "runId:detailed-run-1",
+              "decision:NEEDS_REVISION",
+              "reference:not-selected"
+            ],
+            createdAt: "2026-07-04T14:00:00.000Z",
+            evaluationId: "eval-1",
+            eventType: "UPDATED",
+            id: "event-1",
+            note: "Please add project ownership evidence."
+          }
+        ],
+        runs: [makeRun({ id: "detailed-run-1", runType: "AI" })]
+      })
+    );
+
+    expect(text).toContain("需要重新分析");
+    expect(text).not.toContain("idempotencyKey");
   });
 });
 
