@@ -10,7 +10,8 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
-      findUnique: vi.fn()
+      findUnique: vi.fn(),
+      update: vi.fn()
     }
   }
 }));
@@ -176,6 +177,100 @@ describe("resumeEvaluationRunRepository", () => {
         status: true,
         templateVersionId: true
       },
+      where: { id: "run-1" }
+    });
+  });
+
+  it("marks a run as SUCCEEDED with canonical parsed output and provider metadata", async () => {
+    const completedAt = new Date("2026-07-04T13:05:00.000Z");
+    const detailedOutput = {
+      schemaVersion: "m11-a.detailed.v1",
+      screeningMode: "DETAILED",
+      summary: "Detailed result persisted as canonical output."
+    };
+
+    vi.mocked(prisma.resumeEvaluationRun.update).mockResolvedValueOnce(
+      makeRun({
+        completedAt,
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: detailedOutput,
+        promptVersion: "1.0",
+        runType: "AI",
+        status: "SUCCEEDED"
+      }) as never
+    );
+
+    await resumeEvaluationRunRepository.completeRun("run-1", {
+      completedAt,
+      latencyMs: 1200,
+      modelName: "gpt-5.5",
+      modelProvider: "OPENAI_COMPATIBLE",
+      parsedOutputJson: detailedOutput,
+      promptVersion: "1.0",
+      rating: "PROCEED_TO_NEXT_STEP",
+      score: 82,
+      summary: "Detailed result persisted as canonical output."
+    });
+
+    expect(prisma.resumeEvaluationRun.update).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        completedAt,
+        errorCode: null,
+        errorMessage: null,
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: detailedOutput,
+        promptVersion: "1.0",
+        rating: "PROCEED_TO_NEXT_STEP",
+        score: 82,
+        status: "SUCCEEDED",
+        summary: "Detailed result persisted as canonical output."
+      }),
+      select: expect.not.objectContaining({
+        rawOutputJson: true
+      }),
+      where: { id: "run-1" }
+    });
+  });
+
+  it("marks a run as FAILED with safe error metadata", async () => {
+    const completedAt = new Date("2026-07-04T13:05:00.000Z");
+
+    vi.mocked(prisma.resumeEvaluationRun.update).mockResolvedValueOnce(
+      makeRun({
+        completedAt,
+        errorCode: "TIMEOUT",
+        errorMessage: "Provider timed out.",
+        status: "FAILED"
+      }) as never
+    );
+
+    await resumeEvaluationRunRepository.failRun("run-1", {
+      completedAt,
+      errorCode: "TIMEOUT",
+      errorMessage: "Provider timed out.",
+      latencyMs: 30000,
+      modelName: "gpt-5.5",
+      modelProvider: "OPENAI_COMPATIBLE",
+      promptVersion: "1.0"
+    });
+
+    expect(prisma.resumeEvaluationRun.update).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        completedAt,
+        errorCode: "TIMEOUT",
+        errorMessage: "Provider timed out.",
+        latencyMs: 30000,
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: Prisma.DbNull,
+        promptVersion: "1.0",
+        status: "FAILED"
+      }),
+      select: expect.not.objectContaining({
+        rawOutputJson: true
+      }),
       where: { id: "run-1" }
     });
   });

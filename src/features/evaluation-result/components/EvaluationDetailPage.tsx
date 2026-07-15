@@ -1,6 +1,8 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { useEvaluationDetail } from "@/features/evaluation-result/hooks/useEvaluationDetail";
@@ -9,7 +11,22 @@ import {
   evaluationStatusLabels,
   formatDateTime
 } from "@/features/evaluation-result/evaluationResultLabels";
+import {
+  quickScreeningEvidenceSourceLabels,
+  quickScreeningRecommendationLabels
+} from "@/lib/resume-screening/quick-screening-contract";
+import type { ApiResponse } from "@/types/api";
+import type {
+  DetailedAnalysisRunDto,
+  ResumeEvaluationRunDto
+} from "@/types/resumeEvaluationRun";
 import type { ResumeEvaluationCriterionResultDto } from "@/types/resumeEvaluationResult";
+import type {
+  DetailedScreeningResult,
+  ScreeningRecommendation
+} from "@/types/resume-screening";
+
+const detailedAnalysisTimeoutMs = 120_000;
 
 export function EvaluationDetailPage({
   evaluationId
@@ -18,6 +35,96 @@ export function EvaluationDetailPage({
 }): JSX.Element {
   const { error, evaluation, isLoading, isSaving, review, reopen } =
     useEvaluationDetail(evaluationId);
+  const [detailedAnalysis, setDetailedAnalysis] =
+    useState<DetailedAnalysisRunDto | null>(null);
+  const [detailedAnalysisError, setDetailedAnalysisError] = useState<string | null>(null);
+  const [detailedAnalysisTimedOut, setDetailedAnalysisTimedOut] = useState(false);
+  const [isDetailedAnalysisLoading, setIsDetailedAnalysisLoading] = useState(false);
+  const [isDetailedAnalysisRunning, setIsDetailedAnalysisRunning] = useState(false);
+  const [runHistory, setRunHistory] = useState<ResumeEvaluationRunDto[]>([]);
+
+  const reloadDetailedAnalysis = useCallback(async () => {
+    setIsDetailedAnalysisLoading(true);
+    setDetailedAnalysisError(null);
+    setDetailedAnalysisTimedOut(false);
+
+    try {
+      const runsResponse = await fetch(`/api/evaluations/${evaluationId}/runs`);
+      const runs = await readApiData<ResumeEvaluationRunDto[]>(
+        runsResponse,
+        "评估 run 历史加载失败。"
+      );
+
+      setRunHistory(runs);
+
+      const detailedResponse = await fetch(
+        `/api/evaluations/${evaluationId}/detailed-analysis`
+      );
+      const latestDetailed = await readApiData<DetailedAnalysisRunDto | null>(
+        detailedResponse,
+        "详细分析结果加载失败。"
+      );
+
+      setDetailedAnalysis(latestDetailed);
+    } catch (loadError) {
+      setDetailedAnalysisError(
+        loadError instanceof Error ? loadError.message : "详细分析结果加载失败。"
+      );
+    } finally {
+      setIsDetailedAnalysisLoading(false);
+    }
+  }, [evaluationId]);
+
+  useEffect(() => {
+    void reloadDetailedAnalysis();
+  }, [reloadDetailedAnalysis]);
+
+  const startDetailedAnalysis = useCallback(async () => {
+    setDetailedAnalysisError(null);
+    setDetailedAnalysisTimedOut(false);
+    setIsDetailedAnalysisRunning(true);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, detailedAnalysisTimeoutMs);
+
+    try {
+      const response = await fetch(`/api/evaluations/${evaluationId}/detailed-analysis`, {
+        method: "POST",
+        signal: controller.signal
+      });
+      const result = await readApiData<DetailedAnalysisRunDto>(
+        response,
+        "详细分析启动失败。"
+      );
+
+      if (!result.success) {
+        await reloadDetailedAnalysis();
+        setDetailedAnalysisError(result.error);
+        setDetailedAnalysisTimedOut(result.failureReason === "TIMEOUT");
+        return;
+      }
+
+      setDetailedAnalysis(result);
+      await reloadDetailedAnalysis();
+    } catch (runError) {
+      if (runError instanceof DOMException && runError.name === "AbortError") {
+        setDetailedAnalysisTimedOut(true);
+        setDetailedAnalysisError(
+          "详细分析请求超时。请稍后重试，或返回评估列表查看是否已生成 run。"
+        );
+        return;
+      }
+
+      setDetailedAnalysisError(
+        runError instanceof Error ? runError.message : "详细分析启动失败。"
+      );
+    } finally {
+      window.clearTimeout(timeoutId);
+      setIsDetailedAnalysisRunning(false);
+    }
+  }, [evaluationId, reloadDetailedAnalysis]);
 
   return (
     <div className="space-y-6">
@@ -69,6 +176,17 @@ export function EvaluationDetailPage({
               <MetaLine label="更新时间" value={formatDateTime(evaluation.updatedAt)} />
             </div>
           </section>
+
+          <DetailedAnalysisWorkspace
+            error={detailedAnalysisError}
+            isLoading={isDetailedAnalysisLoading}
+            isRunning={isDetailedAnalysisRunning}
+            latestDetailedAnalysis={detailedAnalysis}
+            onReload={() => void reloadDetailedAnalysis()}
+            onStart={() => void startDetailedAnalysis()}
+            runHistory={runHistory}
+            timedOut={detailedAnalysisTimedOut}
+          />
 
           {evaluation.overallNote ? (
             <section className="rounded-md border border-slate-200 bg-white p-5">
@@ -151,6 +269,479 @@ export function EvaluationDetailPage({
       ) : null}
     </div>
   );
+}
+
+type DetailedAnalysisWorkspaceProps = {
+  error: string | null;
+  isLoading: boolean;
+  isRunning: boolean;
+  latestDetailedAnalysis: DetailedAnalysisRunDto | null;
+  onReload: () => void;
+  onStart: () => void;
+  runHistory: ResumeEvaluationRunDto[];
+  timedOut: boolean;
+};
+
+type DetailedAnalysisReadiness = {
+  canStartDetailedAnalysis: boolean;
+  latestDetailedRun: ResumeEvaluationRunDto | null;
+  latestQuickRun: ResumeEvaluationRunDto | null;
+  startDisabledReason: string | null;
+};
+
+export function DetailedAnalysisWorkspace({
+  error,
+  isLoading,
+  isRunning,
+  latestDetailedAnalysis,
+  onReload,
+  onStart,
+  runHistory,
+  timedOut
+}: DetailedAnalysisWorkspaceProps): JSX.Element {
+  const readiness = deriveDetailedAnalysisState(runHistory);
+  const hasDetailedRun = runHistory.some((run) => run.runType === "AI");
+  const actionLabel = isRunning
+    ? "详细分析中…"
+    : hasDetailedRun
+      ? "重新运行详细分析"
+      : "开始详细分析";
+  const actionDisabled =
+    isLoading || isRunning || !readiness.canStartDetailedAnalysis;
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-sm font-medium uppercase text-slate-500">
+            Detailed Analysis
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">
+            详细分析执行区
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            基于已完成的 Quick Screening、岗位画像和简历解析文本生成可复核的岗位匹配、优势、风险、证据和面试问题。
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={actionDisabled}
+            onClick={onStart}
+          >
+            {actionLabel}
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isLoading || isRunning}
+            onClick={onReload}
+          >
+            刷新状态
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
+        <RunSummaryMetric
+          label="最新快速初筛"
+          value={formatRunSummary(readiness.latestQuickRun)}
+        />
+        <RunSummaryMetric
+          label="详细分析状态"
+          value={formatRunSummary(readiness.latestDetailedRun)}
+        />
+        <RunSummaryMetric
+          label="启动条件"
+          value={
+            readiness.canStartDetailedAnalysis
+              ? "满足，可以启动详细分析"
+              : readiness.startDisabledReason ?? "状态待确认"
+          }
+        />
+      </div>
+
+      {readiness.latestQuickRun ? (
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          最新快速初筛：
+          {formatScreeningRecommendation(readiness.latestQuickRun.rating)}，
+          分数 {readiness.latestQuickRun.score ?? "无"}。
+          {readiness.latestQuickRun.summary
+            ? ` ${readiness.latestQuickRun.summary}`
+            : ""}
+        </p>
+      ) : (
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          尚未找到 Quick Screening run。请先运行快速初筛，再启动详细分析。
+        </p>
+      )}
+
+      {error ? (
+        <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <p className="font-semibold">
+            {timedOut ? "详细分析请求超时" : "详细分析失败"}
+          </p>
+          <p className="mt-2 leading-6">{error}</p>
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          正在读取详细分析状态和 run 历史…
+        </div>
+      ) : null}
+
+      {latestDetailedAnalysis ? (
+        <DetailedAnalysisResultPanel analysis={latestDetailedAnalysis} />
+      ) : !isLoading ? (
+        <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+          暂无成功的详细分析结果。满足快速初筛前置条件后，可以点击“开始详细分析”生成 canonical DetailedScreeningResult。
+        </div>
+      ) : null}
+
+      <DetailedAnalysisHistoryPanel runs={runHistory} />
+    </section>
+  );
+}
+
+export function deriveDetailedAnalysisState(
+  runs: ResumeEvaluationRunDto[]
+): DetailedAnalysisReadiness {
+  const latestDetailedRun = runs.find((run) => run.runType === "AI") ?? null;
+  const runningDetailedRun =
+    runs.find((run) => run.runType === "AI" && run.status === "PENDING") ?? null;
+  const latestQuickRun = runs.find((run) => run.runType === "RULE_BASED") ?? null;
+
+  if (runningDetailedRun) {
+    return {
+      canStartDetailedAnalysis: false,
+      latestDetailedRun,
+      latestQuickRun,
+      startDisabledReason: "当前已有详细分析正在运行，请等待完成后再重试。"
+    };
+  }
+
+  if (!latestQuickRun) {
+    return {
+      canStartDetailedAnalysis: false,
+      latestDetailedRun,
+      latestQuickRun,
+      startDisabledReason: "缺少快速初筛结果，请先完成 Quick Screening。"
+    };
+  }
+
+  if (latestQuickRun.status === "PENDING") {
+    return {
+      canStartDetailedAnalysis: false,
+      latestDetailedRun,
+      latestQuickRun,
+      startDisabledReason: "快速初筛仍在运行，请完成后再启动详细分析。"
+    };
+  }
+
+  if (latestQuickRun.status === "FAILED") {
+    return {
+      canStartDetailedAnalysis: false,
+      latestDetailedRun,
+      latestQuickRun,
+      startDisabledReason: "快速初筛失败，请先重新运行快速初筛。"
+    };
+  }
+
+  if (!isDetailedAnalysisAllowedRecommendation(latestQuickRun.rating)) {
+    return {
+      canStartDetailedAnalysis: false,
+      latestDetailedRun,
+      latestQuickRun,
+      startDisabledReason:
+        "当前快速初筛建议不允许进入详细分析，请补充信息或重新初筛后再试。"
+    };
+  }
+
+  return {
+    canStartDetailedAnalysis: true,
+    latestDetailedRun,
+    latestQuickRun,
+    startDisabledReason: null
+  };
+}
+
+export function DetailedAnalysisResultPanel({
+  analysis
+}: {
+  analysis: DetailedAnalysisRunDto;
+}): JSX.Element {
+  if (!analysis.success) {
+    return (
+      <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        {analysis.error}
+      </div>
+    );
+  }
+
+  const result = analysis.screeningResult;
+
+  return (
+    <div className="mt-5 rounded-md border border-slate-200 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-medium uppercase text-slate-500">
+            Detailed Result
+          </p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-950">
+            详细分析已完成
+          </h3>
+          <p className="mt-2 break-words text-sm text-slate-500">
+            Run {analysis.runId} · {analysis.provider ?? "OPENAI_COMPATIBLE"} ·{" "}
+            {analysis.model ?? analysis.metadata.model ?? "未记录模型"}
+          </p>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+          耗时 {analysis.metadata.durationMs}ms · {formatDateTime(analysis.completedAt)}
+        </div>
+      </div>
+
+      <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
+        <RunSummaryMetric
+          label="详细建议"
+          value={formatScreeningRecommendation(result.recommendation)}
+        />
+        <RunSummaryMetric label="岗位匹配分" value={`${result.overallScore}/100`} />
+        <RunSummaryMetric label="Run 状态" value={analysis.status} />
+      </div>
+
+      <p className="mt-3 text-xs leading-5 text-slate-500">
+        该分数是岗位匹配辅助信号，不代表录用概率，也不用于候选人排名。
+      </p>
+
+      <div className="mt-5 space-y-5">
+        <DetailedListSection title="总结" items={[result.summary]} />
+        <DetailedDimensionSection dimensions={result.dimensions} />
+        <DetailedListSection title="优势" items={result.strengths} />
+        <DetailedListSection title="不足" items={result.weaknesses} />
+        <DetailedListSection
+          title="风险"
+          items={result.risks.map((item) => item.description)}
+        />
+        <DetailedListSection
+          title="待确认信息"
+          emptyText="暂无待确认信息，仍需招聘者人工复核。"
+          items={result.missingInformation}
+        />
+        <DetailedListSection title="证据" items={formatDetailedEvidence(result.evidence)} />
+        <DetailedListSection title="面试问题" items={result.interviewQuestions} />
+        <DetailedListSection title="下一步人工确认建议" items={[result.nextStep]} />
+      </div>
+
+      <p className="mt-5 text-xs leading-5 text-slate-500">
+        本结果为 AI/规则辅助草稿，需招聘者人工确认，不代表自动录用、自动拒绝或自动推进 Pipeline。
+      </p>
+    </div>
+  );
+}
+
+export function DetailedAnalysisHistoryPanel({
+  runs
+}: {
+  runs: ResumeEvaluationRunDto[];
+}): JSX.Element {
+  const relevantRuns = runs.filter(
+    (run) => run.runType === "RULE_BASED" || run.runType === "AI"
+  );
+
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4">
+      <h3 className="text-sm font-semibold text-slate-950">Run 历史</h3>
+      {relevantRuns.length > 0 ? (
+        <div className="mt-3 divide-y divide-slate-100">
+          {relevantRuns.map((run) => (
+            <div key={run.id} className="py-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className="font-medium text-slate-700">
+                  {formatRunType(run.runType)} · {formatRunStatus(run.status)}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {formatDateTime(run.createdAt)}
+                </span>
+              </div>
+              <p className="mt-1 break-words text-xs text-slate-500">
+                {run.modelProvider ?? "local"} / {run.modelName ?? "未记录模型"} ·{" "}
+                {formatScreeningRecommendation(run.rating)} · 分数{" "}
+                {run.score ?? "无"}
+              </p>
+              {run.summary ? (
+                <p className="mt-2 text-sm leading-6 text-slate-600">{run.summary}</p>
+              ) : null}
+              {run.errorMessage ? (
+                <p className="mt-2 text-sm leading-6 text-rose-700">
+                  错误：{run.errorMessage}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">暂无 Quick 或 Detailed run 记录。</p>
+      )}
+    </div>
+  );
+}
+
+function DetailedDimensionSection({
+  dimensions
+}: {
+  dimensions: DetailedScreeningResult["dimensions"];
+}): JSX.Element {
+  return (
+    <div className="border-t border-slate-200 pt-4">
+      <h4 className="text-sm font-semibold text-slate-950">维度分析</h4>
+      <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+        {dimensions.map((dimension) => (
+          <div key={dimension.key} className="min-w-0 rounded-md border border-slate-200 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="break-words text-sm font-semibold text-slate-950">
+                {dimension.name}
+              </p>
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                {dimension.score}/100 · {dimension.matchLevel}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {dimension.conclusion}
+            </p>
+            {dimension.missingInformation.length > 0 ? (
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                待确认：{dimension.missingInformation.join("；")}
+              </p>
+            ) : null}
+            {dimension.risks.length > 0 ? (
+              <p className="mt-1 text-xs leading-5 text-rose-700">
+                风险：{dimension.risks.join("；")}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailedListSection({
+  emptyText = "暂无记录，需人工补充确认。",
+  items,
+  title
+}: {
+  emptyText?: string;
+  items: string[];
+  title: string;
+}): JSX.Element {
+  return (
+    <div className="border-t border-slate-200 pt-4">
+      <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
+      {items.length > 0 ? (
+        <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+          {items.map((item) => (
+            <li key={item} className="break-words">
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function RunSummaryMetric({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="min-w-0 rounded-md border border-slate-200 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+async function readApiData<TData>(
+  response: Response,
+  fallbackMessage: string
+): Promise<TData> {
+  const json = (await response.json()) as ApiResponse<TData>;
+
+  if (!json.success) {
+    throw new Error(json.error?.message ?? fallbackMessage);
+  }
+
+  return json.data;
+}
+
+function formatRunSummary(run: ResumeEvaluationRunDto | null): string {
+  if (!run) {
+    return "无记录";
+  }
+
+  const score = run.score === null ? "无分数" : `${run.score}分`;
+
+  return `${formatRunStatus(run.status)} · ${formatScreeningRecommendation(run.rating)} · ${score}`;
+}
+
+function formatRunType(runType: ResumeEvaluationRunDto["runType"]): string {
+  if (runType === "RULE_BASED") {
+    return "Quick Screening";
+  }
+
+  if (runType === "AI") {
+    return "Detailed Analysis";
+  }
+
+  return "Mock Run";
+}
+
+function formatRunStatus(status: ResumeEvaluationRunDto["status"]): string {
+  if (status === "SUCCEEDED") {
+    return "已完成";
+  }
+
+  if (status === "FAILED") {
+    return "失败";
+  }
+
+  return "运行中";
+}
+
+function formatScreeningRecommendation(value: string | null): string {
+  if (isKnownScreeningRecommendation(value)) {
+    return quickScreeningRecommendationLabels[value];
+  }
+
+  return value ?? "无建议";
+}
+
+function isDetailedAnalysisAllowedRecommendation(value: string | null): boolean {
+  return value === "PROCEED_TO_NEXT_STEP" || value === "MANUAL_REVIEW";
+}
+
+function isKnownScreeningRecommendation(
+  value: string | null
+): value is ScreeningRecommendation {
+  return (
+    value !== null &&
+    Object.prototype.hasOwnProperty.call(quickScreeningRecommendationLabels, value)
+  );
+}
+
+function formatDetailedEvidence(
+  evidence: DetailedScreeningResult["evidence"]
+): string[] {
+  return evidence.map((item) => {
+    const source = quickScreeningEvidenceSourceLabels[item.source];
+    const relatedRequirement = item.relatedRequirement
+      ? `（${item.relatedRequirement}）`
+      : "";
+
+    return `${source}${relatedRequirement}：${item.text}`;
+  });
 }
 
 function CriterionResultRow({

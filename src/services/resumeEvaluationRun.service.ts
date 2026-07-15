@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
+import { MemoryEvaluationRunRepository } from "@/lib/evaluation/memory-run-repository";
+import { runEvaluationProvider } from "@/lib/evaluation/provider-runner";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
 import { prisma } from "@/lib/prisma";
+import {
+  adaptDetailedScreeningResultToLegacyEvaluationResult,
+  resolveDetailedScreeningResult
+} from "@/lib/resume-screening/detailed-screening-contract";
 import {
   resolveQuickScreeningResult,
   toQuickScreeningCompatibilityFields
@@ -10,19 +16,36 @@ import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
-import type { EvaluationProviderResult } from "@/lib/evaluation/provider-interface";
-import type { JsonValue } from "@/types/ai";
 import type {
+  EvaluationProvider,
+  EvaluationProviderMetadata,
+  EvaluationProviderResult
+} from "@/lib/evaluation/provider-interface";
+import type { JsonValue } from "@/types/ai";
+import type { ResumeEvaluationResult } from "@/types/evaluation-output";
+import type {
+  DetailedAnalysisRunDto,
   QuickScreeningRunDto,
   ResumeEvaluationRunDto,
   ResumeEvaluationRunSafeRecord
 } from "@/types/resumeEvaluationRun";
+import type { DetailedScreeningResult } from "@/types/resume-screening";
 
 export class ResumeEvaluationRunServiceError extends Error {
-  readonly code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND";
+  readonly code:
+    | "VALIDATION_ERROR"
+    | "DATABASE_ERROR"
+    | "NOT_FOUND"
+    | "CONFLICT"
+    | "CONFIG_ERROR";
 
   constructor(
-    code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND",
+    code:
+      | "VALIDATION_ERROR"
+      | "DATABASE_ERROR"
+      | "NOT_FOUND"
+      | "CONFLICT"
+      | "CONFIG_ERROR",
     message: string
   ) {
     super(message);
@@ -140,6 +163,182 @@ export const resumeEvaluationRunService = {
     }
   },
 
+  async createDetailedAnalysisRun(
+    evaluationId: string,
+    options: DetailedAnalysisRunOptions
+  ): Promise<DetailedAnalysisRunDto> {
+    try {
+      const context = await resolveRunContext(evaluationId);
+
+      assertDetailedAnalysisInputReady(context);
+
+      const runs = await resumeEvaluationRunRepository.listRunsByEvaluationId(evaluationId);
+
+      assertDetailedAnalysisPreconditions(runs);
+
+      if (options.provider.name !== "OPENAI_COMPATIBLE") {
+        throw new ResumeEvaluationRunServiceError(
+          "CONFIG_ERROR",
+          "详细分析需要配置 openai-compatible AI Provider。请设置 AI_PROVIDER=openai-compatible 以及对应 AI_BASE_URL / AI_API_KEY。"
+        );
+      }
+
+      const pendingRun = await resumeEvaluationRunRepository.createRun({
+        evaluationId: context.evaluation.id,
+        jobProfileId: context.evaluation.jobProfileId,
+        jobProfileVersion: context.evaluation.jobProfileVersion,
+        modelProvider: options.provider.name,
+        parsedSnapshotId: context.evaluation.parsedSnapshotId,
+        resumeId: context.evaluation.resumeId,
+        resumeRevisionId: context.evaluation.resumeRevisionId,
+        runType: "AI",
+        status: "PENDING",
+        templateVersionId: context.evaluation.templateVersionId
+      });
+
+      const now = options.now ?? (() => new Date());
+      const providerResult = await runEvaluationProvider({
+        idGenerator: options.idGenerator,
+        input: createDetailedProviderInput(context, pendingRun.id),
+        now,
+        provider: options.provider,
+        repository: new MemoryEvaluationRunRepository({
+          now
+        })
+      });
+
+      if (!providerResult.success) {
+        await resumeEvaluationRunRepository.failRun(pendingRun.id, {
+          completedAt: getCompletedAt(providerResult.metadata, now),
+          errorCode: providerResult.failureReason,
+          errorMessage: providerResult.error,
+          latencyMs: providerResult.metadata?.durationMs ?? null,
+          modelName: providerResult.metadata?.model ?? options.provider.version,
+          modelProvider: providerResult.metadata?.providerName ?? options.provider.name,
+          promptVersion: providerResult.metadata?.promptVersion ?? null
+        });
+
+        return {
+          error: providerResult.error,
+          evaluationId,
+          failureReason: providerResult.failureReason,
+          metadata: providerResult.metadata,
+          runId: pendingRun.id,
+          success: false
+        };
+      }
+
+      const detailed = resolveDetailedProviderResult(
+        providerResult.detailedScreeningResult
+      );
+
+      if (!detailed.success) {
+        await resumeEvaluationRunRepository.failRun(pendingRun.id, {
+          completedAt: getCompletedAt(providerResult.metadata, now),
+          errorCode: "VALIDATION_ERROR",
+          errorMessage: detailed.error,
+          latencyMs: providerResult.metadata.durationMs,
+          modelName: providerResult.metadata.model ?? options.provider.version,
+          modelProvider: providerResult.metadata.providerName,
+          promptVersion: providerResult.metadata.promptVersion ?? null
+        });
+
+        return {
+          error: detailed.error,
+          evaluationId,
+          failureReason: "VALIDATION_ERROR",
+          metadata: providerResult.metadata,
+          runId: pendingRun.id,
+          success: false
+        };
+      }
+
+      const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(
+        detailed.result
+      );
+      const completedRun = await resumeEvaluationRunRepository.completeRun(
+        pendingRun.id,
+        createDetailedCompletionInput(
+          detailed.result,
+          legacyOutput,
+          providerResult.metadata
+        )
+      );
+      const storedDetailed = resolveDetailedProviderResult(
+        completedRun.parsedOutputJson
+      );
+
+      if (!storedDetailed.success) {
+        await resumeEvaluationRunRepository.failRun(pendingRun.id, {
+          completedAt: getCompletedAt(providerResult.metadata, now),
+          errorCode: "VALIDATION_ERROR",
+          errorMessage: storedDetailed.error,
+          latencyMs: providerResult.metadata.durationMs,
+          modelName: providerResult.metadata.model ?? options.provider.version,
+          modelProvider: providerResult.metadata.providerName,
+          promptVersion: providerResult.metadata.promptVersion ?? null
+        });
+
+        return {
+          error: storedDetailed.error,
+          evaluationId,
+          failureReason: "VALIDATION_ERROR",
+          metadata: providerResult.metadata,
+          runId: pendingRun.id,
+          success: false
+        };
+      }
+
+      return toDetailedAnalysisRunDto(
+        completedRun,
+        storedDetailed.result,
+        legacyOutput,
+        providerResult.metadata
+      );
+    } catch (error) {
+      throw normalizeError(error, "创建详细分析 run 失败。");
+    }
+  },
+
+  async getLatestDetailedAnalysisRunByEvaluationId(
+    evaluationId: string
+  ): Promise<DetailedAnalysisRunDto | null> {
+    try {
+      const runs = await resumeEvaluationRunRepository.listRunsByEvaluationId(evaluationId);
+      const latestDetailedRun = runs.find(
+        (run) => run.runType === "AI" && run.status === "SUCCEEDED"
+      );
+
+      if (!latestDetailedRun) {
+        return null;
+      }
+
+      const detailed = resolveDetailedProviderResult(
+        latestDetailedRun.parsedOutputJson
+      );
+
+      if (!detailed.success) {
+        throw new ResumeEvaluationRunServiceError(
+          "VALIDATION_ERROR",
+          "历史详细分析结果格式不完整，请重新运行详细分析。"
+        );
+      }
+
+      const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(
+        detailed.result
+      );
+
+      return toDetailedAnalysisRunDto(
+        latestDetailedRun,
+        detailed.result,
+        legacyOutput,
+        createHistoricalDetailedMetadata(latestDetailedRun)
+      );
+    } catch (error) {
+      throw normalizeError(error, "查询最新详细分析 run 失败。");
+    }
+  },
+
   async listRunsByEvaluationId(evaluationId: string): Promise<ResumeEvaluationRunDto[]> {
     try {
       const runs = await resumeEvaluationRunRepository.listRunsByEvaluationId(evaluationId);
@@ -183,6 +382,22 @@ type QuickScreeningRunContext = {
   jobUnderstandingSummary: string;
   resumeText: string;
 };
+
+type DetailedAnalysisRunOptions = {
+  provider: EvaluationProvider;
+  now?: () => Date;
+  idGenerator?: () => string;
+};
+
+type DetailedScreeningResolution =
+  | {
+      success: true;
+      result: DetailedScreeningResult;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 async function resolveRunContext(evaluationId: string): Promise<QuickScreeningRunContext> {
   return prisma.$transaction(async (tx) => {
@@ -241,6 +456,216 @@ async function resolveRunContext(evaluationId: string): Promise<QuickScreeningRu
       resumeText: revision.parsedSnapshot.parsedText ?? ""
     };
   });
+}
+
+function assertDetailedAnalysisInputReady(context: QuickScreeningRunContext): void {
+  if (!context.resumeText.trim()) {
+    throw new ResumeEvaluationRunServiceError(
+      "VALIDATION_ERROR",
+      "简历解析文本为空，无法运行详细分析。"
+    );
+  }
+
+  if (!context.jobDescription.trim()) {
+    throw new ResumeEvaluationRunServiceError(
+      "VALIDATION_ERROR",
+      "岗位描述为空，无法运行详细分析。"
+    );
+  }
+}
+
+function assertDetailedAnalysisPreconditions(
+  runs: ResumeEvaluationRunSafeRecord[]
+): void {
+  const runningDetailedRun = runs.find(
+    (run) => run.runType === "AI" && run.status === "PENDING"
+  );
+
+  if (runningDetailedRun) {
+    throw new ResumeEvaluationRunServiceError(
+      "CONFLICT",
+      "当前已有详细分析正在运行，请等待完成后再重试。"
+    );
+  }
+
+  const latestQuickRun = runs.find((run) => run.runType === "RULE_BASED");
+
+  if (!latestQuickRun) {
+    throw new ResumeEvaluationRunServiceError(
+      "CONFLICT",
+      "缺少快速初筛结果，请先完成 Quick Screening。"
+    );
+  }
+
+  if (latestQuickRun.status === "PENDING") {
+    throw new ResumeEvaluationRunServiceError(
+      "CONFLICT",
+      "快速初筛仍在运行，请完成后再启动详细分析。"
+    );
+  }
+
+  if (latestQuickRun.status === "FAILED") {
+    throw new ResumeEvaluationRunServiceError(
+      "CONFLICT",
+      "快速初筛失败，请先重新运行快速初筛。"
+    );
+  }
+
+  const quickResult = resolveQuickScreeningResult(
+    latestQuickRun.parsedOutputJson
+  );
+
+  if (!quickResult.success) {
+    throw new ResumeEvaluationRunServiceError(
+      "VALIDATION_ERROR",
+      "快速初筛结果格式不完整，请重新运行快速初筛。"
+    );
+  }
+
+  if (
+    quickResult.result.recommendation !== "PROCEED_TO_NEXT_STEP" &&
+    quickResult.result.recommendation !== "MANUAL_REVIEW"
+  ) {
+    throw new ResumeEvaluationRunServiceError(
+      "CONFLICT",
+      "当前快速初筛建议不允许进入详细分析，请补充信息或重新初筛后再试。"
+    );
+  }
+}
+
+function createDetailedProviderInput(
+  context: QuickScreeningRunContext,
+  runId: string
+) {
+  return {
+    evaluationTemplateVersionId: context.evaluation.templateVersionId,
+    jobDescription: context.jobDescription,
+    jobTitle: context.jobTitle,
+    jobProfileId: context.evaluation.jobProfileId,
+    jobUnderstandingJson: context.jobUnderstandingJson,
+    jobUnderstandingSummary: context.jobUnderstandingSummary,
+    resumeText: context.resumeText,
+    runId,
+    templateVersionId: context.evaluation.templateVersionId
+  };
+}
+
+function resolveDetailedProviderResult(
+  value: unknown
+): DetailedScreeningResolution {
+  const detailed = resolveDetailedScreeningResult(value);
+
+  if (!detailed.success) {
+    return {
+      error:
+        detailed.message ||
+        "历史详细分析结果格式不完整，请重新运行详细分析。",
+      success: false
+    };
+  }
+
+  return {
+    result: detailed.result,
+    success: true
+  };
+}
+
+function createDetailedCompletionInput(
+  detailedResult: DetailedScreeningResult,
+  legacyOutput: ResumeEvaluationResult,
+  metadata: EvaluationProviderMetadata
+) {
+  return {
+    completedAt: new Date(metadata.completedAt),
+    evidenceJson: legacyOutput.evidence as unknown as Prisma.InputJsonValue,
+    interviewQuestionsJson:
+      legacyOutput.interviewQuestions as unknown as Prisma.InputJsonValue,
+    latencyMs: metadata.durationMs,
+    modelName: metadata.model ?? metadata.providerVersion,
+    modelProvider: metadata.providerName,
+    parsedOutputJson: detailedResult as unknown as Prisma.InputJsonValue,
+    phoneScreenQuestionsJson:
+      legacyOutput.interviewQuestions as unknown as Prisma.InputJsonValue,
+    promptVersion: metadata.promptVersion ?? null,
+    rating: detailedResult.recommendation,
+    riskFlagsJson: legacyOutput.risks as unknown as Prisma.InputJsonValue,
+    score: detailedResult.overallScore,
+    strengthsJson: legacyOutput.strengths as unknown as Prisma.InputJsonValue,
+    summary: detailedResult.summary,
+    weaknessesJson: legacyOutput.weaknesses as unknown as Prisma.InputJsonValue
+  };
+}
+
+function getCompletedAt(
+  metadata: EvaluationProviderMetadata | undefined,
+  now: () => Date
+): Date {
+  return metadata?.completedAt ? new Date(metadata.completedAt) : now();
+}
+
+function toDetailedAnalysisRunDto(
+  run: ResumeEvaluationRunSafeRecord,
+  screeningResult: DetailedScreeningResult,
+  legacyOutput: ResumeEvaluationResult,
+  metadata: EvaluationProviderMetadata
+): DetailedAnalysisRunDto {
+  const runDto = toDto(run);
+
+  return {
+    completedAt: runDto.completedAt,
+    createdAt: runDto.createdAt,
+    evaluationId: runDto.evaluationId,
+    metadata,
+    mode: "DETAILED",
+    model: runDto.modelName,
+    provider: runDto.modelProvider,
+    result: legacyOutput,
+    run: runDto,
+    runId: runDto.id,
+    screeningResult,
+    status: runDto.status,
+    success: true
+  };
+}
+
+function createHistoricalDetailedMetadata(
+  run: ResumeEvaluationRunSafeRecord
+): EvaluationProviderMetadata {
+  const startedAt = run.createdAt.toISOString();
+  const completedAt = run.completedAt?.toISOString() ?? startedAt;
+
+  return {
+    completedAt,
+    durationMs: Math.max(0, new Date(completedAt).getTime() - new Date(startedAt).getTime()),
+    model: run.modelName ?? undefined,
+    promptFile: "prompts/detailed-analysis.md",
+    promptVersion: run.promptVersion ?? undefined,
+    providerName: mapHistoricalProviderName(run.modelProvider),
+    providerVersion: run.modelName ?? run.modelProvider ?? "historical-detailed-analysis",
+    startedAt
+  };
+}
+
+function mapHistoricalProviderName(
+  value: string | null
+): EvaluationProviderMetadata["providerName"] {
+  if (value === "MOCK") {
+    return "MOCK";
+  }
+
+  if (value === "RULE_BASED") {
+    return "RULE_BASED";
+  }
+
+  if (value === "LUMINAI") {
+    return "LUMINAI";
+  }
+
+  if (value === "GPT_5_5") {
+    return "GPT_5_5";
+  }
+
+  return "OPENAI_COMPATIBLE";
 }
 
 function createJobUnderstandingContext(jobProfile: {

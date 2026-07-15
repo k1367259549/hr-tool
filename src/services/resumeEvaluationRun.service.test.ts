@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runEvaluationProvider } from "@/lib/evaluation/provider-runner";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
 import { prisma } from "@/lib/prisma";
-import { QuickScreeningResultSchema } from "@/lib/resume-screening/schema";
+import { adaptDetailedScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/detailed-screening-contract";
+import {
+  DetailedScreeningResultSchema,
+  QuickScreeningResultSchema
+} from "@/lib/resume-screening/schema";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
@@ -12,6 +17,14 @@ import {
 } from "@/services/resumeEvaluationRun.service";
 import type { ResumeEvaluationResultDetailRecord } from "@/types/resumeEvaluationResult";
 import type { ResumeEvaluationRunSafeRecord } from "@/types/resumeEvaluationRun";
+import type {
+  EvaluationProvider,
+  EvaluationProviderMetadata
+} from "@/lib/evaluation/provider-interface";
+import type {
+  DetailedScreeningResult,
+  QuickScreeningResult
+} from "@/types/resume-screening";
 
 const transactionClient = {
   candidateResume: {
@@ -45,10 +58,16 @@ vi.mock("@/repositories/jobProfile.repository", () => ({
 
 vi.mock("@/repositories/resumeEvaluationRun.repository", () => ({
   resumeEvaluationRunRepository: {
+    completeRun: vi.fn(),
     createRun: vi.fn(),
+    failRun: vi.fn(),
     findLatestSuccessfulRun: vi.fn(),
     listRunsByEvaluationId: vi.fn()
   }
+}));
+
+vi.mock("@/lib/evaluation/provider-runner", () => ({
+  runEvaluationProvider: vi.fn()
 }));
 
 vi.mock("@/repositories/resumeRevision.repository", () => ({
@@ -506,3 +525,587 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
     expect(createInput).not.toHaveProperty("autoHire");
   });
 });
+
+describe("resumeEvaluationRunService.createDetailedAnalysisRun", () => {
+  beforeEach(() => {
+    setupDetailedAnalysisContext();
+  });
+
+  it("creates a persisted AI detailed analysis run from the latest allowed quick screening run", async () => {
+    const detailedResult = makeValidDetailedScreeningResult();
+    const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(detailedResult);
+    const metadata = makeProviderMetadata();
+
+    vi.mocked(runEvaluationProvider).mockResolvedValueOnce({
+      detailedScreeningResult: detailedResult,
+      metadata,
+      output: legacyOutput,
+      runId: "detailed-run-1",
+      success: true
+    });
+    vi.mocked(resumeEvaluationRunRepository.completeRun).mockResolvedValueOnce(
+      makeRun({
+        completedAt: new Date(metadata.completedAt),
+        id: "detailed-run-1",
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: detailedResult,
+        promptVersion: "1.0",
+        rating: detailedResult.recommendation,
+        runType: "AI",
+        score: detailedResult.overallScore,
+        status: "SUCCEEDED",
+        summary: detailedResult.summary
+      })
+    );
+
+    const result = await resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+      provider: makeOpenAIProvider()
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.mode).toBe("DETAILED");
+      expect(result.runId).toBe("detailed-run-1");
+      expect(result.screeningResult).toEqual(detailedResult);
+      expect(result.result.overallScore).toBe(detailedResult.overallScore);
+      expect(DetailedScreeningResultSchema.safeParse(result.screeningResult).success).toBe(
+        true
+      );
+    }
+
+    expect(resumeEvaluationRunRepository.createRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationId: "eval-1",
+        modelProvider: "OPENAI_COMPATIBLE",
+        runType: "AI",
+        status: "PENDING"
+      })
+    );
+    expect(runEvaluationProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          jobDescription: expect.stringContaining("Need a backend engineer"),
+          jobProfileId: "job-1",
+          jobUnderstandingJson: expect.objectContaining({
+            mustHaveRequirements: ["typescript", "api", "postgres"]
+          }),
+          resumeText: expect.stringContaining("Built backend"),
+          runId: "detailed-run-1"
+        }),
+        provider: expect.objectContaining({
+          name: "OPENAI_COMPATIBLE"
+        })
+      })
+    );
+    expect(resumeEvaluationRunRepository.completeRun).toHaveBeenCalledWith(
+      "detailed-run-1",
+      expect.objectContaining({
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: detailedResult,
+        rating: detailedResult.recommendation,
+        score: detailedResult.overallScore,
+        summary: detailedResult.summary
+      })
+    );
+    expect(resumeEvaluationRunRepository.failRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects detailed analysis when quick screening is missing", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "缺少快速初筛结果，请先完成 Quick Screening。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+    expect(runEvaluationProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects detailed analysis while quick screening is still pending", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        id: "quick-run-1",
+        runType: "RULE_BASED",
+        status: "PENDING"
+      })
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "快速初筛仍在运行，请完成后再启动详细分析。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects detailed analysis after a failed quick screening run", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        errorCode: "VALIDATION_ERROR",
+        errorMessage: "Quick screening failed.",
+        id: "quick-run-1",
+        runType: "RULE_BASED",
+        status: "FAILED"
+      })
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "快速初筛失败，请先重新运行快速初筛。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects damaged quick screening output before calling the provider", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        id: "quick-run-1",
+        parsedOutputJson: { recommendation: "UNKNOWN" },
+        runType: "RULE_BASED",
+        status: "SUCCEEDED"
+      })
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "快速初筛结果格式不完整，请重新运行快速初筛。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects quick recommendations that do not allow detailed analysis", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeQuickRun(
+        makeValidQuickScreeningResult({
+          recommendation: "NOT_ENOUGH_EVIDENCE",
+          shouldEnterDetailedAnalysis: "no"
+        })
+      )
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "当前快速初筛建议不允许进入详细分析，请补充信息或重新初筛后再试。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+  });
+
+  it("blocks concurrent pending detailed analysis runs", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        id: "detailed-pending",
+        runType: "AI",
+        status: "PENDING"
+      }),
+      makeQuickRun()
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "当前已有详细分析正在运行，请等待完成后再重试。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+  });
+
+  it("marks the detailed run as FAILED when the provider fails", async () => {
+    const metadata = makeProviderMetadata({
+      completedAt: "2026-07-04T13:01:30.000Z",
+      durationMs: 30_000
+    });
+
+    vi.mocked(runEvaluationProvider).mockResolvedValueOnce({
+      error: "OpenAI-compatible provider timed out.",
+      failureReason: "TIMEOUT",
+      metadata,
+      runId: "detailed-run-1",
+      success: false
+    });
+    vi.mocked(resumeEvaluationRunRepository.failRun).mockResolvedValueOnce(
+      makeRun({
+        completedAt: new Date(metadata.completedAt),
+        errorCode: "TIMEOUT",
+        errorMessage: "OpenAI-compatible provider timed out.",
+        id: "detailed-run-1",
+        runType: "AI",
+        status: "FAILED"
+      })
+    );
+
+    const result = await resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+      provider: makeOpenAIProvider()
+    });
+
+    expect(result).toMatchObject({
+      error: "OpenAI-compatible provider timed out.",
+      failureReason: "TIMEOUT",
+      runId: "detailed-run-1",
+      success: false
+    });
+    expect(resumeEvaluationRunRepository.failRun).toHaveBeenCalledWith(
+      "detailed-run-1",
+      expect.objectContaining({
+        errorCode: "TIMEOUT",
+        errorMessage: "OpenAI-compatible provider timed out.",
+        modelProvider: "OPENAI_COMPATIBLE"
+      })
+    );
+    expect(resumeEvaluationRunRepository.completeRun).not.toHaveBeenCalled();
+  });
+
+  it("marks the detailed run as FAILED when canonical detailed output is invalid", async () => {
+    const detailedResult = makeValidDetailedScreeningResult();
+    const metadata = makeProviderMetadata();
+
+    vi.mocked(runEvaluationProvider).mockResolvedValueOnce({
+      detailedScreeningResult: {
+        ...detailedResult,
+        recommendation: "AUTO_HIRE"
+      } as never,
+      metadata,
+      output: adaptDetailedScreeningResultToLegacyEvaluationResult(detailedResult),
+      runId: "detailed-run-1",
+      success: true
+    });
+    vi.mocked(resumeEvaluationRunRepository.failRun).mockResolvedValueOnce(
+      makeRun({
+        completedAt: new Date(metadata.completedAt),
+        errorCode: "VALIDATION_ERROR",
+        errorMessage: "Detailed screening result does not match schema.",
+        id: "detailed-run-1",
+        runType: "AI",
+        status: "FAILED"
+      })
+    );
+
+    const result = await resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+      provider: makeOpenAIProvider()
+    });
+
+    expect(result).toMatchObject({
+      failureReason: "VALIDATION_ERROR",
+      runId: "detailed-run-1",
+      success: false
+    });
+    expect(resumeEvaluationRunRepository.failRun).toHaveBeenCalledWith(
+      "detailed-run-1",
+      expect.objectContaining({
+        errorCode: "VALIDATION_ERROR"
+      })
+    );
+    expect(resumeEvaluationRunRepository.completeRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("resumeEvaluationRunService.getLatestDetailedAnalysisRunByEvaluationId", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns the latest successful detailed analysis run from canonical parsed output", async () => {
+    const detailedResult = makeValidDetailedScreeningResult({
+      overallScore: 86,
+      recommendation: "MANUAL_REVIEW"
+    });
+
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        completedAt: new Date("2026-07-04T14:01:00.000Z"),
+        id: "detailed-run-latest",
+        modelName: "gpt-5.5",
+        modelProvider: "OPENAI_COMPATIBLE",
+        parsedOutputJson: detailedResult,
+        promptVersion: "1.0",
+        rating: "MANUAL_REVIEW",
+        runType: "AI",
+        score: 86,
+        status: "SUCCEEDED",
+        summary: detailedResult.summary
+      }),
+      makeQuickRun()
+    ]);
+
+    const result =
+      await resumeEvaluationRunService.getLatestDetailedAnalysisRunByEvaluationId(
+        "eval-1"
+      );
+
+    expect(result?.success).toBe(true);
+
+    if (result?.success) {
+      expect(result.runId).toBe("detailed-run-latest");
+      expect(result.screeningResult).toEqual(detailedResult);
+      expect(result.result.overallScore).toBe(86);
+      expect(result.metadata.providerName).toBe("OPENAI_COMPATIBLE");
+      expect(result.metadata.model).toBe("gpt-5.5");
+    }
+  });
+
+  it("returns null when there is no successful detailed analysis run", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeQuickRun()
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.getLatestDetailedAnalysisRunByEvaluationId("eval-1")
+    ).resolves.toBeNull();
+  });
+
+  it("rejects damaged historical detailed output with a controlled validation error", async () => {
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        id: "detailed-run-damaged",
+        parsedOutputJson: { schemaVersion: "unknown" },
+        runType: "AI",
+        status: "SUCCEEDED"
+      })
+    ]);
+
+    await expect(
+      resumeEvaluationRunService.getLatestDetailedAnalysisRunByEvaluationId("eval-1")
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "历史详细分析结果格式不完整，请重新运行详细分析。"
+    });
+  });
+});
+
+function setupDetailedAnalysisContext(
+  runs: ResumeEvaluationRunSafeRecord[] = [makeQuickRun()]
+): void {
+  vi.clearAllMocks();
+  transactionClient.candidateResume.update.mockClear();
+  transactionClient.resumeEvaluationResult.update.mockClear();
+  vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValue(makeEvaluation());
+  vi.mocked(resumeRevisionRepository.findRevisionWithSnapshotById).mockResolvedValue({
+    id: "revision-1",
+    parsedSnapshot: {
+      id: "snapshot-1",
+      parsedText:
+        "Built backend TypeScript API services with postgres and workflow automation for HR tools."
+    },
+    resumeId: "resume-1"
+  } as never);
+  vi.mocked(jobProfileRepository.findById).mockResolvedValue(makeJobProfile() as never);
+  vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValue(runs);
+  vi.mocked(resumeEvaluationRunRepository.createRun).mockResolvedValue(
+    makeRun({
+      id: "detailed-run-1",
+      modelProvider: "OPENAI_COMPATIBLE",
+      runType: "AI",
+      status: "PENDING"
+    })
+  );
+}
+
+function makeOpenAIProvider(): EvaluationProvider {
+  return {
+    name: "OPENAI_COMPATIBLE",
+    version: "openai-compatible-test-v1",
+    async evaluate() {
+      throw new Error("Provider should be called through runEvaluationProvider mock.");
+    }
+  };
+}
+
+function makeProviderMetadata(
+  overrides: Partial<EvaluationProviderMetadata> = {}
+): EvaluationProviderMetadata {
+  return {
+    completedAt: "2026-07-04T13:01:00.000Z",
+    durationMs: 1000,
+    model: "gpt-5.5",
+    promptFile: "prompts/detailed-analysis.md",
+    promptVersion: "1.0",
+    providerName: "OPENAI_COMPATIBLE" as const,
+    providerVersion: "openai-compatible-test-v1",
+    startedAt: "2026-07-04T13:00:59.000Z",
+    ...overrides
+  };
+}
+
+function makeQuickRun(
+  quickResult: QuickScreeningResult = makeValidQuickScreeningResult()
+): ResumeEvaluationRunSafeRecord {
+  return makeRun({
+    id: "quick-run-1",
+    parsedOutputJson: quickResult,
+    rating: quickResult.recommendation,
+    runType: "RULE_BASED",
+    score: quickResult.overallScore,
+    status: "SUCCEEDED",
+    summary: quickResult.summary
+  });
+}
+
+function makeValidQuickScreeningResult(
+  overrides: Partial<QuickScreeningResult> = {}
+): QuickScreeningResult {
+  return {
+    dimensions: [
+      {
+        conclusion: "Backend API experience maps to the role.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Backend API experience",
+            source: "RESUME",
+            text: "Built backend TypeScript API services."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "JD Match",
+        risks: [],
+        score: 78
+      }
+    ],
+    educationPass: "unclear",
+    evidence: [
+      {
+        id: "ev_backend_api",
+        relatedRequirement: "Backend API experience",
+        source: "RESUME",
+        text: "Built backend TypeScript API services."
+      }
+    ],
+    fullTimeBachelor: "unclear",
+    interviewQuestions: ["Please describe your backend API ownership."],
+    mainRisk: "Availability still needs confirmation.",
+    missingInformation: ["Availability is not visible."],
+    nextStep: "Proceed to detailed analysis and recruiter review.",
+    notes: null,
+    overallScore: 78,
+    priority: "A",
+    reasons: ["Backend API evidence is present."],
+    recommendation: "PROCEED_TO_NEXT_STEP",
+    risks: [
+      {
+        description: "Availability still needs confirmation.",
+        severity: "medium",
+        title: "Availability missing"
+      }
+    ],
+    robotArmRelevance: "unclear",
+    schemaVersion: "m11-a.quick.v1",
+    screeningMode: "QUICK",
+    shouldEnterDetailedAnalysis: "yes",
+    strengths: ["Backend API evidence is present."],
+    summary: "Quick screening found enough backend evidence to enter detailed analysis.",
+    ...overrides
+  };
+}
+
+function makeValidDetailedScreeningResult(
+  overrides: Partial<DetailedScreeningResult> = {}
+): DetailedScreeningResult {
+  return {
+    dimensions: [
+      {
+        conclusion:
+          "The resume explicitly names TypeScript API service work that maps to the backend JD.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "TypeScript backend API experience",
+            source: "RESUME",
+            text: "Built backend TypeScript API services."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "JD Match",
+        risks: [],
+        score: 86
+      },
+      {
+        conclusion:
+          "The HR workflow project context is relevant to the recruiting tooling role.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Backend workflow services",
+            source: "RESUME",
+            text: "Built backend TypeScript API services."
+          }
+        ],
+        key: "experience_quality",
+        matchLevel: "high",
+        missingInformation: ["Availability is not visible."],
+        name: "Experience Quality",
+        risks: ["Ownership depth needs interview confirmation."],
+        score: 82
+      }
+    ],
+    evidence: [
+      {
+        id: "ev_backend_api",
+        relatedRequirement: "TypeScript backend API experience",
+        source: "RESUME",
+        text: "Built backend TypeScript API services."
+      },
+      {
+        id: "ev_missing_availability",
+        relatedRequirement: "Internship availability",
+        source: "MISSING_INFORMATION",
+        text: "Availability and weekly attendance are not visible in the resume."
+      }
+    ],
+    interviewQuestions: [
+      "Please walk through the backend API project and your direct responsibilities.",
+      "What is your availability, internship duration, and weekly attendance?"
+    ],
+    missingInformation: ["Availability and weekly attendance are not visible."],
+    nextStep: "Recruiter should manually confirm ownership depth and availability.",
+    notes: null,
+    overallScore: 84,
+    recommendation: "PROCEED_TO_NEXT_STEP",
+    risks: [
+      {
+        description: "Availability is missing and must be confirmed before proceeding.",
+        severity: "medium",
+        title: "Availability missing"
+      }
+    ],
+    schemaVersion: "m11-a.detailed.v1",
+    screeningMode: "DETAILED",
+    strengths: ["Backend TypeScript API experience maps to the JD."],
+    summary:
+      "The candidate has relevant backend TypeScript API evidence for the role, while availability and ownership depth still need recruiter confirmation.",
+    weaknesses: ["Availability and exact ownership depth are not explicit."],
+    ...overrides
+  };
+}

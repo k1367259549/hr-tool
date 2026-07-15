@@ -3,23 +3,47 @@ import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createGetRequest, createJsonRequest, readApiJson } from "../setup/testDb";
+import { adaptDetailedScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/detailed-screening-contract";
 import { QuickScreeningResultSchema } from "@/lib/resume-screening/schema";
-import type { ResumeEvaluationRunDto } from "@/types/resumeEvaluationRun";
-import type { QuickScreeningResult } from "@/types/resume-screening";
+import type {
+  DetailedAnalysisRunDto,
+  ResumeEvaluationRunDto
+} from "@/types/resumeEvaluationRun";
+import type {
+  DetailedScreeningResult,
+  QuickScreeningResult
+} from "@/types/resume-screening";
 
 const serviceMock = vi.hoisted(() => ({
+  createDetailedAnalysisRun: vi.fn(),
   createMockEvaluationRun: vi.fn(),
   createQuickScreeningRun: vi.fn(),
+  getLatestDetailedAnalysisRunByEvaluationId: vi.fn(),
   getLatestSuccessfulRunByEvaluationId: vi.fn(),
   listRunsByEvaluationId: vi.fn()
 }));
 
+const providerRuntimeConfigMock = vi.hoisted(() => ({
+  createEvaluationProviderFromRuntimeConfig: vi.fn(),
+  readEvaluationProviderRuntimeConfig: vi.fn()
+}));
+
 vi.mock("@/services/resumeEvaluationRun.service", () => ({
   ResumeEvaluationRunServiceError: class ResumeEvaluationRunServiceError extends Error {
-    readonly code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND";
+    readonly code:
+      | "VALIDATION_ERROR"
+      | "DATABASE_ERROR"
+      | "NOT_FOUND"
+      | "CONFLICT"
+      | "CONFIG_ERROR";
 
     constructor(
-      code: "VALIDATION_ERROR" | "DATABASE_ERROR" | "NOT_FOUND",
+      code:
+        | "VALIDATION_ERROR"
+        | "DATABASE_ERROR"
+        | "NOT_FOUND"
+        | "CONFLICT"
+        | "CONFIG_ERROR",
       message: string
     ) {
       super(message);
@@ -28,6 +52,13 @@ vi.mock("@/services/resumeEvaluationRun.service", () => ({
     }
   },
   resumeEvaluationRunService: serviceMock
+}));
+
+vi.mock("@/lib/evaluation/provider-runtime-config", () => ({
+  createEvaluationProviderFromRuntimeConfig:
+    providerRuntimeConfigMock.createEvaluationProviderFromRuntimeConfig,
+  readEvaluationProviderRuntimeConfig:
+    providerRuntimeConfigMock.readEvaluationProviderRuntimeConfig
 }));
 
 const baseRun: ResumeEvaluationRunDto = {
@@ -368,6 +399,196 @@ describe("POST /api/evaluations/[id]/quick-screening", () => {
   });
 });
 
+describe("GET /api/evaluations/[id]/detailed-analysis", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns the latest successful detailed analysis run with canonical screeningResult", async () => {
+    const detailedAnalysis = createDetailedAnalysisRunDto();
+
+    vi.mocked(serviceMock.getLatestDetailedAnalysisRunByEvaluationId).mockResolvedValueOnce(
+      detailedAnalysis
+    );
+
+    const { GET } = await import(
+      "@/app/api/evaluations/[id]/detailed-analysis/route"
+    );
+    const response = await GET(
+      createGetRequest("http://localhost/api/evaluations/eval-1/detailed-analysis"),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<DetailedAnalysisRunDto | null>(response);
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.getLatestDetailedAnalysisRunByEvaluationId).toHaveBeenCalledWith(
+      "eval-1"
+    );
+    expect(json.data).toMatchObject({
+      success: true,
+      screeningResult: {
+        overallScore: detailedAnalysis.success
+          ? detailedAnalysis.screeningResult.overallScore
+          : undefined,
+        screeningMode: "DETAILED"
+      }
+    });
+    expect(JSON.stringify(json.data)).not.toContain("rawOutputJson");
+    expect(JSON.stringify(json.data)).not.toContain("parsedText");
+    expect(JSON.stringify(json.data)).not.toContain("secret");
+  });
+
+  it("returns null when no successful detailed analysis run exists", async () => {
+    vi.mocked(serviceMock.getLatestDetailedAnalysisRunByEvaluationId).mockResolvedValueOnce(
+      null
+    );
+
+    const { GET } = await import(
+      "@/app/api/evaluations/[id]/detailed-analysis/route"
+    );
+    const response = await GET(
+      createGetRequest("http://localhost/api/evaluations/eval-1/detailed-analysis"),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<DetailedAnalysisRunDto | null>(response);
+
+    expect(response.status).toBe(200);
+    expect(json.data).toBeNull();
+  });
+});
+
+describe("POST /api/evaluations/[id]/detailed-analysis", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(providerRuntimeConfigMock.readEvaluationProviderRuntimeConfig).mockReturnValue(
+      {
+        provider: "openai-compatible",
+        luminAIConfig: {
+          apiKey: "secret-key-that-must-not-leak",
+          baseUrl: "https://luminai.test",
+          model: "gpt-5.5",
+          timeoutMs: 30_000
+        },
+        safeSummary: {
+          baseUrl: "https://luminai.test",
+          hasApiKey: true,
+          model: "gpt-5.5",
+          provider: "openai-compatible",
+          requiresApiKey: true,
+          timeoutMs: 30_000
+        }
+      }
+    );
+    vi.mocked(providerRuntimeConfigMock.createEvaluationProviderFromRuntimeConfig).mockReturnValue(
+      {
+        name: "OPENAI_COMPATIBLE",
+        version: "openai-compatible-test-v1",
+        evaluate: vi.fn()
+      }
+    );
+  });
+
+  it("creates a detailed analysis run through runtime config and the service layer", async () => {
+    const detailedAnalysis = createDetailedAnalysisRunDto();
+
+    vi.mocked(serviceMock.createDetailedAnalysisRun).mockResolvedValueOnce(
+      detailedAnalysis
+    );
+
+    const { POST } = await import(
+      "@/app/api/evaluations/[id]/detailed-analysis/route"
+    );
+    const response = await POST(
+      createJsonRequest("http://localhost/api/evaluations/eval-1/detailed-analysis", {}),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<DetailedAnalysisRunDto>(response);
+
+    expect(response.status).toBe(201);
+    expect(providerRuntimeConfigMock.readEvaluationProviderRuntimeConfig).toHaveBeenCalled();
+    expect(providerRuntimeConfigMock.createEvaluationProviderFromRuntimeConfig).toHaveBeenCalled();
+    expect(serviceMock.createDetailedAnalysisRun).toHaveBeenCalledWith(
+      "eval-1",
+      expect.objectContaining({
+        provider: expect.objectContaining({
+          name: "OPENAI_COMPATIBLE"
+        })
+      })
+    );
+    expect(json.data).toMatchObject({
+      mode: "DETAILED",
+      runId: "detailed-run-1",
+      screeningResult: {
+        screeningMode: "DETAILED"
+      },
+      success: true
+    });
+    expect(json.data?.success && json.data.result.overallScore).toBe(
+      json.data?.success && json.data.screeningResult.overallScore
+    );
+    expect(JSON.stringify(json.data)).not.toContain("secret-key-that-must-not-leak");
+    expect(JSON.stringify(json.data)).not.toContain("rawProviderResponse");
+    expect(JSON.stringify(json.data)).not.toContain("promptBody");
+  });
+
+  it("returns controlled provider failures as a failed detailed-analysis DTO", async () => {
+    vi.mocked(serviceMock.createDetailedAnalysisRun).mockResolvedValueOnce({
+      error: "OpenAI-compatible provider timed out.",
+      evaluationId: "eval-1",
+      failureReason: "TIMEOUT",
+      metadata: {
+        completedAt: "2026-07-04T13:02:00.000Z",
+        durationMs: 30_000,
+        model: "gpt-5.5",
+        providerName: "OPENAI_COMPATIBLE",
+        providerVersion: "openai-compatible-test-v1",
+        startedAt: "2026-07-04T13:01:30.000Z"
+      },
+      runId: "detailed-run-failed",
+      success: false
+    });
+
+    const { POST } = await import(
+      "@/app/api/evaluations/[id]/detailed-analysis/route"
+    );
+    const response = await POST(
+      createJsonRequest("http://localhost/api/evaluations/eval-1/detailed-analysis", {}),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<DetailedAnalysisRunDto>(response);
+
+    expect(response.status).toBe(200);
+    expect(json.data).toMatchObject({
+      error: "OpenAI-compatible provider timed out.",
+      failureReason: "TIMEOUT",
+      runId: "detailed-run-failed",
+      success: false
+    });
+  });
+
+  it("maps quick-screening precondition conflicts to 409", async () => {
+    const { ResumeEvaluationRunServiceError } = await import(
+      "@/services/resumeEvaluationRun.service"
+    );
+    vi.mocked(serviceMock.createDetailedAnalysisRun).mockRejectedValueOnce(
+      new ResumeEvaluationRunServiceError(
+        "CONFLICT",
+        "缺少快速初筛结果，请先完成 Quick Screening。"
+      )
+    );
+
+    const { POST } = await import(
+      "@/app/api/evaluations/[id]/detailed-analysis/route"
+    );
+    const response = await POST(
+      createJsonRequest("http://localhost/api/evaluations/eval-1/detailed-analysis", {}),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+
+    expect(response.status).toBe(409);
+  });
+});
+
 const quickScreeningResult: QuickScreeningResult = {
   dimensions: [
     {
@@ -422,6 +643,110 @@ const quickScreeningResult: QuickScreeningResult = {
   summary: "Rule-based quick screening summary."
 };
 
+function createDetailedAnalysisRunDto(): DetailedAnalysisRunDto {
+  const screeningResult = createDetailedScreeningResult();
+  const result = adaptDetailedScreeningResultToLegacyEvaluationResult(screeningResult);
+
+  return {
+    completedAt: "2026-07-04T13:02:00.000Z",
+    createdAt: "2026-07-04T13:01:00.000Z",
+    evaluationId: "eval-1",
+    metadata: {
+      completedAt: "2026-07-04T13:02:00.000Z",
+      durationMs: 60_000,
+      model: "gpt-5.5",
+      promptFile: "prompts/detailed-analysis.md",
+      promptVersion: "1.0",
+      providerName: "OPENAI_COMPATIBLE",
+      providerVersion: "openai-compatible-test-v1",
+      startedAt: "2026-07-04T13:01:00.000Z"
+    },
+    mode: "DETAILED",
+    model: "gpt-5.5",
+    provider: "OPENAI_COMPATIBLE",
+    result,
+    run: {
+      ...baseRun,
+      completedAt: "2026-07-04T13:02:00.000Z",
+      createdAt: "2026-07-04T13:01:00.000Z",
+      id: "detailed-run-1",
+      modelName: "gpt-5.5",
+      modelProvider: "OPENAI_COMPATIBLE",
+      promptVersion: "1.0",
+      rating: screeningResult.recommendation,
+      runType: "AI",
+      score: screeningResult.overallScore,
+      status: "SUCCEEDED",
+      summary: screeningResult.summary
+    },
+    runId: "detailed-run-1",
+    screeningResult,
+    status: "SUCCEEDED",
+    success: true
+  };
+}
+
+function createDetailedScreeningResult(): DetailedScreeningResult {
+  return {
+    dimensions: [
+      {
+        conclusion:
+          "The resume explicitly names TypeScript API service work that maps to the backend JD.",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Backend API experience",
+            source: "RESUME",
+            text: "Built TypeScript API services for recruiting workflows."
+          }
+        ],
+        key: "job_match",
+        matchLevel: "high",
+        missingInformation: [],
+        name: "JD Match",
+        risks: [],
+        score: 86
+      }
+    ],
+    evidence: [
+      {
+        id: "ev_backend_api",
+        relatedRequirement: "Backend API experience",
+        source: "RESUME",
+        text: "Built TypeScript API services for recruiting workflows."
+      },
+      {
+        id: "ev_missing_availability",
+        relatedRequirement: "Internship availability",
+        source: "MISSING_INFORMATION",
+        text: "Availability and weekly attendance are not visible in the resume."
+      }
+    ],
+    interviewQuestions: [
+      "Please walk through the API project and your direct responsibilities.",
+      "What is your availability and weekly attendance?"
+    ],
+    missingInformation: ["Availability and weekly attendance are not visible."],
+    nextStep: "Recruiter should manually confirm ownership depth and availability.",
+    notes: null,
+    overallScore: 86,
+    recommendation: "MANUAL_REVIEW",
+    risks: [
+      {
+        description: "Availability is missing and must be confirmed before proceeding.",
+        severity: "medium",
+        title: "Availability missing"
+      }
+    ],
+    schemaVersion: "m11-a.detailed.v1",
+    screeningMode: "DETAILED",
+    strengths: ["Backend TypeScript API experience maps to the JD."],
+    summary:
+      "The candidate has relevant backend TypeScript API evidence for the role, while availability and ownership depth still need recruiter confirmation.",
+    weaknesses: ["Availability and exact ownership depth are not explicit."]
+  };
+}
+
 describe("EvaluationRun API route boundaries", () => {
   it("does not import Prisma, AI providers, prompts, or selected/latest run writes", () => {
     const routeSource = readFileSync(
@@ -455,7 +780,20 @@ describe("EvaluationRun API route boundaries", () => {
       ),
       "utf8"
     );
-    const combinedSource = `${routeSource}\n${latestRouteSource}\n${quickScreeningRouteSource}`;
+    const detailedAnalysisRouteSource = readFileSync(
+      join(
+        process.cwd(),
+        "src",
+        "app",
+        "api",
+        "evaluations",
+        "[id]",
+        "detailed-analysis",
+        "route.ts"
+      ),
+      "utf8"
+    );
+    const combinedSource = `${routeSource}\n${latestRouteSource}\n${quickScreeningRouteSource}\n${detailedAnalysisRouteSource}`;
 
     expect(combinedSource).not.toContain("@/lib/prisma");
     expect(combinedSource).not.toContain("@/ai");

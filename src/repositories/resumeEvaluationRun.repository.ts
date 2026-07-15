@@ -41,6 +41,34 @@ export type ResumeEvaluationRunSelectionRecord =
     select: typeof runSelectionSelect;
   }>;
 
+type ResumeEvaluationRunCompleteInput = {
+  completedAt: Date;
+  evidenceJson?: Prisma.InputJsonValue | null;
+  interviewQuestionsJson?: Prisma.InputJsonValue | null;
+  latencyMs?: number | null;
+  modelName?: string | null;
+  modelProvider?: string | null;
+  parsedOutputJson?: Prisma.InputJsonValue | null;
+  phoneScreenQuestionsJson?: Prisma.InputJsonValue | null;
+  promptVersion?: string | null;
+  rating?: string | null;
+  riskFlagsJson?: Prisma.InputJsonValue | null;
+  score?: number | null;
+  strengthsJson?: Prisma.InputJsonValue | null;
+  summary?: string | null;
+  weaknessesJson?: Prisma.InputJsonValue | null;
+};
+
+type ResumeEvaluationRunFailInput = {
+  completedAt: Date;
+  errorCode: string | null;
+  errorMessage: string;
+  latencyMs?: number | null;
+  modelName?: string | null;
+  modelProvider?: string | null;
+  promptVersion?: string | null;
+};
+
 export const resumeEvaluationRunRepository = {
   async createRun(
     input: CreateResumeEvaluationRunInput,
@@ -98,6 +126,59 @@ export const resumeEvaluationRunRepository = {
   ): Promise<ResumeEvaluationRunSelectionRecord | null> {
     return client.resumeEvaluationRun.findUnique({
       select: runSelectionSelect,
+      where: { id: runId }
+    });
+  },
+
+  async completeRun(
+    runId: string,
+    input: ResumeEvaluationRunCompleteInput,
+    client: CandidateDbClient = prisma
+  ): Promise<ResumeEvaluationRunSafeRecord> {
+    return client.resumeEvaluationRun.update({
+      data: {
+        completedAt: input.completedAt,
+        errorCode: null,
+        errorMessage: null,
+        evidenceJson: toNullableJson(input.evidenceJson),
+        interviewQuestionsJson: toNullableJson(input.interviewQuestionsJson),
+        latencyMs: input.latencyMs ?? null,
+        modelName: input.modelName ?? null,
+        modelProvider: input.modelProvider ?? null,
+        parsedOutputJson: toNullableJson(input.parsedOutputJson),
+        phoneScreenQuestionsJson: toNullableJson(input.phoneScreenQuestionsJson),
+        promptVersion: input.promptVersion ?? null,
+        rating: input.rating ?? null,
+        riskFlagsJson: toNullableJson(input.riskFlagsJson),
+        score: input.score ?? null,
+        status: "SUCCEEDED",
+        strengthsJson: toNullableJson(input.strengthsJson),
+        summary: input.summary ?? null,
+        weaknessesJson: toNullableJson(input.weaknessesJson)
+      },
+      select: runSafeSelect,
+      where: { id: runId }
+    });
+  },
+
+  async failRun(
+    runId: string,
+    input: ResumeEvaluationRunFailInput,
+    client: CandidateDbClient = prisma
+  ): Promise<ResumeEvaluationRunSafeRecord> {
+    return client.resumeEvaluationRun.update({
+      data: {
+        completedAt: input.completedAt,
+        errorCode: input.errorCode,
+        errorMessage: input.errorMessage,
+        latencyMs: input.latencyMs ?? null,
+        modelName: input.modelName ?? null,
+        modelProvider: input.modelProvider ?? null,
+        parsedOutputJson: Prisma.DbNull,
+        promptVersion: input.promptVersion ?? null,
+        status: "FAILED"
+      },
+      select: runSafeSelect,
       where: { id: runId }
     });
   },

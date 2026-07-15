@@ -3,7 +3,11 @@ import type {
   ResumeEvaluationRunStatus,
   ResumeEvaluationRunType
 } from "@prisma/client";
+import type { EvaluationProviderMetadata } from "@/lib/evaluation/provider-interface";
+import type { ResumeEvaluationResult } from "@/types/evaluation-output";
+import type { EvaluationRunFailureReason } from "@/types/evaluation-run-lifecycle";
 import type {
+  DetailedScreeningResult,
   QuickScreeningResult,
   ScreeningRecommendation
 } from "@/types/resume-screening";
@@ -44,6 +48,42 @@ export type QuickScreeningRunDto = {
   screeningResult: QuickScreeningResult;
   result: QuickScreeningResultDto;
 };
+
+export type DetailedAnalysisRunFailureReason =
+  | EvaluationRunFailureReason
+  | "CONFIG_ERROR"
+  | "CONFLICT"
+  | "DATABASE_ERROR"
+  | "NOT_FOUND";
+
+export type DetailedAnalysisRunSuccessDto = {
+  success: true;
+  evaluationId: string;
+  runId: string;
+  mode: "DETAILED";
+  status: ResumeEvaluationRunStatus;
+  provider: string | null;
+  model: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  run: ResumeEvaluationRunDto;
+  screeningResult: DetailedScreeningResult;
+  result: ResumeEvaluationResult;
+  metadata: EvaluationProviderMetadata;
+};
+
+export type DetailedAnalysisRunFailureDto = {
+  success: false;
+  evaluationId?: string;
+  runId?: string;
+  failureReason: DetailedAnalysisRunFailureReason;
+  error: string;
+  metadata?: EvaluationProviderMetadata;
+};
+
+export type DetailedAnalysisRunDto =
+  | DetailedAnalysisRunSuccessDto
+  | DetailedAnalysisRunFailureDto;
 
 export type ResumeEvaluationRunSafeRecord = Prisma.ResumeEvaluationRunGetPayload<{
   select: {
