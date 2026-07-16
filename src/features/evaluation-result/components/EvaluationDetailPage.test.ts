@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import {
+  AiReferenceStatusNotice,
+  CriterionAiReferencePanel,
   deriveDetailedAnalysisState,
   DetailedAnalysisHistoryPanel,
   DetailedAnalysisResultPanel,
@@ -11,6 +13,7 @@ import type {
   DetailedAnalysisRunDto,
   ResumeEvaluationRunDto
 } from "@/types/resumeEvaluationRun";
+import type { CriterionAiReferenceDto } from "@/types/resumeEvaluationResult";
 import type { DetailedScreeningResult } from "@/types/resume-screening";
 
 type ReactElementLike = ReactElement & {
@@ -189,6 +192,50 @@ describe("formal detailed analysis UI", () => {
     expect(text).toContain("需要重新分析");
     expect(text).not.toContain("idempotencyKey");
   });
+
+  it("renders read-only criterion AI references with evidence, risks, missing information, and questions", () => {
+    const text = extractText(CriterionAiReferencePanel({ reference: createAiReference() }));
+
+    expect(text).toContain("AI 逐项参考");
+    expect(text).toContain("Backend API");
+    expect(text).toContain("88/100");
+    expect(text).toContain("Backend API conclusion");
+    expect(text).toContain("简历证据");
+    expect(text).toContain("AI 提示的风险");
+    expect(text).toContain("待确认信息");
+    expect(text).toContain("面试问题");
+    expect(text).not.toContain("一键采纳");
+  });
+
+  it("renders selected-run compatibility warnings without changing manual fields", () => {
+    const noSelectedText = extractText(AiReferenceStatusNotice({ reference: undefined }));
+    const legacyText = extractText(
+      AiReferenceStatusNotice({
+        reference: {
+          criterionReferences: [],
+          selectedRunSummary: null,
+          status: "LEGACY_SELECTED_RUN",
+          warning:
+            "当前选中的详细分析不包含评价标准逐项结果。请重新运行详细分析并审核采用后，再查看逐项 AI 参考。"
+        }
+      })
+    );
+    const invalidText = extractText(
+      AiReferenceStatusNotice({
+        reference: {
+          criterionReferences: [],
+          selectedRunSummary: null,
+          status: "INVALID_SELECTED_RUN",
+          warning: "当前 AI 详细分析结果格式不完整，无法安全提供逐项参考。请重新运行详细分析。"
+        }
+      })
+    );
+
+    expect(noSelectedText).toContain("尚未选择 AI 详细分析作为人工评估参考");
+    expect(legacyText).toContain("不包含评价标准逐项结果");
+    expect(invalidText).toContain("无法安全提供逐项参考");
+    expect(CriterionAiReferencePanel({ reference: null })).toBeTruthy();
+  });
 });
 
 function makeRun(overrides: Partial<ResumeEvaluationRunDto> = {}): ResumeEvaluationRunDto {
@@ -306,6 +353,27 @@ function createDetailedScreeningResult(): DetailedScreeningResult {
     summary:
       "The candidate has relevant backend TypeScript API evidence for the role, while availability and ownership depth still need recruiter confirmation.",
     weaknesses: ["Availability and exact ownership depth are not explicit."]
+  };
+}
+
+function createAiReference(): CriterionAiReferenceDto {
+  return {
+    conclusion: "Backend API conclusion",
+    criterionKey: "backend-api",
+    criterionLabel: "Backend API",
+    evidence: [
+      {
+        id: "ev_backend_api",
+        relatedRequirement: "Backend API experience",
+        source: "RESUME",
+        text: "Built TypeScript API services."
+      }
+    ],
+    interviewQuestions: ["Which API decisions did you own?"],
+    missingInformation: ["Availability is not stated."],
+    risks: ["Ownership depth needs confirmation."],
+    score: 88,
+    status: "AVAILABLE"
   };
 }
 

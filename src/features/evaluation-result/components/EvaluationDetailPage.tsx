@@ -23,6 +23,8 @@ import type {
   ResumeEvaluationRunDto
 } from "@/types/resumeEvaluationRun";
 import type {
+  CriterionAiReferenceDto,
+  EvaluationAiReferenceDto,
   ResumeEvaluationCriterionResultDto,
   ResumeEvaluationEventDto
 } from "@/types/resumeEvaluationResult";
@@ -259,10 +261,15 @@ export function EvaluationDetailPage({
 
           <section className="rounded-md border border-slate-200 bg-white p-5">
             <h2 className="text-lg font-semibold text-slate-950">评估维度</h2>
+            <AiReferenceStatusNotice reference={evaluation.aiReference} />
             {evaluation.criterionResults.length > 0 ? (
               <div className="mt-4 divide-y divide-slate-100">
                 {evaluation.criterionResults.map((cr) => (
-                  <CriterionResultRow key={cr.criterionKey} result={cr} />
+                  <CriterionResultRow
+                    aiReference={findCriterionAiReference(evaluation.aiReference, cr.criterionKey)}
+                    key={cr.criterionKey}
+                    result={cr}
+                  />
                 ))}
               </div>
             ) : (
@@ -1000,8 +1007,10 @@ function formatDetailedEvidence(
 }
 
 function CriterionResultRow({
+  aiReference,
   result
 }: {
+  aiReference: CriterionAiReferenceDto | null;
   result: ResumeEvaluationCriterionResultDto;
 }): JSX.Element {
   return (
@@ -1022,8 +1031,113 @@ function CriterionResultRow({
           ))}
         </ul>
       ) : null}
+      <CriterionAiReferencePanel reference={aiReference} />
     </div>
   );
+}
+
+export function AiReferenceStatusNotice({
+  reference
+}: {
+  reference: EvaluationAiReferenceDto | undefined;
+}): JSX.Element {
+  const message = reference?.warning ?? "尚未选择 AI 详细分析作为人工评估参考。人工评价仍可独立完成。";
+
+  if (reference?.status === "AVAILABLE") {
+    return (
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        以下内容来自已由招聘人员选定的 AI 详细分析，仅作为人工评价参考。最终评价需要由招聘人员核对、编辑并确认。
+      </p>
+    );
+  }
+
+  return <p className="mt-3 text-sm leading-6 text-slate-500">{message}</p>;
+}
+
+export function CriterionAiReferencePanel({
+  reference
+}: {
+  reference: CriterionAiReferenceDto | null;
+}): JSX.Element {
+  if (!reference || reference.status !== "AVAILABLE") {
+    return (
+      <p className="mt-3 text-xs leading-5 text-slate-500">
+        当前 AI 详细分析中没有该评价标准的有效逐项结果。请由招聘人员根据简历和岗位要求独立完成评价。
+      </p>
+    );
+  }
+
+  return (
+    <aside className="mt-4 min-w-0 border-l-2 border-sky-200 pl-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">AI 逐项参考</h3>
+          <p className="mt-1 break-words text-xs text-slate-500">{reference.criterionLabel}</p>
+        </div>
+        <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-800">
+          {reference.score}/100
+        </span>
+      </div>
+      <p className="mt-2 break-words text-sm leading-6 text-slate-700">{reference.conclusion}</p>
+      <AiReferenceList title="证据" items={formatAiReferenceEvidence(reference.evidence)} />
+      <AiReferenceList title="AI 提示的风险" items={reference.risks} />
+      <AiReferenceList
+        emptyText="暂无待确认信息，仍需招聘人员人工核对。"
+        title="待确认信息"
+        items={reference.missingInformation}
+      />
+      <AiReferenceList title="面试问题" items={reference.interviewQuestions} />
+    </aside>
+  );
+}
+
+function AiReferenceList({
+  emptyText = "暂无记录。",
+  items,
+  title
+}: {
+  emptyText?: string;
+  items: string[];
+  title: string;
+}): JSX.Element {
+  return (
+    <div className="mt-3 min-w-0">
+      <h4 className="text-xs font-medium text-slate-600">{title}</h4>
+      {items.length > 0 ? (
+        <ul className="mt-1 list-inside list-disc space-y-1 text-sm leading-6 text-slate-600">
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`} className="break-words">
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-xs leading-5 text-slate-500">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function findCriterionAiReference(
+  reference: EvaluationAiReferenceDto | undefined,
+  criterionKey: string
+): CriterionAiReferenceDto | null {
+  if (reference?.status !== "AVAILABLE") {
+    return null;
+  }
+
+  return reference.criterionReferences.find((item) => item.criterionKey === criterionKey) ?? null;
+}
+
+function formatAiReferenceEvidence(
+  evidence: CriterionAiReferenceDto["evidence"]
+): string[] {
+  return evidence.map((item) => {
+    const source = quickScreeningEvidenceSourceLabels[item.source];
+    const relatedRequirement = item.relatedRequirement ? `（${item.relatedRequirement}）` : "";
+
+    return `${source}${relatedRequirement}：${item.text}`;
+  });
 }
 
 function MetaItem({ label, value }: { label: string; value: string }): JSX.Element {

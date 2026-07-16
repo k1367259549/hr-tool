@@ -4,6 +4,7 @@ import type {
   ResumeEvaluationStatus,
   ResumeReviewerDecision
 } from "@prisma/client";
+import type { ScreeningEvidence } from "@/types/resume-screening";
 
 export type {
   ResumeEvaluationStatus,
@@ -97,7 +98,47 @@ export type ResumeEvaluationCriterionResultDto = {
   recruiterNote: string | null;
 };
 
+export type CriterionAiReferenceStatus = "AVAILABLE" | "UNAVAILABLE" | "INVALID";
+
+export type CriterionAiReferenceDto = {
+  criterionKey: string;
+  criterionLabel: string;
+  status: CriterionAiReferenceStatus;
+  score: number;
+  conclusion: string;
+  evidence: ScreeningEvidence[];
+  risks: string[];
+  missingInformation: string[];
+  interviewQuestions: string[];
+};
+
+export type EvaluationAiReferenceStatus =
+  | "NO_SELECTED_RUN"
+  | "AVAILABLE"
+  | "LEGACY_SELECTED_RUN"
+  | "INVALID_SELECTED_RUN"
+  | "RUN_NOT_FOUND"
+  | "RUN_CONTEXT_MISMATCH"
+  | "RUN_NOT_DETAILED"
+  | "RUN_NOT_COMPLETED";
+
+export type EvaluationAiReferenceDto = {
+  status: EvaluationAiReferenceStatus;
+  criterionReferences: CriterionAiReferenceDto[];
+  warning: string | null;
+  selectedRunSummary: {
+    provider: string | null;
+    model: string | null;
+    completedAt: string | null;
+    reviewer: string | null;
+    reviewedAt: string | null;
+    reviewerNote: string | null;
+    contractVersion: "detailed-screening.v2" | null;
+  } | null;
+};
+
 export type ResumeEvaluationDetailDto = ResumeEvaluationSummaryDto & {
+  aiReference?: EvaluationAiReferenceDto;
   criterionResults: ResumeEvaluationCriterionResultDto[];
   events: ResumeEvaluationEventDto[];
 };

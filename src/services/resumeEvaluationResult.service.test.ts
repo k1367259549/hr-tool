@@ -269,6 +269,96 @@ function makeDetailedScreeningResult() {
   };
 }
 
+function makeReferenceCriteria() {
+  return [
+    {
+      description: "Backend API evidence",
+      importance: "REQUIRED" as const,
+      key: "backend-api",
+      label: "Backend API"
+    },
+    {
+      description: "Workflow service experience",
+      importance: "PREFERRED" as const,
+      key: "workflow-experience",
+      label: "Workflow Experience"
+    }
+  ];
+}
+
+function makeDetailedScreeningResultV2() {
+  const v1 = makeDetailedScreeningResult();
+
+  return {
+    ...v1,
+    contractVersion: "detailed-screening.v2" as const,
+    criterionAssessments: [
+      {
+        conclusion: "backend-api conclusion",
+        criterionKey: "backend-api",
+        criterionLabel: "Backend API",
+        evidence: [v1.evidence[0]],
+        interviewQuestions: ["Which API decisions did you own?"],
+        missingInformation: ["Availability is not stated."],
+        risks: ["Ownership depth needs confirmation."],
+        score: 88
+      },
+      {
+        conclusion: "workflow-experience conclusion",
+        criterionKey: "workflow-experience",
+        criterionLabel: "Workflow Experience",
+        evidence: [v1.evidence[0]],
+        interviewQuestions: ["Which workflow responsibilities did you own?"],
+        missingInformation: [],
+        risks: [],
+        score: 72
+      }
+    ],
+    schemaVersion: "m11-a.detailed.v2" as const
+  };
+}
+
+function makeReferenceRun(parsedOutputJson: unknown, overrides?: object) {
+  return {
+    completedAt: new Date("2026-07-03T10:00:00.000Z"),
+    createdAt: new Date("2026-07-03T09:59:00.000Z"),
+    errorCode: null,
+    errorMessage: null,
+    evaluationId: "eval-1",
+    id: "run-1",
+    modelName: "gpt-5.5",
+    modelProvider: "OPENAI_COMPATIBLE",
+    parsedOutputJson,
+    parsedSnapshotId: "snapshot-1",
+    promptVersion: "2.0",
+    rating: "MANUAL_REVIEW",
+    resumeRevisionId: "revision-1",
+    runType: "AI",
+    score: 82,
+    status: "SUCCEEDED",
+    summary: "Detailed analysis summary.",
+    ...overrides
+  };
+}
+
+function makeAcceptedReferenceEvent() {
+  return {
+    actor: "Recruiter A",
+    changedFields: [
+      "detailed-analysis-review",
+      "runId:run-1",
+      "decision:ACCEPTED_AS_REFERENCE",
+      "reference:selected",
+      "selectedRunId"
+    ],
+    createdAt: new Date("2026-07-03T10:01:00.000Z"),
+    evaluationId: "eval-1",
+    eventType: "UPDATED",
+    id: "event-reference",
+    note: "Checked as reference."
+  };
+}
+
 function makeP2002(target: unknown) {
   return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
     clientVersion: "test",
@@ -624,6 +714,172 @@ describe("resumeEvaluationResultService.createEvaluation", () => {
         templateVersionId: "tv-1"
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("resumeEvaluationResultService.getEvaluation AI references", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns NO_SELECTED_RUN without affecting the manual evaluation detail", async () => {
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(makeEvaluation());
+
+    const result = await resumeEvaluationResultService.getEvaluation("eval-1");
+
+    expect(result.criterionResults).toEqual([
+      expect.objectContaining({
+        assessment: "SUPPORTED",
+        criterionKey: "backend-api",
+        evidenceNotes: ["有后端 API 经验"]
+      })
+    ]);
+    expect(result.aiReference).toMatchObject({
+      criterionReferences: [],
+      status: "NO_SELECTED_RUN"
+    });
+    expect(resumeEvaluationRunRepository.findRunForSelection).not.toHaveBeenCalled();
+  });
+
+  it("maps a selected current V2 detailed run by exact template criterion key", async () => {
+    const criteria = makeReferenceCriteria();
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+      makeEvaluation({
+        criterionResults: [
+          { assessment: "SUPPORTED", criterionKey: "backend-api", evidenceNotes: ["manual note"] },
+          { assessment: "NOT_ASSESSED", criterionKey: "workflow-experience", evidenceNotes: [] }
+        ],
+        events: [makeAcceptedReferenceEvent()],
+        selectedRunId: "run-1"
+      })
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun() as never
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+      makeReferenceRun(makeDetailedScreeningResultV2()) as never
+    );
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(
+      makeTemplateVersion({ criteria }) as never
+    );
+
+    const result = await resumeEvaluationResultService.getEvaluation("eval-1");
+
+    expect(result.aiReference).toMatchObject({
+      status: "AVAILABLE",
+      selectedRunSummary: {
+        contractVersion: "detailed-screening.v2",
+        reviewer: "Recruiter A"
+      }
+    });
+    expect(result.aiReference?.criterionReferences.map((item) => item.criterionKey)).toEqual([
+      "backend-api",
+      "workflow-experience"
+    ]);
+    expect(result.aiReference?.criterionReferences[0]).toMatchObject({
+      conclusion: "backend-api conclusion",
+      criterionLabel: "Backend API",
+      score: 88
+    });
+    expect(result.criterionResults[0]?.evidenceNotes).toEqual(["manual note"]);
+  });
+
+  it("returns a legacy warning without mapping generic dimensions", async () => {
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+      makeEvaluation({ selectedRunId: "run-1" })
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+      makeSelectableRun() as never
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+      makeReferenceRun(makeDetailedScreeningResult()) as never
+    );
+
+    const result = await resumeEvaluationResultService.getEvaluation("eval-1");
+
+    expect(result.aiReference).toMatchObject({
+      criterionReferences: [],
+      status: "LEGACY_SELECTED_RUN"
+    });
+    expect(evaluationTemplateRepository.findVersionById).not.toHaveBeenCalled();
+  });
+
+  it("returns controlled states for missing, mismatched, non-detailed, incomplete, and invalid selected runs", async () => {
+    const cases = [
+      {
+        configure: () =>
+          vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(null),
+        status: "RUN_NOT_FOUND"
+      },
+      {
+        configure: () =>
+          vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+            makeSelectableRun({ evaluationId: "other-evaluation" }) as never
+          ),
+        status: "RUN_CONTEXT_MISMATCH"
+      },
+      {
+        configure: () => {
+          vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+            makeSelectableRun() as never
+          );
+          vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+            makeReferenceRun(makeDetailedScreeningResultV2(), { runType: "RULE_BASED" }) as never
+          );
+        },
+        status: "RUN_NOT_DETAILED"
+      },
+      {
+        configure: () =>
+          vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+            makeSelectableRun({ status: "PENDING" }) as never
+          ),
+        status: "RUN_NOT_COMPLETED"
+      },
+      {
+        configure: () => {
+          vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockResolvedValueOnce(
+            makeSelectableRun() as never
+          );
+          vi.mocked(resumeEvaluationRunRepository.findRunById).mockResolvedValueOnce(
+            makeReferenceRun({ schemaVersion: "m11-a.detailed.v2" }) as never
+          );
+        },
+        status: "INVALID_SELECTED_RUN"
+      }
+    ] as const;
+
+    for (const testCase of cases) {
+      vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+        makeEvaluation({ selectedRunId: "run-1" })
+      );
+      testCase.configure();
+
+      await expect(resumeEvaluationResultService.getEvaluation("eval-1")).resolves.toMatchObject({
+        aiReference: {
+          criterionReferences: [],
+          status: testCase.status
+        }
+      });
+    }
+  });
+
+  it("keeps manual evaluation data readable when AI reference lookup fails", async () => {
+    vi.mocked(resumeEvaluationRepository.findDetailById).mockResolvedValueOnce(
+      makeEvaluation({ selectedRunId: "run-1" })
+    );
+    vi.mocked(resumeEvaluationRunRepository.findRunForSelection).mockRejectedValueOnce(
+      new Error("run repository unavailable")
+    );
+
+    const result = await resumeEvaluationResultService.getEvaluation("eval-1");
+
+    expect(result.criterionResults).toHaveLength(1);
+    expect(result.overallNote).toBe("整体评估摘要");
+    expect(result.aiReference).toMatchObject({
+      criterionReferences: [],
+      status: "INVALID_SELECTED_RUN"
+    });
   });
 });
 

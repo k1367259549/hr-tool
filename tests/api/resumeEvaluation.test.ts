@@ -187,6 +187,58 @@ describe("GET /api/resume-evaluations/[id]", () => {
     expect(json.data?.status).toBe("DRAFT");
   });
 
+  it("returns the service-provided AI reference projection without provider raw output", async () => {
+    vi.mocked(serviceMock.getEvaluation).mockResolvedValueOnce({
+      ...baseEvaluation,
+      aiReference: {
+        criterionReferences: [
+          {
+            conclusion: "Backend API evidence is present.",
+            criterionKey: "backend-api",
+            criterionLabel: "Backend API",
+            evidence: [
+              {
+                id: "ev_backend_api",
+                relatedRequirement: "Backend API",
+                source: "RESUME",
+                text: "Built TypeScript API services."
+              }
+            ],
+            interviewQuestions: ["Which API decisions did you own?"],
+            missingInformation: ["Availability is not stated."],
+            risks: ["Ownership depth needs confirmation."],
+            score: 88,
+            status: "AVAILABLE"
+          }
+        ],
+        selectedRunSummary: {
+          completedAt: "2026-07-03T10:00:00.000Z",
+          contractVersion: "detailed-screening.v2",
+          model: "gpt-5.5",
+          provider: "OPENAI_COMPATIBLE",
+          reviewedAt: "2026-07-03T10:01:00.000Z",
+          reviewer: "Recruiter A",
+          reviewerNote: "Checked as reference."
+        },
+        status: "AVAILABLE",
+        warning: null
+      }
+    });
+
+    const { GET } = await import("@/app/api/resume-evaluations/[id]/route");
+    const response = await GET(
+      createGetRequest("http://localhost/api/resume-evaluations/eval-1"),
+      { params: Promise.resolve({ id: "eval-1" }) }
+    );
+    const json = await readApiJson<ResumeEvaluationDetailDto>(response);
+
+    expect(json.data?.aiReference).toMatchObject({
+      status: "AVAILABLE"
+    });
+    expect(JSON.stringify(json.data)).not.toContain("rawProviderResponse");
+    expect(JSON.stringify(json.data)).not.toContain("apiKey");
+  });
+
   it("returns 404 when not found", async () => {
     const { ResumeEvaluationResultServiceError } = await import(
       "@/services/resumeEvaluationResult.service"

@@ -11,6 +11,8 @@ import {
   createDetailedAnalysisReviewAuditFields,
   parseDetailedAnalysisReviewAudit
 } from "@/lib/resume-screening/detailed-analysis-review";
+import { mapCriterionAssessmentsToAiReferences } from "@/lib/resume-screening/criterion-ai-reference";
+import { resolveDetailedScreeningResult } from "@/lib/resume-screening/detailed-screening-contract";
 import { DetailedScreeningResultSchema } from "@/lib/resume-screening/schema";
 import type {
   EvaluationCriterion
@@ -18,6 +20,7 @@ import type {
 import type {
   ResumeEvaluationCreateInput,
   ResumeEvaluationDetailDto,
+  EvaluationAiReferenceDto,
   ResumeEvaluationEventDto,
   ResumeEvaluationListQuery,
   ResumeEvaluationListResultDto,
@@ -191,7 +194,10 @@ export const resumeEvaluationResultService = {
         throw new ResumeEvaluationResultServiceError("NOT_FOUND", "评估记录不存在。");
       }
 
-      return toDetailDto(evaluation);
+      return {
+        ...toDetailDto(evaluation),
+        aiReference: await resolveEvaluationAiReference(evaluation)
+      };
     } catch (error) {
       throw normalizeError(error, "读取评估失败。");
     }
@@ -1010,6 +1016,196 @@ function toDetailDto(
     criterionResults: toCriterionResultDtos(evaluation.criterionResults),
     events: evaluation.events.map(toEventDto)
   };
+}
+
+async function resolveEvaluationAiReference(
+  evaluation: ResumeEvaluationResultDetailRecord
+): Promise<EvaluationAiReferenceDto> {
+  try {
+    return await buildEvaluationAiReference(evaluation);
+  } catch {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "AI 逐项参考读取失败，人工评价仍可独立完成。请稍后重试或重新运行详细分析。"
+    );
+  }
+}
+
+async function buildEvaluationAiReference(
+  evaluation: ResumeEvaluationResultDetailRecord
+): Promise<EvaluationAiReferenceDto> {
+  if (!evaluation.selectedRunId) {
+    return unavailableAiReference(
+      "NO_SELECTED_RUN",
+      "尚未选择 AI 详细分析作为人工评估参考。人工评价仍可独立完成。"
+    );
+  }
+
+  const selectedRun = await resumeEvaluationRunRepository.findRunForSelection(
+    evaluation.selectedRunId
+  );
+
+  if (!selectedRun) {
+    return unavailableAiReference(
+      "RUN_NOT_FOUND",
+      "当前选中的 AI 详细分析记录不存在。请重新运行详细分析。"
+    );
+  }
+
+  if (!hasMatchingRunContext(evaluation, selectedRun)) {
+    return unavailableAiReference(
+      "RUN_CONTEXT_MISMATCH",
+      "当前选中的 AI 详细分析与本次评估上下文不一致，无法安全提供逐项参考。"
+    );
+  }
+
+  if (selectedRun.status !== "SUCCEEDED") {
+    return unavailableAiReference(
+      "RUN_NOT_COMPLETED",
+      "当前选中的 AI 详细分析尚未成功完成，无法提供逐项参考。"
+    );
+  }
+
+  const detailedRun = await resumeEvaluationRunRepository.findRunById(evaluation.selectedRunId);
+
+  if (!detailedRun) {
+    return unavailableAiReference(
+      "RUN_NOT_FOUND",
+      "当前选中的 AI 详细分析记录不存在。请重新运行详细分析。"
+    );
+  }
+
+  if (
+    detailedRun.evaluationId !== evaluation.id ||
+    detailedRun.status !== "SUCCEEDED"
+  ) {
+    return unavailableAiReference(
+      "RUN_CONTEXT_MISMATCH",
+      "当前选中的 AI 详细分析与本次评估上下文不一致，无法安全提供逐项参考。"
+    );
+  }
+
+  if (detailedRun.runType !== "AI") {
+    return unavailableAiReference(
+      "RUN_NOT_DETAILED",
+      "当前选中的 run 不是详细分析，无法提供逐项 AI 参考。"
+    );
+  }
+
+  const resolved = resolveDetailedScreeningResult(detailedRun.parsedOutputJson);
+
+  if (!resolved.success) {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "当前 AI 详细分析结果格式不完整，无法安全提供逐项参考。请重新运行详细分析。"
+    );
+  }
+
+  if (resolved.compatibilityStatus === "LEGACY_V1") {
+    return unavailableAiReference(
+      "LEGACY_SELECTED_RUN",
+      "当前选中的详细分析不包含评价标准逐项结果。请重新运行详细分析并审核采用后，再查看逐项 AI 参考。"
+    );
+  }
+
+  if (resolved.result.schemaVersion !== "m11-a.detailed.v2") {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "当前 AI 详细分析结果格式不完整，无法安全提供逐项参考。请重新运行详细分析。"
+    );
+  }
+
+  const templateVersion = await evaluationTemplateRepository.findVersionById(
+    evaluation.templateVersionId
+  );
+
+  if (!templateVersion) {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "当前评价标准版本不可用，无法安全提供逐项 AI 参考。"
+    );
+  }
+
+  let criteria: EvaluationCriterion[];
+  try {
+    criteria = parseTemplateCriteria(templateVersion.criteria);
+  } catch {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "当前评价标准版本数据无效，无法安全提供逐项 AI 参考。"
+    );
+  }
+
+  const mapping = mapCriterionAssessmentsToAiReferences(
+    criteria,
+    resolved.result.criterionAssessments
+  );
+
+  if (!mapping.success) {
+    return unavailableAiReference(
+      "INVALID_SELECTED_RUN",
+      "当前 AI 详细分析与评价标准不一致，无法安全提供逐项参考。请重新运行详细分析。"
+    );
+  }
+
+  const reviewEvent = evaluation.events.find((event) => {
+    const audit = parseDetailedAnalysisReviewAudit(event);
+
+    return (
+      audit?.runId === evaluation.selectedRunId &&
+      audit.decision === "ACCEPTED_AS_REFERENCE" &&
+      audit.becameReference
+    );
+  });
+
+  return {
+    criterionReferences: mapping.references,
+    selectedRunSummary: {
+      completedAt: detailedRun.completedAt?.toISOString() ?? null,
+      contractVersion: "detailed-screening.v2",
+      model: detailedRun.modelName,
+      provider: detailedRun.modelProvider,
+      reviewedAt: reviewEvent?.createdAt.toISOString() ?? null,
+      reviewer: reviewEvent?.actor ?? null,
+      reviewerNote: reviewEvent?.note ?? null
+    },
+    status: "AVAILABLE",
+    warning: null
+  };
+}
+
+function unavailableAiReference(
+  status: Exclude<EvaluationAiReferenceDto["status"], "AVAILABLE">,
+  warning: string
+): EvaluationAiReferenceDto {
+  return {
+    criterionReferences: [],
+    selectedRunSummary: null,
+    status,
+    warning
+  };
+}
+
+function hasMatchingRunContext(
+  evaluation: Pick<
+    ResumeEvaluationResultDetailRecord,
+    "id" | "resumeId" | "jobProfileId" | "templateVersionId" | "jobProfileVersion"
+  >,
+  run: {
+    evaluationId: string;
+    resumeId: string;
+    jobProfileId: string;
+    templateVersionId: string;
+    jobProfileVersion: string;
+  }
+): boolean {
+  return (
+    run.evaluationId === evaluation.id &&
+    run.resumeId === evaluation.resumeId &&
+    run.jobProfileId === evaluation.jobProfileId &&
+    run.templateVersionId === evaluation.templateVersionId &&
+    run.jobProfileVersion === evaluation.jobProfileVersion
+  );
 }
 
 function toEventDto(
