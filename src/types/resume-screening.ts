@@ -177,12 +177,36 @@ export type QuickScreeningResult = BaseScreeningResult & {
   nextStep: string;
 };
 
-export type DetailedScreeningResult = BaseScreeningResult & {
+export type DetailedScreeningResultV1 = BaseScreeningResult & {
   schemaVersion: "m11-a.detailed.v1";
   screeningMode: "DETAILED";
   weaknesses: string[];
   nextStep: string;
 };
+
+export type DetailedCriterionAssessment = {
+  criterionKey: string;
+  criterionLabel: string;
+  score: number;
+  conclusion: string;
+  evidence: ScreeningEvidence[];
+  risks: string[];
+  missingInformation: string[];
+  interviewQuestions: string[];
+};
+
+export type DetailedScreeningResultV2 = BaseScreeningResult & {
+  contractVersion: "detailed-screening.v2";
+  criterionAssessments: DetailedCriterionAssessment[];
+  schemaVersion: "m11-a.detailed.v2";
+  screeningMode: "DETAILED";
+  weaknesses: string[];
+  nextStep: string;
+};
+
+export type DetailedScreeningResult = DetailedScreeningResultV1;
+
+export type AnyDetailedScreeningResult = DetailedScreeningResultV1 | DetailedScreeningResultV2;
 
 export type DuplicateCheckResult = {
   schemaVersion: "m11-a.duplicate.v1";

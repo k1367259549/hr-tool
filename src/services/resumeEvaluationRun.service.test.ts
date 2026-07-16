@@ -4,9 +4,10 @@ import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provide
 import { prisma } from "@/lib/prisma";
 import { adaptDetailedScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/detailed-screening-contract";
 import {
-  DetailedScreeningResultSchema,
+  DetailedScreeningResultV2Schema,
   QuickScreeningResultSchema
 } from "@/lib/resume-screening/schema";
+import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.repository";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
@@ -22,7 +23,7 @@ import type {
   EvaluationProviderMetadata
 } from "@/lib/evaluation/provider-interface";
 import type {
-  DetailedScreeningResult,
+  DetailedScreeningResultV2,
   QuickScreeningResult
 } from "@/types/resume-screening";
 
@@ -53,6 +54,12 @@ vi.mock("@/repositories/resumeEvaluation.repository", () => ({
 vi.mock("@/repositories/jobProfile.repository", () => ({
   jobProfileRepository: {
     findById: vi.fn()
+  }
+}));
+
+vi.mock("@/repositories/evaluationTemplate.repository", () => ({
+  evaluationTemplateRepository: {
+    findVersionById: vi.fn()
   }
 }));
 
@@ -550,7 +557,7 @@ describe("resumeEvaluationRunService.createDetailedAnalysisRun", () => {
         modelName: "gpt-5.5",
         modelProvider: "OPENAI_COMPATIBLE",
         parsedOutputJson: detailedResult,
-        promptVersion: "1.0",
+        promptVersion: "2.0",
         rating: detailedResult.recommendation,
         runType: "AI",
         score: detailedResult.overallScore,
@@ -570,7 +577,7 @@ describe("resumeEvaluationRunService.createDetailedAnalysisRun", () => {
       expect(result.runId).toBe("detailed-run-1");
       expect(result.screeningResult).toEqual(detailedResult);
       expect(result.result.overallScore).toBe(detailedResult.overallScore);
-      expect(DetailedScreeningResultSchema.safeParse(result.screeningResult).success).toBe(
+      expect(DetailedScreeningResultV2Schema.safeParse(result.screeningResult).success).toBe(
         true
       );
     }
@@ -586,6 +593,11 @@ describe("resumeEvaluationRunService.createDetailedAnalysisRun", () => {
     expect(runEvaluationProvider).toHaveBeenCalledWith(
       expect.objectContaining({
         input: expect.objectContaining({
+          analysisMode: "DETAILED",
+          evaluationCriteria: [
+            expect.objectContaining({ key: "backend-api" }),
+            expect.objectContaining({ key: "workflow-experience" })
+          ],
           jobDescription: expect.stringContaining("Need a backend engineer"),
           jobProfileId: "job-1",
           jobUnderstandingJson: expect.objectContaining({
@@ -826,6 +838,94 @@ describe("resumeEvaluationRunService.createDetailedAnalysisRun", () => {
     );
     expect(resumeEvaluationRunRepository.completeRun).not.toHaveBeenCalled();
   });
+
+  it("requires criteria from the evaluation-bound template version", async () => {
+    vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValueOnce(null);
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "评价标准版本不存在。"
+    });
+
+    expect(resumeEvaluationRunRepository.createRun).not.toHaveBeenCalled();
+    expect(runEvaluationProvider).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "missing",
+      makeValidDetailedScreeningResult({
+        criterionAssessments: [makeValidDetailedScreeningResult().criterionAssessments[0]!]
+      }),
+      "详细分析遗漏了评价标准 criterionKey。"
+    ],
+    [
+      "unknown",
+      makeValidDetailedScreeningResult({
+        criterionAssessments: [
+          ...makeValidDetailedScreeningResult().criterionAssessments,
+          {
+            ...makeValidDetailedScreeningResult().criterionAssessments[1]!,
+            criterionKey: "unknown-key"
+          }
+        ]
+      }),
+      "详细分析返回了未知的 criterionKey。"
+    ],
+    [
+      "duplicate",
+      makeValidDetailedScreeningResult({
+        criterionAssessments: [
+          makeValidDetailedScreeningResult().criterionAssessments[0]!,
+          { ...makeValidDetailedScreeningResult().criterionAssessments[0]! }
+        ]
+      }),
+      "详细分析返回了重复的 criterionKey。"
+    ],
+    [
+      "rewritten",
+      makeValidDetailedScreeningResult({
+        criterionAssessments: [
+          {
+            ...makeValidDetailedScreeningResult().criterionAssessments[0]!,
+            criterionKey: "backend_api"
+          },
+          makeValidDetailedScreeningResult().criterionAssessments[1]!
+        ]
+      }) as never,
+      "Detailed screening result does not match the current V2 contract."
+    ]
+  ])("marks the detailed run FAILED for %s criterion output", async (_name, output, error) => {
+    const metadata = makeProviderMetadata();
+
+    vi.mocked(runEvaluationProvider).mockResolvedValueOnce({
+      detailedScreeningResult: output,
+      metadata,
+      output: adaptDetailedScreeningResultToLegacyEvaluationResult(
+        makeValidDetailedScreeningResult()
+      ),
+      runId: "detailed-run-1",
+      success: true
+    });
+    vi.mocked(resumeEvaluationRunRepository.failRun).mockResolvedValueOnce(
+      makeRun({ id: "detailed-run-1", runType: "AI", status: "FAILED" })
+    );
+
+    await expect(
+      resumeEvaluationRunService.createDetailedAnalysisRun("eval-1", {
+        provider: makeOpenAIProvider()
+      })
+    ).resolves.toMatchObject({
+      error,
+      failureReason: "VALIDATION_ERROR",
+      success: false
+    });
+    expect(resumeEvaluationRunRepository.completeRun).not.toHaveBeenCalled();
+  });
 });
 
 describe("resumeEvaluationRunService.getLatestDetailedAnalysisRunByEvaluationId", () => {
@@ -918,6 +1018,23 @@ function setupDetailedAnalysisContext(
     resumeId: "resume-1"
   } as never);
   vi.mocked(jobProfileRepository.findById).mockResolvedValue(makeJobProfile() as never);
+  vi.mocked(evaluationTemplateRepository.findVersionById).mockResolvedValue({
+    criteria: [
+      {
+        description: "Build and maintain TypeScript backend APIs.",
+        evidenceGuidance: "Use direct resume evidence about API ownership.",
+        importance: "REQUIRED",
+        key: "backend-api",
+        label: "Backend API"
+      },
+      {
+        description: "Explain workflow service experience relevant to the role.",
+        importance: "PREFERRED",
+        key: "workflow-experience",
+        label: "Workflow Experience"
+      }
+    ]
+  } as never);
   vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValue(runs);
   vi.mocked(resumeEvaluationRunRepository.createRun).mockResolvedValue(
     makeRun({
@@ -947,7 +1064,7 @@ function makeProviderMetadata(
     durationMs: 1000,
     model: "gpt-5.5",
     promptFile: "prompts/detailed-analysis.md",
-    promptVersion: "1.0",
+    promptVersion: "2.0",
     providerName: "OPENAI_COMPATIBLE" as const,
     providerVersion: "openai-compatible-test-v1",
     startedAt: "2026-07-04T13:00:59.000Z",
@@ -1029,8 +1146,8 @@ function makeValidQuickScreeningResult(
 }
 
 function makeValidDetailedScreeningResult(
-  overrides: Partial<DetailedScreeningResult> = {}
-): DetailedScreeningResult {
+  overrides: Partial<DetailedScreeningResultV2> = {}
+): DetailedScreeningResultV2 {
   return {
     dimensions: [
       {
@@ -1070,6 +1187,45 @@ function makeValidDetailedScreeningResult(
         score: 82
       }
     ],
+    contractVersion: "detailed-screening.v2",
+    criterionAssessments: [
+      {
+        conclusion:
+          "The resume explicitly names TypeScript API service work that maps to the backend API criterion.",
+        criterionKey: "backend-api",
+        criterionLabel: "Backend API",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "TypeScript backend API experience",
+            source: "RESUME",
+            text: "Built backend TypeScript API services."
+          }
+        ],
+        interviewQuestions: ["Which API design responsibilities did you own?"],
+        missingInformation: [],
+        risks: [],
+        score: 86
+      },
+      {
+        conclusion:
+          "The workflow automation experience is relevant to the workflow experience criterion.",
+        criterionKey: "workflow-experience",
+        criterionLabel: "Workflow Experience",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Workflow service experience",
+            source: "RESUME",
+            text: "Built backend TypeScript API services."
+          }
+        ],
+        interviewQuestions: [],
+        missingInformation: [],
+        risks: [],
+        score: 82
+      }
+    ],
     evidence: [
       {
         id: "ev_backend_api",
@@ -1100,7 +1256,7 @@ function makeValidDetailedScreeningResult(
         title: "Availability missing"
       }
     ],
-    schemaVersion: "m11-a.detailed.v1",
+    schemaVersion: "m11-a.detailed.v2",
     screeningMode: "DETAILED",
     strengths: ["Backend TypeScript API experience maps to the JD."],
     summary:

@@ -4,12 +4,14 @@ import {
   adaptDetailedScreeningResultToLegacyEvaluationResult,
   resolveDetailedScreeningResult
 } from "@/lib/resume-screening/detailed-screening-contract";
+import { validateAndNormalizeDetailedCriterionAssessments } from "@/lib/resume-screening/detailed-criterion-contract";
 import type {
   EvaluationProvider,
   EvaluationProviderInput,
   EvaluationProviderMetadata,
   EvaluationProviderResult
 } from "@/lib/evaluation/provider-interface";
+import { validateEvaluationProviderInput } from "@/lib/evaluation/provider-interface";
 import type { EvaluationRunFailureReason } from "@/types/evaluation-run-lifecycle";
 
 type FetchLike = (
@@ -150,13 +152,60 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
         );
       }
 
+      let detailedResult = detailed.result;
+
+      if (input.analysisMode === "DETAILED") {
+        if (detailed.compatibilityStatus !== "CURRENT_V2") {
+          return this.failure(
+            "VALIDATION_ERROR",
+            "openai-compatible-detailed-contract-version-invalid",
+            "OpenAI-compatible provider must return the current detailed screening V2 contract.",
+            metadata
+          );
+        }
+
+        if (!input.evaluationCriteria) {
+          return this.failure(
+            "VALIDATION_ERROR",
+            "openai-compatible-evaluation-criteria-required",
+            "evaluationCriteria is required for criterion-aware detailed analysis.",
+            metadata
+          );
+        }
+
+        if (detailedResult.schemaVersion !== "m11-a.detailed.v2") {
+          return this.failure(
+            "VALIDATION_ERROR",
+            "openai-compatible-detailed-contract-version-invalid",
+            "OpenAI-compatible provider must return the current detailed screening V2 contract.",
+            metadata
+          );
+        }
+
+        const criterionContract = validateAndNormalizeDetailedCriterionAssessments(
+          input.evaluationCriteria,
+          detailedResult
+        );
+
+        if (!criterionContract.success) {
+          return this.failure(
+            "VALIDATION_ERROR",
+            `openai-compatible-${criterionContract.code.toLowerCase().replaceAll("_", "-")}`,
+            criterionContract.message,
+            metadata
+          );
+        }
+
+        detailedResult = criterionContract.result;
+      }
+
       const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(
-        detailed.result
+        detailedResult
       );
 
       return {
         success: true,
-        detailedScreeningResult: detailed.result,
+        detailedScreeningResult: detailedResult,
         output: legacyOutput,
         metadata
       };
@@ -263,6 +312,7 @@ function createEvaluationInputBlock(input: EvaluationProviderInput): string {
     `templateVersionId: ${input.templateVersionId ?? ""}`,
     `evaluationTemplateVersionId: ${input.evaluationTemplateVersionId ?? ""}`,
     "</EVALUATION_CONTEXT>",
+    ...createEvaluationCriteriaBlock(input),
     ...createJobUnderstandingBlock(input),
     "<JOB_DESCRIPTION>",
     input.jobDescription,
@@ -271,6 +321,14 @@ function createEvaluationInputBlock(input: EvaluationProviderInput): string {
     input.resumeText,
     "</RESUME_TEXT>"
   ].join("\n");
+}
+
+function createEvaluationCriteriaBlock(input: EvaluationProviderInput): string[] {
+  if (input.analysisMode !== "DETAILED") {
+    return [];
+  }
+
+  return ["<EVALUATION_CRITERIA>", JSON.stringify(input.evaluationCriteria ?? [], null, 2), "</EVALUATION_CRITERIA>"];
 }
 
 function createJobUnderstandingBlock(input: EvaluationProviderInput): string[] {
@@ -323,6 +381,20 @@ function validateProviderInput(input: EvaluationProviderInput): string | null {
 
   if (!input.jobDescription.trim()) {
     return "jobDescription is required for detailed analysis.";
+  }
+
+  const modeError = validateEvaluationProviderInput(input);
+
+  if (modeError === "EVALUATION_CRITERIA_REQUIRED") {
+    return "evaluationCriteria is required for criterion-aware detailed analysis.";
+  }
+
+  if (modeError === "EVALUATION_CRITERIA_INVALID") {
+    return "evaluationCriteria must contain unique, valid template criteria.";
+  }
+
+  if (modeError === "EVALUATION_PROVIDER_MODE_INVALID") {
+    return "analysisMode must be DETAILED for the OpenAI-compatible detailed analysis provider.";
   }
 
   return null;

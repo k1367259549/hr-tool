@@ -1,7 +1,7 @@
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
-import { DetailedScreeningResultSchema } from "@/lib/resume-screening/schema";
+import { DetailedScreeningResultSchema, DetailedScreeningResultV2Schema } from "@/lib/resume-screening/schema";
 import type {
-  DetailedScreeningResult,
+  AnyDetailedScreeningResult,
   RobotArmRelevance,
   ScreeningDimensionKey,
   ScreeningEvidence,
@@ -21,37 +21,70 @@ import type {
 
 export type DetailedScreeningContractErrorCode =
   | "INVALID_JSON"
+  | "DETAILED_CONTRACT_VERSION_INVALID"
   | "SCHEMA_VALIDATION_FAILED"
   | "INCOMPATIBLE_LEGACY_RESULT";
+
+export type DetailedScreeningCompatibilityStatus =
+  | "CURRENT_V2"
+  | "LEGACY_V1"
+  | "INVALID";
 
 export type DetailedScreeningContractResult =
   | {
       success: true;
-      result: DetailedScreeningResult;
+      result: AnyDetailedScreeningResult;
       source: "canonical" | "legacy";
+      compatibilityStatus: Exclude<DetailedScreeningCompatibilityStatus, "INVALID">;
+      warning?: string;
     }
   | {
       success: false;
       code: DetailedScreeningContractErrorCode;
       message: string;
+      compatibilityStatus: "INVALID";
     };
 
 export function resolveDetailedScreeningResult(
   value: unknown
 ): DetailedScreeningContractResult {
-  const canonical = DetailedScreeningResultSchema.safeParse(value);
+  const canonical = DetailedScreeningResultV2Schema.safeParse(value);
 
   if (canonical.success) {
     return {
+      compatibilityStatus: "CURRENT_V2",
       result: canonical.data,
       source: "canonical",
       success: true
     };
   }
 
+  const v1 = DetailedScreeningResultSchema.safeParse(value);
+
+  if (v1.success) {
+    return {
+      compatibilityStatus: "LEGACY_V1",
+      result: v1.data,
+      source: "legacy",
+      success: true,
+      warning:
+        "该详细分析生成于评价标准逐项契约建立之前。如需逐项 AI 参考，请重新运行详细分析。"
+    };
+  }
+
+  if (looksLikeDetailedV2(value)) {
+    return {
+      code: "DETAILED_CONTRACT_VERSION_INVALID",
+      compatibilityStatus: "INVALID",
+      message: "Detailed screening result does not match the current V2 contract.",
+      success: false
+    };
+  }
+
   if (!isLegacyEvaluationResultLike(value)) {
     return {
       code: "SCHEMA_VALIDATION_FAILED",
+      compatibilityStatus: "INVALID",
       message:
         canonical.error.issues[0]?.message ??
         "Detailed screening result does not match schema.",
@@ -64,6 +97,7 @@ export function resolveDetailedScreeningResult(
   if (!legacy.success) {
     return {
       code: "INCOMPATIBLE_LEGACY_RESULT",
+      compatibilityStatus: "INVALID",
       message: legacy.error,
       success: false
     };
@@ -73,7 +107,7 @@ export function resolveDetailedScreeningResult(
 }
 
 export function adaptDetailedScreeningResultToLegacyEvaluationResult(
-  result: DetailedScreeningResult
+  result: AnyDetailedScreeningResult
 ): ResumeEvaluationResult {
   const evidence = result.evidence.map((item) => ({
     id: item.id,
@@ -129,6 +163,7 @@ function legacyEvaluationResultToDetailedScreeningResult(
   if (legacy.evidence.length === 0 || legacy.dimensionScores.length === 0) {
     return {
       code: "INCOMPATIBLE_LEGACY_RESULT",
+      compatibilityStatus: "INVALID",
       message: "Historical detailed result lacks traceable evidence.",
       success: false
     };
@@ -166,6 +201,7 @@ function legacyEvaluationResultToDetailedScreeningResult(
   if (!parsed.success) {
     return {
       code: "INCOMPATIBLE_LEGACY_RESULT",
+      compatibilityStatus: "INVALID",
       message:
         parsed.error.issues[0]?.message ??
         "Historical detailed result cannot be converted safely.",
@@ -174,10 +210,23 @@ function legacyEvaluationResultToDetailedScreeningResult(
   }
 
   return {
+    compatibilityStatus: "LEGACY_V1",
     result: parsed.data,
     source: "legacy",
-    success: true
+    success: true,
+    warning:
+      "该详细分析生成于评价标准逐项契约建立之前。如需逐项 AI 参考，请重新运行详细分析。"
   };
+}
+
+function looksLikeDetailedV2(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as { contractVersion?: unknown; schemaVersion?: unknown };
+
+  return record.contractVersion !== undefined || record.schemaVersion === "m11-a.detailed.v2";
 }
 
 function isLegacyEvaluationResultLike(value: unknown): boolean {

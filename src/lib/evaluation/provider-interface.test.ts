@@ -3,6 +3,7 @@ import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import { MemoryEvaluationRunRepository } from "@/lib/evaluation/memory-run-repository";
 import {
   MockEvaluationProvider,
+  validateEvaluationProviderInput,
   type EvaluationProvider
 } from "@/lib/evaluation/provider-interface";
 import { createEvaluationRunAuditEvent } from "@/lib/evaluation/run-audit-contract";
@@ -207,6 +208,35 @@ describe("Evaluation provider interface", () => {
     await provider.evaluate(createProviderInput());
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("requires formal criteria only for explicit detailed analysis requests", () => {
+    expect(
+      validateEvaluationProviderInput({
+        ...createProviderInput(),
+        analysisMode: "QUICK"
+      })
+    ).toBeNull();
+    expect(
+      validateEvaluationProviderInput({
+        ...createProviderInput(),
+        analysisMode: "DETAILED"
+      })
+    ).toBe("EVALUATION_CRITERIA_REQUIRED");
+    expect(
+      validateEvaluationProviderInput({
+        ...createProviderInput(),
+        analysisMode: "DETAILED",
+        evaluationCriteria: [
+          {
+            description: "Build backend APIs.",
+            importance: "REQUIRED",
+            key: "backend-api",
+            label: "Backend API"
+          }
+        ]
+      })
+    ).toBeNull();
   });
 
   it("can run through memory repository, lifecycle transition, and audit contracts", async () => {

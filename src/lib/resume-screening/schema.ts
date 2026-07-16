@@ -27,6 +27,14 @@ const textList = (field: string, maxItems: number, maxLength: number) =>
   z.array(boundedText(field, maxLength)).max(maxItems);
 
 const percentageScore = z.number().finite().int().min(0).max(100);
+const criterionKey = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+    message: "criterionKey must be a stable slug."
+  });
 
 const evidenceId = z
   .string()
@@ -180,12 +188,36 @@ export const QuickScreeningResultSchema = BaseScreeningResultSchema.extend({
   shouldEnterDetailedAnalysis: z.enum(["yes", "no", "manual_review"])
 }).strict();
 
-export const DetailedScreeningResultSchema = BaseScreeningResultSchema.extend({
+export const DetailedScreeningResultV1Schema = BaseScreeningResultSchema.extend({
   nextStep: boundedText("nextStep", 500),
   schemaVersion: z.literal("m11-a.detailed.v1"),
   screeningMode: z.literal("DETAILED"),
   weaknesses: textList("weaknesses", 30, 500).default([])
 }).strict();
+
+export const DetailedCriterionAssessmentSchema = z
+  .object({
+    conclusion: boundedText("conclusion", 1000),
+    criterionKey,
+    criterionLabel: boundedText("criterionLabel", 120),
+    evidence: z.array(ScreeningEvidenceSchema).min(1).max(30),
+    interviewQuestions: textList("interviewQuestions", 10, 500).default([]),
+    missingInformation: textList("missingInformation", 20, 500),
+    risks: textList("risks", 20, 500),
+    score: percentageScore
+  })
+  .strict();
+
+export const DetailedScreeningResultV2Schema = BaseScreeningResultSchema.extend({
+  contractVersion: z.literal("detailed-screening.v2"),
+  criterionAssessments: z.array(DetailedCriterionAssessmentSchema).min(1).max(50),
+  nextStep: boundedText("nextStep", 500),
+  schemaVersion: z.literal("m11-a.detailed.v2"),
+  screeningMode: z.literal("DETAILED"),
+  weaknesses: textList("weaknesses", 30, 500).default([])
+}).strict();
+
+export const DetailedScreeningResultSchema = DetailedScreeningResultV1Schema;
 
 export const DuplicateCheckResultSchema = z
   .object({

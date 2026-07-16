@@ -4,10 +4,11 @@ import type {
   ResumeEvaluationRunType
 } from "@prisma/client";
 import type { EvaluationProviderMetadata } from "@/lib/evaluation/provider-interface";
+import type { DetailedScreeningCompatibilityStatus } from "@/lib/resume-screening/detailed-screening-contract";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type { EvaluationRunFailureReason } from "@/types/evaluation-run-lifecycle";
 import type {
-  DetailedScreeningResult,
+  AnyDetailedScreeningResult,
   QuickScreeningResult,
   ScreeningRecommendation
 } from "@/types/resume-screening";
@@ -67,7 +68,8 @@ export type DetailedAnalysisRunSuccessDto = {
   createdAt: string;
   completedAt: string | null;
   run: ResumeEvaluationRunDto;
-  screeningResult: DetailedScreeningResult;
+  screeningResult: AnyDetailedScreeningResult;
+  compatibilityStatus?: Exclude<DetailedScreeningCompatibilityStatus, "INVALID">;
   result: ResumeEvaluationResult;
   metadata: EvaluationProviderMetadata;
 };

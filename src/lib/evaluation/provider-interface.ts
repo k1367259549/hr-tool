@@ -2,9 +2,10 @@ import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import type { JsonValue } from "@/types/ai";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type {
-  DetailedScreeningResult,
+  AnyDetailedScreeningResult,
   QuickScreeningResult
 } from "@/types/resume-screening";
+import type { EvaluationCriterion } from "@/types/evaluationTemplate";
 import type {
   EvaluationRunFailureReason,
   EvaluationRunLifecycleSnapshot
@@ -33,7 +34,52 @@ export type EvaluationProviderInput = {
   templateVersionId?: string;
   evaluationTemplateVersionId?: string;
   lifecycleSnapshot?: EvaluationRunLifecycleSnapshot;
+  /** Execution mode for a provider request; distinct from result.screeningMode. */
+  analysisMode?: "QUICK" | "DETAILED";
+  evaluationCriteria?: EvaluationCriterion[];
 };
+
+export type EvaluationProviderInputValidationError =
+  | "EVALUATION_CRITERIA_REQUIRED"
+  | "EVALUATION_CRITERIA_INVALID"
+  | "EVALUATION_PROVIDER_MODE_INVALID";
+
+export function validateEvaluationProviderInput(
+  input: EvaluationProviderInput
+): EvaluationProviderInputValidationError | null {
+  if (input.analysisMode === "QUICK") {
+    return input.evaluationCriteria === undefined
+      ? null
+      : "EVALUATION_PROVIDER_MODE_INVALID";
+  }
+
+  if (input.analysisMode === undefined) {
+    return null;
+  }
+
+  if (!input.evaluationCriteria || input.evaluationCriteria.length === 0) {
+    return "EVALUATION_CRITERIA_REQUIRED";
+  }
+
+  const keys = new Set<string>();
+
+  for (const criterion of input.evaluationCriteria) {
+    if (
+      !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(criterion.key) ||
+      !criterion.label.trim() ||
+      !criterion.description.trim() ||
+      !["REQUIRED", "PREFERRED", "CONTEXTUAL"].includes(criterion.importance) ||
+      (criterion.evidenceGuidance !== undefined && !criterion.evidenceGuidance.trim()) ||
+      keys.has(criterion.key)
+    ) {
+      return "EVALUATION_CRITERIA_INVALID";
+    }
+
+    keys.add(criterion.key);
+  }
+
+  return null;
+}
 
 export type EvaluationProviderMetadata = {
   providerName: EvaluationProviderName;
@@ -55,7 +101,7 @@ export type EvaluationProviderResult =
   | {
       success: true;
       output: ResumeEvaluationResult;
-      detailedScreeningResult?: DetailedScreeningResult;
+      detailedScreeningResult?: AnyDetailedScreeningResult;
       quickScreeningResult?: QuickScreeningResult;
       metadata: EvaluationProviderMetadata;
     }

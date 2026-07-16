@@ -5,14 +5,17 @@ import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provide
 import { prisma } from "@/lib/prisma";
 import {
   adaptDetailedScreeningResultToLegacyEvaluationResult,
-  resolveDetailedScreeningResult
+  resolveDetailedScreeningResult,
+  type DetailedScreeningCompatibilityStatus
 } from "@/lib/resume-screening/detailed-screening-contract";
+import { validateAndNormalizeDetailedCriterionAssessments } from "@/lib/resume-screening/detailed-criterion-contract";
 import {
   resolveQuickScreeningResult,
   toQuickScreeningCompatibilityFields
 } from "@/lib/resume-screening/quick-screening-contract";
 import { adaptQuickScreeningResultToLegacyEvaluationResult } from "@/lib/resume-screening/rule-based-quick-screening-engine";
 import { jobProfileRepository } from "@/repositories/jobProfile.repository";
+import { evaluationTemplateRepository } from "@/repositories/evaluationTemplate.repository";
 import { resumeEvaluationRepository } from "@/repositories/resumeEvaluation.repository";
 import { resumeEvaluationRunRepository } from "@/repositories/resumeEvaluationRun.repository";
 import { resumeRevisionRepository } from "@/repositories/resumeRevision.repository";
@@ -29,7 +32,11 @@ import type {
   ResumeEvaluationRunDto,
   ResumeEvaluationRunSafeRecord
 } from "@/types/resumeEvaluationRun";
-import type { DetailedScreeningResult } from "@/types/resume-screening";
+import type {
+  AnyDetailedScreeningResult
+} from "@/types/resume-screening";
+import type { EvaluationCriterion } from "@/types/evaluationTemplate";
+import { parseEvaluationCriteriaJson } from "@/utils/evaluationTemplateValidation";
 
 export class ResumeEvaluationRunServiceError extends Error {
   readonly code:
@@ -175,6 +182,9 @@ export const resumeEvaluationRunService = {
       const runs = await resumeEvaluationRunRepository.listRunsByEvaluationId(evaluationId);
 
       assertDetailedAnalysisPreconditions(runs);
+      const evaluationCriteria = await loadDetailedEvaluationCriteria(
+        context.evaluation.templateVersionId
+      );
 
       if (options.provider.name !== "OPENAI_COMPATIBLE") {
         throw new ResumeEvaluationRunServiceError(
@@ -199,7 +209,7 @@ export const resumeEvaluationRunService = {
       const now = options.now ?? (() => new Date());
       const providerResult = await runEvaluationProvider({
         idGenerator: options.idGenerator,
-        input: createDetailedProviderInput(context, pendingRun.id),
+        input: createDetailedProviderInput(context, pendingRun.id, evaluationCriteria),
         now,
         provider: options.provider,
         repository: new MemoryEvaluationRunRepository({
@@ -253,6 +263,51 @@ export const resumeEvaluationRunService = {
         };
       }
 
+      if (detailed.result.schemaVersion !== "m11-a.detailed.v2") {
+        await resumeEvaluationRunRepository.failRun(pendingRun.id, {
+          completedAt: getCompletedAt(providerResult.metadata, now),
+          errorCode: "VALIDATION_ERROR",
+          errorMessage: "详细分析未返回 criterion-aware V2 结果。",
+          latencyMs: providerResult.metadata.durationMs,
+          modelName: providerResult.metadata.model ?? options.provider.version,
+          modelProvider: providerResult.metadata.providerName,
+          promptVersion: providerResult.metadata.promptVersion ?? null
+        });
+        return {
+          error: "详细分析未返回 criterion-aware V2 结果。",
+          evaluationId,
+          failureReason: "VALIDATION_ERROR",
+          metadata: providerResult.metadata,
+          runId: pendingRun.id,
+          success: false
+        };
+      }
+
+      const criterionContract = validateAndNormalizeDetailedCriterionAssessments(
+        evaluationCriteria,
+        detailed.result
+      );
+      if (!criterionContract.success) {
+        await resumeEvaluationRunRepository.failRun(pendingRun.id, {
+          completedAt: getCompletedAt(providerResult.metadata, now),
+          errorCode: "VALIDATION_ERROR",
+          errorMessage: criterionContract.message,
+          latencyMs: providerResult.metadata.durationMs,
+          modelName: providerResult.metadata.model ?? options.provider.version,
+          modelProvider: providerResult.metadata.providerName,
+          promptVersion: providerResult.metadata.promptVersion ?? null
+        });
+        return {
+          error: criterionContract.message,
+          evaluationId,
+          failureReason: "VALIDATION_ERROR",
+          metadata: providerResult.metadata,
+          runId: pendingRun.id,
+          success: false
+        };
+      }
+      detailed.result = criterionContract.result;
+
       const legacyOutput = adaptDetailedScreeningResultToLegacyEvaluationResult(
         detailed.result
       );
@@ -293,7 +348,8 @@ export const resumeEvaluationRunService = {
         completedRun,
         storedDetailed.result,
         legacyOutput,
-        providerResult.metadata
+        providerResult.metadata,
+        storedDetailed.compatibilityStatus
       );
     } catch (error) {
       throw normalizeError(error, "创建详细分析 run 失败。");
@@ -332,7 +388,8 @@ export const resumeEvaluationRunService = {
         latestDetailedRun,
         detailed.result,
         legacyOutput,
-        createHistoricalDetailedMetadata(latestDetailedRun)
+        createHistoricalDetailedMetadata(latestDetailedRun),
+        detailed.compatibilityStatus
       );
     } catch (error) {
       throw normalizeError(error, "查询最新详细分析 run 失败。");
@@ -392,7 +449,8 @@ type DetailedAnalysisRunOptions = {
 type DetailedScreeningResolution =
   | {
       success: true;
-      result: DetailedScreeningResult;
+      result: AnyDetailedScreeningResult;
+      compatibilityStatus: Exclude<DetailedScreeningCompatibilityStatus, "INVALID">;
     }
   | {
       success: false;
@@ -535,9 +593,12 @@ function assertDetailedAnalysisPreconditions(
 
 function createDetailedProviderInput(
   context: QuickScreeningRunContext,
-  runId: string
+  runId: string,
+  evaluationCriteria: EvaluationCriterion[]
 ) {
   return {
+    analysisMode: "DETAILED" as const,
+    evaluationCriteria,
     evaluationTemplateVersionId: context.evaluation.templateVersionId,
     jobDescription: context.jobDescription,
     jobTitle: context.jobTitle,
@@ -548,6 +609,29 @@ function createDetailedProviderInput(
     runId,
     templateVersionId: context.evaluation.templateVersionId
   };
+}
+
+async function loadDetailedEvaluationCriteria(
+  templateVersionId: string
+): Promise<EvaluationCriterion[]> {
+  const templateVersion = await evaluationTemplateRepository.findVersionById(templateVersionId);
+
+  if (!templateVersion) {
+    throw new ResumeEvaluationRunServiceError("NOT_FOUND", "评价标准版本不存在。");
+  }
+
+  let criteria: EvaluationCriterion[];
+  try {
+    criteria = parseEvaluationCriteriaJson(templateVersion.criteria);
+  } catch {
+    throw new ResumeEvaluationRunServiceError("VALIDATION_ERROR", "评价标准格式无效。");
+  }
+
+  if (criteria.length === 0) {
+    throw new ResumeEvaluationRunServiceError("VALIDATION_ERROR", "详细分析需要至少一项评价标准。");
+  }
+
+  return criteria;
 }
 
 function resolveDetailedProviderResult(
@@ -565,13 +649,14 @@ function resolveDetailedProviderResult(
   }
 
   return {
+    compatibilityStatus: detailed.compatibilityStatus,
     result: detailed.result,
     success: true
   };
 }
 
 function createDetailedCompletionInput(
-  detailedResult: DetailedScreeningResult,
+  detailedResult: AnyDetailedScreeningResult,
   legacyOutput: ResumeEvaluationResult,
   metadata: EvaluationProviderMetadata
 ) {
@@ -605,14 +690,16 @@ function getCompletedAt(
 
 function toDetailedAnalysisRunDto(
   run: ResumeEvaluationRunSafeRecord,
-  screeningResult: DetailedScreeningResult,
+  screeningResult: AnyDetailedScreeningResult,
   legacyOutput: ResumeEvaluationResult,
-  metadata: EvaluationProviderMetadata
+  metadata: EvaluationProviderMetadata,
+  compatibilityStatus: Exclude<DetailedScreeningCompatibilityStatus, "INVALID">
 ): DetailedAnalysisRunDto {
   const runDto = toDto(run);
 
   return {
     completedAt: runDto.completedAt,
+    compatibilityStatus,
     createdAt: runDto.createdAt,
     evaluationId: runDto.evaluationId,
     metadata,

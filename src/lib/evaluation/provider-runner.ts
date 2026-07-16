@@ -17,7 +17,7 @@ import type {
 } from "@/lib/evaluation/run-persistence-contract";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
 import type {
-  DetailedScreeningResult,
+  AnyDetailedScreeningResult,
   QuickScreeningResult
 } from "@/types/resume-screening";
 import type {
@@ -40,7 +40,7 @@ type RunEvaluationProviderResult =
       success: true;
       runId: string;
       output: ResumeEvaluationResult;
-      detailedScreeningResult?: DetailedScreeningResult;
+      detailedScreeningResult?: AnyDetailedScreeningResult;
       quickScreeningResult?: QuickScreeningResult;
       metadata: EvaluationProviderMetadata;
     }

@@ -4,25 +4,29 @@ import {
   resolveDetailedScreeningResult
 } from "@/lib/resume-screening/detailed-screening-contract";
 import type { ResumeEvaluationResult } from "@/types/evaluation-output";
-import type { DetailedScreeningResult } from "@/types/resume-screening";
+import type {
+  DetailedScreeningResult,
+  DetailedScreeningResultV2
+} from "@/types/resume-screening";
 
 describe("detailed screening contract", () => {
-  it("accepts a complete canonical Chinese detailed screening result", () => {
-    const result = createDetailedResult({
+  it("reports current compatibility for a complete V2 detailed screening result", () => {
+    const result = createDetailedV2Result({
       summary:
         "候选人简历中明确提到 TypeScript 后端 API 项目，与岗位中后端服务开发和接口设计要求存在直接对应关系。仍需人工确认项目所有权、协作方式、到岗时间、实习周期和每周出勤情况，本结果只作为详细分析草稿，不代表自动录用或拒绝。"
     });
 
     const resolved = resolveDetailedScreeningResult(result);
 
-    expect(resolved).toEqual({
+    expect(resolved).toMatchObject({
+      compatibilityStatus: "CURRENT_V2",
       result,
       source: "canonical",
       success: true
     });
   });
 
-  it("accepts a complete canonical English detailed screening result", () => {
+  it("reports legacy compatibility for a V1 result without criterion assessments", () => {
     const result = createDetailedResult({
       summary:
         "The resume explicitly mentions TypeScript backend API work, which maps to the job description's backend service and API design expectations. Recruiter review is still required to confirm ownership depth, collaboration context, start date, internship duration, and weekly availability before any human hiring decision is made."
@@ -32,7 +36,8 @@ describe("detailed screening contract", () => {
 
     expect(resolved).toMatchObject({
       result,
-      source: "canonical",
+      compatibilityStatus: "LEGACY_V1",
+      source: "legacy",
       success: true
     });
   });
@@ -45,6 +50,7 @@ describe("detailed screening contract", () => {
 
     expect(resolved).toMatchObject({
       code: "SCHEMA_VALIDATION_FAILED",
+      compatibilityStatus: "INVALID",
       success: false
     });
   });
@@ -61,6 +67,7 @@ describe("detailed screening contract", () => {
 
     if (resolved.success) {
       expect(resolved.source).toBe("legacy");
+      expect(resolved.compatibilityStatus).toBe("LEGACY_V1");
       expect(resolved.result.overallScore).toBe(64);
       expect(resolved.result.recommendation).toBe("MANUAL_REVIEW");
       expect(resolved.result.evidence[0]?.text).toBe(
@@ -79,6 +86,7 @@ describe("detailed screening contract", () => {
 
     expect(resolved).toMatchObject({
       code: "INCOMPATIBLE_LEGACY_RESULT",
+      compatibilityStatus: "INVALID",
       success: false
     });
   });
@@ -93,6 +101,19 @@ describe("detailed screening contract", () => {
 
     expect(legacy.overallScore).toBe(96);
     expect(legacy.recommendation).toBe("NOT_ENOUGH_EVIDENCE");
+  });
+
+  it("does not downgrade an invalid V2-shaped result to V1", () => {
+    const resolved = resolveDetailedScreeningResult({
+      ...createDetailedV2Result(),
+      contractVersion: "detailed-screening.v1"
+    });
+
+    expect(resolved).toMatchObject({
+      code: "DETAILED_CONTRACT_VERSION_INVALID",
+      compatibilityStatus: "INVALID",
+      success: false
+    });
   });
 });
 
@@ -165,6 +186,31 @@ function createDetailedResult(
       "Ownership depth is not explicit.",
       "Availability information is missing."
     ],
+    ...overrides
+  };
+}
+
+function createDetailedV2Result(
+  overrides: Partial<DetailedScreeningResultV2> = {}
+): DetailedScreeningResultV2 {
+  const v1 = createDetailedResult();
+
+  return {
+    ...v1,
+    contractVersion: "detailed-screening.v2",
+    criterionAssessments: [
+      {
+        conclusion: "The resume contains TypeScript backend API evidence.",
+        criterionKey: "backend-api",
+        criterionLabel: "Backend API",
+        evidence: [v1.evidence[0]!],
+        interviewQuestions: [],
+        missingInformation: [],
+        risks: [],
+        score: 82
+      }
+    ],
+    schemaVersion: "m11-a.detailed.v2",
     ...overrides
   };
 }

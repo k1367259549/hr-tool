@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindEvaluationRunOutput } from "@/lib/evaluation/output-binding";
 import { OpenAICompatibleEvaluationProvider } from "@/lib/evaluation/openai-compatible-provider";
-import type { DetailedScreeningResult } from "@/types/resume-screening";
+import type { DetailedScreeningResultV2 } from "@/types/resume-screening";
 
 const startedAt = "2026-07-05T13:00:00.000Z";
 const completedAt = "2026-07-05T13:00:00.050Z";
@@ -26,8 +26,24 @@ function createSequentialClock(values: string[]) {
 
 function createProviderInput() {
   return {
+    analysisMode: "DETAILED" as const,
     candidateId: "candidate-1",
     candidateName: "Demo Candidate",
+    evaluationCriteria: [
+      {
+        description: "Build and maintain TypeScript backend APIs.",
+        evidenceGuidance: "Use direct resume evidence about API ownership.",
+        importance: "REQUIRED" as const,
+        key: "backend-api",
+        label: "Backend API"
+      },
+      {
+        description: "Explain relevant workflow service experience.",
+        importance: "PREFERRED" as const,
+        key: "workflow-experience",
+        label: "Workflow Experience"
+      }
+    ],
     jobDescription: "Need a backend engineer with TypeScript and API experience.",
     jobTitle: "Backend Engineer",
     jobProfileId: "job-profile-1",
@@ -48,8 +64,8 @@ function createProviderInput() {
 }
 
 function createValidDetailedOutput(
-  overrides?: Partial<DetailedScreeningResult>
-): DetailedScreeningResult {
+  overrides?: Partial<DetailedScreeningResultV2>
+): DetailedScreeningResultV2 {
   return {
     dimensions: [
       {
@@ -145,6 +161,43 @@ function createValidDetailedOutput(
         score: 52
       }
     ],
+    contractVersion: "detailed-screening.v2",
+    criterionAssessments: [
+      {
+        conclusion: "The resume states TypeScript API service work that maps to the backend API criterion.",
+        criterionKey: "backend-api",
+        criterionLabel: "Backend API",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "TypeScript backend API experience",
+            source: "RESUME",
+            text: "Built and maintained TypeScript backend APIs."
+          }
+        ],
+        interviewQuestions: ["Which API design decisions did you own?"],
+        missingInformation: [],
+        risks: [],
+        score: 88
+      },
+      {
+        conclusion: "The recruiting workflow service experience is relevant to the workflow experience criterion.",
+        criterionKey: "workflow-experience",
+        criterionLabel: "Workflow Experience",
+        evidence: [
+          {
+            id: "ev_backend_api",
+            relatedRequirement: "Workflow service experience",
+            source: "RESUME",
+            text: "Built and maintained TypeScript backend APIs."
+          }
+        ],
+        interviewQuestions: [],
+        missingInformation: [],
+        risks: [],
+        score: 84
+      }
+    ],
     evidence: [
       {
         id: "ev_backend_api",
@@ -188,7 +241,7 @@ function createValidDetailedOutput(
         title: "Availability missing"
       }
     ],
-    schemaVersion: "m11-a.detailed.v1",
+    schemaVersion: "m11-a.detailed.v2",
     screeningMode: "DETAILED",
     strengths: [
       "The resume states TypeScript API service experience, which maps to the JD's backend API requirement.",
@@ -361,6 +414,63 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(body.messages[1].content).toContain(
       "Built TypeScript API services for recruiting workflows."
     );
+    expect(body.messages[1].content).toContain("<EVALUATION_CRITERIA>");
+    expect(body.messages[1].content).toContain("backend-api");
+    expect(body.messages[1].content).toContain("Backend API");
+    expect(body.messages[1].content).toContain("Build and maintain TypeScript backend APIs.");
+    expect(body.messages[1].content).toContain("REQUIRED");
+    expect(body.messages[1].content).toContain("Use direct resume evidence about API ownership.");
+  });
+
+  it("normalizes valid detailed assessments to template order without matching labels", async () => {
+    const output = createValidDetailedOutput({
+      criterionAssessments: [
+        {
+          ...createValidDetailedOutput().criterionAssessments[1]!,
+          criterionLabel: "Untrusted provider label"
+        },
+        {
+          ...createValidDetailedOutput().criterionAssessments[0]!,
+          criterionLabel: "Another untrusted label"
+        }
+      ]
+    });
+    const provider = createProvider(async () => createChatResponse(JSON.stringify(output)));
+
+    const result = await provider.evaluate(createProviderInput());
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.detailedScreeningResult?.schemaVersion).toBe("m11-a.detailed.v2");
+      if (result.detailedScreeningResult?.schemaVersion !== "m11-a.detailed.v2") {
+        throw new Error("Expected V2 detailed screening result.");
+      }
+
+      expect(result.detailedScreeningResult.criterionAssessments.map((item) => item.criterionKey)).toEqual([
+        "backend-api",
+        "workflow-experience"
+      ]);
+      expect(result.detailedScreeningResult.criterionAssessments.map((item) => item.criterionLabel)).toEqual([
+        "Backend API",
+        "Workflow Experience"
+      ]);
+    }
+  });
+
+  it.each([
+    ["missing", createValidDetailedOutput({ criterionAssessments: [createValidDetailedOutput().criterionAssessments[0]!] }), "openai-compatible-detailed-criterion-key-missing"],
+    ["unknown", createValidDetailedOutput({ criterionAssessments: [...createValidDetailedOutput().criterionAssessments, { ...createValidDetailedOutput().criterionAssessments[1]!, criterionKey: "unknown-key" }] }), "openai-compatible-detailed-criterion-key-unknown"],
+    ["duplicate", createValidDetailedOutput({ criterionAssessments: [createValidDetailedOutput().criterionAssessments[0]!, { ...createValidDetailedOutput().criterionAssessments[0]! }] }), "openai-compatible-detailed-criterion-key-duplicate"],
+    ["underscore", createValidDetailedOutput({ criterionAssessments: [{ ...createValidDetailedOutput().criterionAssessments[0]!, criterionKey: "backend_api" }, createValidDetailedOutput().criterionAssessments[1]!] }), "openai-compatible-detailed-contract-version-invalid"],
+    ["case", createValidDetailedOutput({ criterionAssessments: [{ ...createValidDetailedOutput().criterionAssessments[0]!, criterionKey: "Backend-Api" }, createValidDetailedOutput().criterionAssessments[1]!] }), "openai-compatible-detailed-contract-version-invalid"]
+  ])("rejects %s criterion keys without fuzzy mapping", async (_name, output, code) => {
+    const provider = createProvider(async () => createChatResponse(JSON.stringify(output)));
+
+    await expect(provider.evaluate(createProviderInput())).resolves.toMatchObject({
+      error: { code },
+      failureReason: "VALIDATION_ERROR",
+      success: false
+    });
   });
 
   it("falls back to raw job description when no job understanding context is provided", async () => {
@@ -435,6 +545,28 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(callCount).toBe(0);
   });
 
+  it("rejects detailed input without formal evaluation criteria before calling fetch", async () => {
+    let callCount = 0;
+    const provider = createProvider(async () => {
+      callCount += 1;
+      return createChatResponse(JSON.stringify(createValidDetailedOutput()));
+    });
+
+    const result = await provider.evaluate({
+      ...createProviderInput(),
+      evaluationCriteria: []
+    });
+
+    expect(result).toMatchObject({
+      error: {
+        code: "openai-compatible-input-invalid",
+        message: "evaluationCriteria is required for criterion-aware detailed analysis."
+      },
+      success: false
+    });
+    expect(callCount).toBe(0);
+  });
+
   it("fails when response content is invalid JSON", async () => {
     const provider = createProvider(async () => createChatResponse("{bad-json"));
 
@@ -488,7 +620,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
 
     expect(result).toMatchObject({
       error: {
-        code: "openai-compatible-schema-validation-failed"
+        code: "openai-compatible-detailed-contract-version-invalid"
       },
       failureReason: "VALIDATION_ERROR",
       success: false
@@ -585,7 +717,7 @@ describe("OpenAICompatibleEvaluationProvider", () => {
       durationMs: 50,
       model: "gpt-5.5-compatible",
       promptFile: "prompts/detailed-analysis.md",
-      promptVersion: "1.0",
+      promptVersion: "2.0",
       providerName: "OPENAI_COMPATIBLE",
       providerVersion: "openai-compatible-test-v1",
       startedAt

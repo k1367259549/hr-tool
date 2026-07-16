@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 import {
   DetailedScreeningResultSchema,
+  DetailedScreeningResultV2Schema,
   DuplicateCheckResultSchema,
   FeishuScreeningSummarySchema,
   QuickScreeningResultSchema,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/resume-screening/schema";
 import type {
   DetailedScreeningResult,
+  DetailedScreeningResultV2,
   DuplicateCheckResult,
   FeishuScreeningSummary,
   QuickScreeningResult,
@@ -161,15 +163,95 @@ describe("resume screening core schemas", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts a complete V2 detailed result with hyphenated criterion keys", () => {
+    const result = DetailedScreeningResultV2Schema.safeParse(createValidDetailedV2Result());
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contractVersion).toBe("detailed-screening.v2");
+      expect(result.data.criterionAssessments.map((item) => item.criterionKey)).toEqual([
+        "backend-api",
+        "motion-control",
+        "robotics-experience"
+      ]);
+    }
+  });
+
+  it("rejects V2 results with a wrong contract version or missing criterion assessments", () => {
+    const wrongVersion = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      contractVersion: "detailed-screening.v1"
+    });
+    const missingAssessments = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      criterionAssessments: undefined
+    });
+
+    expect(wrongVersion.success).toBe(false);
+    expect(missingAssessments.success).toBe(false);
+  });
+
+  it("keeps V2 risks and missing information independent", () => {
+    const result = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      missingInformation: ["Weekly availability is not stated."],
+      risks: []
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid V2 criterion assessment fields and unknown fields", () => {
+    const blankConclusion = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      criterionAssessments: [
+        {
+          ...createValidDetailedV2Result().criterionAssessments[0],
+          conclusion: " "
+        }
+      ]
+    });
+    const invalidEvidence = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      criterionAssessments: [
+        {
+          ...createValidDetailedV2Result().criterionAssessments[0],
+          evidence: []
+        }
+      ]
+    });
+    const underscoreKey = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      criterionAssessments: [
+        {
+          ...createValidDetailedV2Result().criterionAssessments[0],
+          criterionKey: "backend_api"
+        }
+      ]
+    });
+    const unknownField = DetailedScreeningResultV2Schema.safeParse({
+      ...createValidDetailedV2Result(),
+      rawProviderResponse: "not allowed"
+    });
+
+    expect(blankConclusion.success).toBe(false);
+    expect(invalidEvidence.success).toBe(false);
+    expect(underscoreKey.success).toBe(false);
+    expect(unknownField.success).toBe(false);
+  });
+
   it("keeps TypeScript types aligned with schema inference", () => {
     type QuickSchemaOutput = z.infer<typeof QuickScreeningResultSchema>;
     type DetailedSchemaOutput = z.infer<typeof DetailedScreeningResultSchema>;
+    type DetailedV2SchemaOutput = z.infer<typeof DetailedScreeningResultV2Schema>;
     type EvidenceSchemaOutput = z.infer<typeof ScreeningEvidenceSchema>;
 
     expectTypeOf<QuickSchemaOutput>().toMatchTypeOf<QuickScreeningResult>();
     expectTypeOf<QuickScreeningResult>().toMatchTypeOf<QuickSchemaOutput>();
     expectTypeOf<DetailedSchemaOutput>().toMatchTypeOf<DetailedScreeningResult>();
     expectTypeOf<DetailedScreeningResult>().toMatchTypeOf<DetailedSchemaOutput>();
+    expectTypeOf<DetailedV2SchemaOutput>().toMatchTypeOf<DetailedScreeningResultV2>();
+    expectTypeOf<DetailedScreeningResultV2>().toMatchTypeOf<DetailedV2SchemaOutput>();
     expectTypeOf<EvidenceSchemaOutput>().toMatchTypeOf<ScreeningEvidence>();
     expectTypeOf<ScreeningEvidence>().toMatchTypeOf<EvidenceSchemaOutput>();
   });
@@ -311,6 +393,33 @@ function createValidDetailedResult(
     strengths: ["Direct robot arm project evidence."],
     summary: "The candidate has relevant robot arm experience with some gaps.",
     weaknesses: ["PLC evidence is not explicit."],
+    ...overrides
+  };
+}
+
+function createValidDetailedV2Result(
+  overrides: Partial<DetailedScreeningResultV2> = {}
+): DetailedScreeningResultV2 {
+  const evidence = createValidEvidence({ id: "ev_backend_api" });
+
+  return {
+    ...createValidDetailedResult(),
+    contractVersion: "detailed-screening.v2",
+    criterionAssessments: [
+      "backend-api",
+      "motion-control",
+      "robotics-experience"
+    ].map((criterionKey) => ({
+      conclusion: `${criterionKey} is supported by the available resume evidence.`,
+      criterionKey,
+      criterionLabel: criterionKey,
+      evidence: [evidence],
+      interviewQuestions: [],
+      missingInformation: [],
+      risks: [],
+      score: 80
+    })),
+    schemaVersion: "m11-a.detailed.v2",
     ...overrides
   };
 }
