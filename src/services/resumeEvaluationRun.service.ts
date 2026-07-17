@@ -833,15 +833,15 @@ async function createRunFromProviderResult(
     parsedOutputJson: quickScreeningResult as unknown as Prisma.InputJsonValue,
     parsedSnapshotId: context.evaluation.parsedSnapshotId,
     phoneScreenQuestionsJson: output.interviewQuestions as unknown as Prisma.InputJsonValue,
-    rating: output.recommendation,
+    rating: quickScreeningResult.recommendation,
     resumeId: context.evaluation.resumeId,
     resumeRevisionId: context.evaluation.resumeRevisionId,
     riskFlagsJson: output.risks as unknown as Prisma.InputJsonValue,
     runType: "RULE_BASED",
-    score: output.overallScore,
+    score: quickScreeningResult.overallScore,
     status: "SUCCEEDED",
     strengthsJson: output.strengths as unknown as Prisma.InputJsonValue,
-    summary: output.overallSummary,
+    summary: quickScreeningResult.summary,
     templateVersionId: context.evaluation.templateVersionId,
     weaknessesJson: output.weaknesses as unknown as Prisma.InputJsonValue
   });
@@ -883,6 +883,10 @@ function createMockParsedOutput(): Prisma.InputJsonObject {
 }
 
 function toDto(run: ResumeEvaluationRunSafeRecord): ResumeEvaluationRunDto {
+  const canonicalQuickResult =
+    run.runType === "RULE_BASED" ? resolveQuickScreeningResult(run.parsedOutputJson) : null;
+  const quickResult = canonicalQuickResult?.success ? canonicalQuickResult.result : null;
+
   return {
     completedAt: run.completedAt?.toISOString() ?? null,
     createdAt: run.createdAt.toISOString(),
@@ -894,12 +898,12 @@ function toDto(run: ResumeEvaluationRunSafeRecord): ResumeEvaluationRunDto {
     modelProvider: run.modelProvider,
     parsedSnapshotId: run.parsedSnapshotId,
     promptVersion: run.promptVersion,
-    rating: run.rating,
+    rating: quickResult?.recommendation ?? run.rating,
     resumeRevisionId: run.resumeRevisionId,
     runType: run.runType,
-    score: run.score,
+    score: quickResult?.overallScore ?? run.score,
     status: run.status,
-    summary: run.summary
+    summary: quickResult?.summary ?? run.summary
   };
 }
 

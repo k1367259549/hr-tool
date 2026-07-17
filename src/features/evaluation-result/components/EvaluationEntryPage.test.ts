@@ -48,6 +48,15 @@ describe("formal evaluation entry UI", () => {
     expect(`${quickText}\n${detailedText}`).toContain("不自动推进 Pipeline");
   });
 
+  it("uses the parsed resume list instead of asking HR to paste an internal ID", () => {
+    const newSource = readNewEvaluationPageSource();
+
+    expect(newSource).toContain("/api/resumes?parsingStatus=PARSED&linkStatus=all");
+    expect(newSource).toContain("简历（已解析）");
+    expect(newSource).toContain("请选择已解析简历");
+    expect(newSource).not.toContain("粘贴 Resume ID");
+  });
+
   it("does not promote the local demo page from the formal evaluation entry", () => {
     const listSource = readEvaluationListPageSource();
     const newSource = readFileSync(
@@ -59,6 +68,14 @@ describe("formal evaluation entry UI", () => {
     );
 
     expect(`${listSource}\n${newSource}`).not.toContain("/feishu/demo");
+  });
+
+  it("does not render internal evaluation identifiers in the formal list", () => {
+    const listSource = readEvaluationListPageSource();
+
+    expect(listSource).not.toContain('label="简历 ID"');
+    expect(listSource).not.toContain('label="岗位 ID"');
+    expect(listSource).not.toContain("评估 {evaluation.id.slice");
   });
 
   it("renders quick screening loading, success, error, and timeout states", () => {

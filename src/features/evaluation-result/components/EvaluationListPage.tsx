@@ -193,9 +193,7 @@ function EvaluationRow({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="break-all text-sm font-semibold text-slate-950">
-            评估 {evaluation.id.slice(0, 8)}
-          </p>
+          <p className="text-sm font-semibold text-slate-950">评估记录</p>
           <p className="mt-1 text-xs text-slate-500">
             {evaluation.evaluatedBy ? `评估人：${evaluation.evaluatedBy}` : "未指定评估人"}
           </p>
@@ -205,8 +203,8 @@ function EvaluationRow({
         </span>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-4">
-        <MetaLine label="简历 ID" value={evaluation.resumeId.slice(0, 8)} />
-        <MetaLine label="岗位 ID" value={evaluation.jobProfileId.slice(0, 8)} />
+        <MetaLine label="简历" value="已关联" />
+        <MetaLine label="岗位" value="已关联" />
         <MetaLine label="版本号" value={String(evaluation.revision)} />
         <MetaLine label="更新时间" value={formatDateTime(evaluation.updatedAt)} />
       </div>

@@ -318,6 +318,31 @@ describe("resumeEvaluationRunService query helpers", () => {
     });
   });
 
+  it("uses canonical quick-screening fields for historical run DTOs", async () => {
+    const canonicalQuickResult = makeValidQuickScreeningResult({
+      overallScore: 49,
+      recommendation: "MANUAL_REVIEW",
+      summary: "Canonical quick screening summary for manual review."
+    });
+    vi.mocked(resumeEvaluationRunRepository.listRunsByEvaluationId).mockResolvedValueOnce([
+      makeRun({
+        parsedOutputJson: canonicalQuickResult,
+        rating: "UNCERTAIN",
+        runType: "RULE_BASED",
+        score: 49,
+        summary: "Legacy compatibility summary."
+      })
+    ]);
+
+    const [result] = await resumeEvaluationRunService.listRunsByEvaluationId("eval-1");
+
+    expect(result).toMatchObject({
+      rating: "MANUAL_REVIEW",
+      score: 49,
+      summary: "Canonical quick screening summary for manual review."
+    });
+  });
+
   it("returns latest successful run when available", async () => {
     vi.mocked(resumeEvaluationRunRepository.findLatestSuccessfulRun).mockResolvedValueOnce(
       makeRun({ id: "run-latest" })
@@ -442,6 +467,7 @@ describe("resumeEvaluationRunService.createQuickScreeningRun", () => {
     expect(result.result.recommendation).toBe(result.screeningResult.recommendation);
     expect(result.result.score).toBe(result.screeningResult.overallScore);
     expect(result.result.summary).toBe(result.screeningResult.summary);
+    expect(result.run.rating).toBe(result.screeningResult.recommendation);
     expect(result.result.evidence.length).toBeGreaterThan(0);
     expect(result.result.nextStep).toContain("人工复核");
     expect(resumeEvaluationRepository.findDetailById).toHaveBeenCalledWith(

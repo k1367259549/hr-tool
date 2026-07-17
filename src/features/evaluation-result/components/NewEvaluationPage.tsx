@@ -14,6 +14,7 @@ import type {
   ResumeEvaluationDetailDto,
   ResumeEvaluationOptionsDto
 } from "@/types/resumeEvaluationResult";
+import type { ResumeListResultDto } from "@/types/resumeLibrary";
 
 const quickScreeningTimeoutMs = 30_000;
 
@@ -29,6 +30,9 @@ export function NewEvaluationPage(): JSX.Element {
   const [evaluatedBy, setEvaluatedBy] = useState("");
   const [options, setOptions] = useState<ResumeEvaluationOptionsDto | null>(null);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [resumeOptions, setResumeOptions] = useState<ResumeListResultDto | null>(null);
+  const [isLoadingResumes, setIsLoadingResumes] = useState(true);
+  const [resumeOptionsError, setResumeOptionsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quickScreeningResult, setQuickScreeningResult] =
@@ -67,6 +71,40 @@ export function NewEvaluationPage(): JSX.Element {
       cancelled = true;
     };
   }, [resumeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetch("/api/resumes?parsingStatus=PARSED&linkStatus=all&page=1&pageSize=100")
+      .then((response) => response.json() as Promise<ApiResponse<ResumeListResultDto>>)
+      .then((json) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!json.success || !json.data) {
+          throw new Error(json.error?.message ?? "已解析简历加载失败。");
+        }
+
+        setResumeOptions(json.data);
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          setResumeOptionsError(
+            loadError instanceof Error ? loadError.message : "已解析简历加载失败。"
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingResumes(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -194,15 +232,29 @@ export function NewEvaluationPage(): JSX.Element {
         ) : null}
 
         <label className="block text-sm font-medium text-slate-700">
-          简历 ID
-          <input
+          简历（已解析）
+          <select
             required
             className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            placeholder="粘贴 Resume ID"
             value={resumeId}
             onChange={(e) => setResumeId(e.target.value)}
-          />
+          >
+            <option value="">请选择已解析简历</option>
+            {resumeOptions?.items.map((resume) => (
+              <option key={resume.id} value={resume.id}>
+                {formatResumeOptionLabel(resume)}
+              </option>
+            ))}
+          </select>
         </label>
+
+        {isLoadingResumes ? <p className="text-sm text-slate-500">正在加载已解析简历…</p> : null}
+        {resumeOptionsError ? (
+          <p className="text-sm text-rose-700">{resumeOptionsError}</p>
+        ) : null}
+        {!isLoadingResumes && !resumeOptionsError && resumeOptions?.items.length === 0 ? (
+          <p className="text-sm text-slate-500">暂无可用于评估的已解析简历。</p>
+        ) : null}
 
         {isLoadingOptions ? (
           <p className="text-sm text-slate-500">正在加载岗位和模板选项…</p>
@@ -259,7 +311,14 @@ export function NewEvaluationPage(): JSX.Element {
         <button
           type="submit"
           className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={isSaving || !resumeId.trim() || !jobProfileId || !templateVersionId}
+          disabled={
+            isSaving ||
+            isLoadingResumes ||
+            !!resumeOptionsError ||
+            !resumeId.trim() ||
+            !jobProfileId ||
+            !templateVersionId
+          }
         >
           {isSaving
             ? mode === "quick"
@@ -316,6 +375,15 @@ export function EvaluationModeGuide({ mode }: { mode: EvaluationMode }): JSX.Ele
 
 function normalizeEvaluationMode(value: string | null): EvaluationMode {
   return value === "detailed-analysis" ? "detailed-analysis" : "quick";
+}
+
+function formatResumeOptionLabel(
+  resume: ResumeListResultDto["items"][number]
+): string {
+  const owner = resume.candidateName ?? resume.candidateSource ?? "未关联候选人";
+  const jobContext = resume.jobProfileTitle ? ` · ${resume.jobProfileTitle}` : "";
+
+  return `${owner} · ${resume.fileName}${jobContext}`;
 }
 
 export function QuickScreeningStatusPanel({

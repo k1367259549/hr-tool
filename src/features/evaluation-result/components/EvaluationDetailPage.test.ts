@@ -1,4 +1,6 @@
 import type { ReactElement } from "react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AiReferenceStatusNotice,
@@ -235,6 +237,17 @@ describe("formal detailed analysis UI", () => {
     expect(legacyText).toContain("不包含评价标准逐项结果");
     expect(invalidText).toContain("无法安全提供逐项参考");
     expect(CriterionAiReferencePanel({ reference: null })).toBeTruthy();
+  });
+
+  it("does not render linked record IDs in the recruiter-facing detail metadata", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/features/evaluation-result/components/EvaluationDetailPage.tsx"),
+      "utf8"
+    );
+
+    expect(source).not.toContain('label="简历 ID"');
+    expect(source).not.toContain('label="岗位 ID"');
+    expect(source).not.toContain('label="模板版本 ID"');
   });
 });
 

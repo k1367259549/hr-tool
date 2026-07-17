@@ -225,9 +225,9 @@ export function EvaluationDetailPage({
           <section className="rounded-md border border-slate-200 bg-white p-5">
             <h2 className="text-lg font-semibold text-slate-950">关联信息</h2>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-              <MetaLine label="简历 ID" value={evaluation.resumeId} />
-              <MetaLine label="岗位 ID" value={evaluation.jobProfileId} />
-              <MetaLine label="模板版本 ID" value={evaluation.templateVersionId} />
+              <MetaLine label="简历" value="已关联" />
+              <MetaLine label="岗位" value="已关联" />
+              <MetaLine label="评价标准" value="已关联" />
               <MetaLine label="岗位画像快照版本" value={evaluation.jobProfileVersion} />
               <MetaLine label="创建时间" value={formatDateTime(evaluation.createdAt)} />
               <MetaLine label="更新时间" value={formatDateTime(evaluation.updatedAt)} />
