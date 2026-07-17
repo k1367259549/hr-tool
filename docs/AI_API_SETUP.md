@@ -22,6 +22,7 @@ AI_PROVIDER=openai-compatible
 AI_BASE_URL=https://your-relay.example.com/v1
 AI_API_KEY=your_relay_token_here
 AI_MODEL=your_model_name
+AI_ENDPOINT_MODE=chat-completions
 ```
 
 Do not put the key in UI code, browser storage, GitHub workflow files, or committed documentation.
@@ -83,6 +84,12 @@ Optional reliability settings:
 
 - `AI_TIMEOUT_MS=60000` controls the provider request timeout in milliseconds.
 - `AI_MAX_RETRIES=2` controls provider retry attempts after transient failures.
+
+Relay endpoint mode defaults to `chat-completions`, which sends requests to the
+OpenAI-compatible `/v1/chat/completions` endpoint. For a relay that explicitly
+supports the Responses API instead, set `AI_ENDPOINT_MODE=responses`; this sends
+requests to `/v1/responses`. The application does not automatically switch
+endpoints after an error.
 
 For slower relay providers or larger models, increase `AI_TIMEOUT_MS` in `.env`, then restart Docker. Do not hardcode provider-specific timing inside workflow code.
 

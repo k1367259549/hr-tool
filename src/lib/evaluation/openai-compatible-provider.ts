@@ -25,13 +25,25 @@ type FetchLike = (
   ok: boolean;
   status: number;
   statusText?: string;
+  headers?: {
+    get(name: string): string | null;
+  };
   json(): Promise<unknown>;
 }>;
+
+export const openAICompatibleEndpointModes = [
+  "chat-completions",
+  "responses"
+] as const;
+
+export type OpenAICompatibleEndpointMode =
+  (typeof openAICompatibleEndpointModes)[number];
 
 type OpenAICompatibleEvaluationProviderOptions = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  endpointMode?: OpenAICompatibleEndpointMode;
   timeoutMs?: number;
   fetchImpl?: FetchLike;
   now?: () => Date;
@@ -46,8 +58,17 @@ type ChatCompletionResponse = {
   }>;
 };
 
+type ResponsesApiResponse = {
+  output_text?: unknown;
+  output?: Array<{
+    content?: Array<{
+      text?: unknown;
+      type?: unknown;
+    }>;
+  }>;
+};
+
 const DEFAULT_TIMEOUT_MS = 30_000;
-const CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions";
 const DETAILED_ANALYSIS_PROMPT_FILE = "detailed-analysis.md";
 
 export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
@@ -56,6 +77,7 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
+  private readonly endpointMode: OpenAICompatibleEndpointMode;
   private readonly model: string;
   private readonly now: () => Date;
   private readonly timeoutMs: number;
@@ -66,6 +88,7 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.endpointMode = options.endpointMode ?? "chat-completions";
     this.model = options.model;
     this.now = options.now ?? (() => new Date());
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -91,8 +114,9 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
       }
 
       const prompt = await promptRegistry.getPrompt(DETAILED_ANALYSIS_PROMPT_FILE);
+      const requestUrl = this.createUrl();
       const response = await withTimeout(
-        this.fetchImpl(this.createUrl(), {
+        this.fetchImpl(requestUrl, {
           body: JSON.stringify(this.createRequestBody(input, prompt.template)),
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
@@ -109,13 +133,13 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
         return this.failure(
           "PROVIDER_ERROR",
           "openai-compatible-provider-response-error",
-          `OpenAI-compatible provider returned HTTP ${response.status}.`,
-          metadata
+          `OpenAI-compatible provider returned HTTP ${response.status} at ${this.getRequestPath(requestUrl)}.`,
+          this.createResponseErrorMetadata(metadata, response, requestUrl)
         );
       }
 
       const payload = await response.json();
-      const content = getChatMessageContent(payload);
+      const content = getResponseContent(payload, this.endpointMode);
 
       if (typeof content !== "string") {
         return this.failure(
@@ -237,6 +261,13 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
     if (!options.model.trim()) {
       throw new Error("OpenAI-compatible provider model is required.");
     }
+
+    if (
+      options.endpointMode !== undefined &&
+      !openAICompatibleEndpointModes.includes(options.endpointMode)
+    ) {
+      throw new Error("OpenAI-compatible provider endpointMode is invalid.");
+    }
   }
 
   private createMetadata(
@@ -257,21 +288,18 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
   }
 
   private createRequestBody(input: EvaluationProviderInput, promptTemplate: string) {
+    const messages = createRequestMessages(input, promptTemplate);
+
+    if (this.endpointMode === "responses") {
+      return {
+        input: messages,
+        model: this.model
+      };
+    }
+
     return {
       model: this.model,
-      messages: [
-        {
-          role: "system",
-          content: promptTemplate.replace(
-            "{{INPUT}}",
-            "The user message contains the delimited evaluation input blocks."
-          )
-        },
-        {
-          role: "user",
-          content: createEvaluationInputBlock(input)
-        }
-      ],
+      messages,
       response_format: {
         type: "json_object"
       },
@@ -280,7 +308,51 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
   }
 
   private createUrl(): string {
-    return `${this.baseUrl}${CHAT_COMPLETIONS_ENDPOINT}`;
+    const url = new URL(this.baseUrl);
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+
+    if (
+      pathSegments.at(-2) === "chat" &&
+      pathSegments.at(-1) === "completions"
+    ) {
+      pathSegments.splice(-2);
+    } else if (pathSegments.at(-1) === "responses") {
+      pathSegments.pop();
+    }
+
+    if (pathSegments.at(-1) !== "v1") {
+      pathSegments.push("v1");
+    }
+
+    pathSegments.push(
+      ...(this.endpointMode === "responses" ? ["responses"] : ["chat", "completions"])
+    );
+    url.hash = "";
+    url.pathname = `/${pathSegments.join("/")}`;
+    url.search = "";
+
+    return url.toString();
+  }
+
+  private createResponseErrorMetadata(
+    metadata: EvaluationProviderMetadata,
+    response: Awaited<ReturnType<FetchLike>>,
+    requestUrl: string
+  ): EvaluationProviderMetadata {
+    return {
+      ...metadata,
+      cfRay: readSafeHeader(response.headers, "cf-ray"),
+      httpStatus: response.status,
+      providerHost: new URL(requestUrl).host,
+      requestId:
+        readSafeHeader(response.headers, "x-request-id") ??
+        readSafeHeader(response.headers, "request-id"),
+      requestPath: this.getRequestPath(requestUrl)
+    };
+  }
+
+  private getRequestPath(requestUrl: string): string {
+    return new URL(requestUrl).pathname;
   }
 
   private failure(
@@ -299,6 +371,22 @@ export class OpenAICompatibleEvaluationProvider implements EvaluationProvider {
       metadata
     };
   }
+}
+
+function createRequestMessages(input: EvaluationProviderInput, promptTemplate: string) {
+  return [
+    {
+      role: "system",
+      content: promptTemplate.replace(
+        "{{INPUT}}",
+        "The user message contains the delimited evaluation input blocks."
+      )
+    },
+    {
+      role: "user",
+      content: createEvaluationInputBlock(input)
+    }
+  ];
 }
 
 function createEvaluationInputBlock(input: EvaluationProviderInput): string {
@@ -351,10 +439,48 @@ function formatJobUnderstanding(input: EvaluationProviderInput): string | null {
   return summary ? summary : null;
 }
 
+function getResponseContent(
+  payload: unknown,
+  endpointMode: OpenAICompatibleEndpointMode
+): unknown {
+  if (endpointMode === "responses") {
+    return getResponsesOutputText(payload);
+  }
+
+  return getChatMessageContent(payload);
+}
+
 function getChatMessageContent(payload: unknown): unknown {
   const response = payload as ChatCompletionResponse;
 
   return response.choices?.[0]?.message?.content;
+}
+
+function getResponsesOutputText(payload: unknown): unknown {
+  const response = payload as ResponsesApiResponse;
+
+  if (typeof response.output_text === "string") {
+    return response.output_text;
+  }
+
+  for (const outputItem of response.output ?? []) {
+    for (const contentItem of outputItem.content ?? []) {
+      if (contentItem.type === "output_text" && typeof contentItem.text === "string") {
+        return contentItem.text;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function readSafeHeader(
+  headers: { get(name: string): string | null } | undefined,
+  name: string
+): string | undefined {
+  const value = headers?.get(name)?.trim();
+
+  return value ? value.slice(0, 200) : undefined;
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {

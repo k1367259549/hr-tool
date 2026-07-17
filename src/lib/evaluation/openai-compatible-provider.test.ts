@@ -275,6 +275,27 @@ function createChatResponse(content: string) {
   };
 }
 
+function createResponsesResponse(content: string) {
+  return {
+    ok: true,
+    status: 200,
+    async json() {
+      return {
+        output: [
+          {
+            content: [
+              {
+                text: content,
+                type: "output_text"
+              }
+            ]
+          }
+        ]
+      };
+    }
+  };
+}
+
 function createProvider(fetchImpl: FetchImpl = async () =>
   createChatResponse(JSON.stringify(createValidDetailedOutput()))
 ) {
@@ -420,6 +441,38 @@ describe("OpenAICompatibleEvaluationProvider", () => {
     expect(body.messages[1].content).toContain("Build and maintain TypeScript backend APIs.");
     expect(body.messages[1].content).toContain("REQUIRED");
     expect(body.messages[1].content).toContain("Use direct resume evidence about API ownership.");
+  });
+
+  it("uses the explicit Responses endpoint mode with message-list input", async () => {
+    let requestUrl: string | null = null;
+    let requestInit: FetchInit;
+    const output = createValidDetailedOutput();
+    const provider = new OpenAICompatibleEvaluationProvider({
+      apiKey: "explicit-test-key",
+      baseUrl: "https://provider.test/v1/",
+      endpointMode: "responses",
+      fetchImpl: async (url, init) => {
+        requestUrl = url;
+        requestInit = init;
+        return createResponsesResponse(JSON.stringify(output));
+      },
+      model: "gpt-5.5-compatible",
+      now: createSequentialClock([startedAt, completedAt]),
+      timeoutMs: 50,
+      version: "openai-compatible-test-v1"
+    });
+
+    const result = await provider.evaluate(createProviderInput());
+    const body = JSON.parse(String(requestInit?.body));
+
+    expect(result.success).toBe(true);
+    expect(requestUrl).toBe("https://provider.test/v1/responses");
+    expect(body).toMatchObject({
+      model: "gpt-5.5-compatible"
+    });
+    expect(body.input).toHaveLength(2);
+    expect(body.input[0]).toMatchObject({ role: "system" });
+    expect(body.input[1].content).toContain("<RESUME_TEXT>");
   });
 
   it("normalizes valid detailed assessments to template order without matching labels", async () => {
@@ -648,6 +701,44 @@ describe("OpenAICompatibleEvaluationProvider", () => {
       failureReason: "PROVIDER_ERROR",
       success: false
     });
+  });
+
+  it("adds safe endpoint diagnostics to non-2xx provider errors", async () => {
+    const provider = createProvider(
+      async () => ({
+        headers: {
+          get(name: string) {
+            if (name === "cf-ray") {
+              return "cf-test-123";
+            }
+
+            return name === "x-request-id" ? "request-test-123" : null;
+          }
+        },
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        }
+      })
+    );
+
+    const result = await provider.evaluate(createProviderInput());
+
+    expect(result).toMatchObject({
+      error: {
+        message: "OpenAI-compatible provider returned HTTP 404 at /v1/chat/completions."
+      },
+      metadata: {
+        cfRay: "cf-test-123",
+        httpStatus: 404,
+        providerHost: "provider.test",
+        requestId: "request-test-123",
+        requestPath: "/v1/chat/completions"
+      },
+      success: false
+    });
+    expect(JSON.stringify(result)).not.toContain("explicit-test-key");
   });
 
   it("maps fetch rejection to PROVIDER_ERROR", async () => {

@@ -1,8 +1,13 @@
 import { z } from "zod";
-import { OpenAICompatibleEvaluationProvider } from "@/lib/evaluation/openai-compatible-provider";
+import {
+  OpenAICompatibleEvaluationProvider,
+  openAICompatibleEndpointModes,
+  type OpenAICompatibleEndpointMode
+} from "@/lib/evaluation/openai-compatible-provider";
 
 const DEFAULT_LUMINAI_MODEL = "gpt-5.5";
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_ENDPOINT_MODE: OpenAICompatibleEndpointMode = "chat-completions";
 
 type OpenAICompatibleProviderOptions = ConstructorParameters<
   typeof OpenAICompatibleEvaluationProvider
@@ -12,6 +17,7 @@ export type LuminAIConfigInput = {
   baseUrl: string;
   apiKey: string;
   model?: string;
+  endpointMode?: OpenAICompatibleEndpointMode;
   timeoutMs?: number;
 };
 
@@ -19,6 +25,7 @@ export type LuminAIProviderConfig = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  endpointMode: OpenAICompatibleEndpointMode;
   timeoutMs: number;
 };
 
@@ -49,6 +56,7 @@ const LuminAIConfigInputSchema = z
       .trim()
       .min(1, "model is required.")
       .optional(),
+    endpointMode: z.enum(openAICompatibleEndpointModes).optional(),
     timeoutMs: z
       .number()
       .int("timeoutMs must be an integer.")
@@ -69,6 +77,7 @@ export function createLuminAIConfig(input: LuminAIConfigInput): LuminAIProviderC
   return {
     apiKey: result.data.apiKey,
     baseUrl: normalizeBaseUrl(result.data.baseUrl),
+    endpointMode: result.data.endpointMode ?? DEFAULT_ENDPOINT_MODE,
     model: result.data.model ?? DEFAULT_LUMINAI_MODEL,
     timeoutMs: result.data.timeoutMs ?? DEFAULT_TIMEOUT_MS
   };

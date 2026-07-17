@@ -4,6 +4,10 @@ import {
   type LuminAIProviderConfig,
   type LuminAIProviderOptions
 } from "@/lib/evaluation/luminai-config-adapter";
+import {
+  openAICompatibleEndpointModes,
+  type OpenAICompatibleEndpointMode
+} from "@/lib/evaluation/openai-compatible-provider";
 import type { EvaluationProvider } from "@/lib/evaluation/provider-interface";
 import { RuleBasedEvaluationProvider } from "@/lib/evaluation/rule-based-provider";
 
@@ -23,6 +27,7 @@ export type EvaluationProviderRuntimeSafeSummary =
       baseUrl: string;
       hasApiKey: boolean;
       model: string;
+      endpointMode?: OpenAICompatibleEndpointMode;
       requiresApiKey: true;
       timeoutMs: number;
     };
@@ -65,6 +70,7 @@ export function readEvaluationProviderRuntimeConfig(
     apiKey,
     baseUrl,
     model: normalizeOptionalEnvValue(env.AI_MODEL),
+    endpointMode: parseEndpointMode(env.AI_ENDPOINT_MODE),
     timeoutMs: parseOptionalPositiveInteger(env.AI_TIMEOUT_MS)
   });
 
@@ -76,10 +82,25 @@ export function readEvaluationProviderRuntimeConfig(
       baseUrl: luminAIConfig.baseUrl,
       hasApiKey: true,
       model: luminAIConfig.model,
+      endpointMode: luminAIConfig.endpointMode,
       requiresApiKey: true,
       timeoutMs: luminAIConfig.timeoutMs
     }
   };
+}
+
+function parseEndpointMode(value: string | undefined): OpenAICompatibleEndpointMode | undefined {
+  const endpointMode = normalizeOptionalEnvValue(value);
+
+  if (endpointMode === undefined) {
+    return undefined;
+  }
+
+  if (openAICompatibleEndpointModes.includes(endpointMode as OpenAICompatibleEndpointMode)) {
+    return endpointMode as OpenAICompatibleEndpointMode;
+  }
+
+  throw new Error("AI_ENDPOINT_MODE must be chat-completions or responses.");
 }
 
 export function createEvaluationProviderFromRuntimeConfig(

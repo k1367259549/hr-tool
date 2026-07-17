@@ -321,6 +321,49 @@ describe("evaluation provider smoke script", () => {
     expect(messages.join("\n")).not.toContain("secret-smoke-key");
   });
 
+  it("forwards an explicit Responses endpoint mode to the provider", async () => {
+    let requestUrl: string | null = null;
+    let requestBody: unknown;
+    const { logger } = createLogger();
+    const result = await runEvaluationProviderSmoke({
+      env: createEnv({
+        AI_BASE_URL: "https://luminai.test/v1",
+        AI_ENDPOINT_MODE: "responses"
+      }),
+      fetchImpl: async (url, init) => {
+        requestUrl = url;
+        requestBody = JSON.parse(String(init?.body));
+
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              output: [
+                {
+                  content: [
+                    {
+                      text: JSON.stringify(createValidEvaluationOutput()),
+                      type: "output_text"
+                    }
+                  ]
+                }
+              ]
+            };
+          }
+        };
+      },
+      logger
+    });
+
+    expect(result).toMatchObject({ exitCode: 0, status: "success" });
+    expect(requestUrl).toBe("https://luminai.test/v1/responses");
+    expect(requestBody).toMatchObject({
+      input: expect.any(Array),
+      model: "gpt-5.5-smoke"
+    });
+  });
+
   it("runs a mocked provider failure path", async () => {
     let callCount = 0;
     const fetchImpl: FetchImpl = async () => {

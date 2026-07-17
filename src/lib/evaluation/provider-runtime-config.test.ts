@@ -64,11 +64,13 @@ describe("Evaluation provider runtime config", () => {
       luminAIConfig: {
         apiKey: "secret-key",
         baseUrl: "https://luminai.test",
+        endpointMode: "chat-completions",
         model: "custom-model",
         timeoutMs: 12000
       },
       safeSummary: {
         baseUrl: "https://luminai.test",
+        endpointMode: "chat-completions",
         hasApiKey: true,
         model: "custom-model",
         provider: "openai-compatible",
@@ -100,6 +102,7 @@ describe("Evaluation provider runtime config", () => {
 
     if (config.provider === "openai-compatible") {
       expect(config.luminAIConfig.model).toBe("gpt-5.5");
+      expect(config.luminAIConfig.endpointMode).toBe("chat-completions");
       expect(config.luminAIConfig.timeoutMs).toBe(30_000);
 
       if (config.safeSummary.provider === "openai-compatible") {
@@ -162,5 +165,28 @@ describe("Evaluation provider runtime config", () => {
         AI_PROVIDER: "luminai"
       })
     ).toThrow("AI_PROVIDER must be openai-compatible or rule-based.");
+  });
+
+  it("accepts responses endpoint mode and rejects invalid values", () => {
+    const config = readEvaluationProviderRuntimeConfig({
+      AI_API_KEY: "secret-key",
+      AI_BASE_URL: "https://luminai.test/v1",
+      AI_ENDPOINT_MODE: "responses",
+      AI_PROVIDER: "openai-compatible"
+    });
+
+    expect(config.provider).toBe("openai-compatible");
+    if (config.provider === "openai-compatible") {
+      expect(config.luminAIConfig.endpointMode).toBe("responses");
+    }
+
+    expect(() =>
+      readEvaluationProviderRuntimeConfig({
+        AI_API_KEY: "secret-key",
+        AI_BASE_URL: "https://luminai.test",
+        AI_ENDPOINT_MODE: "automatic",
+        AI_PROVIDER: "openai-compatible"
+      })
+    ).toThrow("AI_ENDPOINT_MODE must be chat-completions or responses.");
   });
 });

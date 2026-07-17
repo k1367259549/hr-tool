@@ -90,6 +90,11 @@ export type EvaluationProviderMetadata = {
   model?: string;
   promptFile?: string;
   promptVersion?: string;
+  providerHost?: string;
+  requestPath?: string;
+  httpStatus?: number;
+  requestId?: string;
+  cfRay?: string;
 };
 
 export type EvaluationProviderError = {

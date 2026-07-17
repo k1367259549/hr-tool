@@ -2,6 +2,10 @@ import {
   createLuminAIConfig,
   createLuminAIEvaluationProvider
 } from "../src/lib/evaluation/luminai-config-adapter";
+import {
+  openAICompatibleEndpointModes,
+  type OpenAICompatibleEndpointMode
+} from "../src/lib/evaluation/openai-compatible-provider";
 import { MemoryEvaluationRunRepository } from "../src/lib/evaluation/memory-run-repository";
 import { runEvaluationProvider } from "../src/lib/evaluation/provider-runner";
 
@@ -98,6 +102,7 @@ export async function runEvaluationProviderSmoke(
     const config = createLuminAIConfig({
       apiKey: env.AI_API_KEY,
       baseUrl: env.AI_BASE_URL,
+      endpointMode: parseOptionalEndpointMode(env.AI_ENDPOINT_MODE),
       model: env.AI_MODEL?.trim() ? env.AI_MODEL : DEFAULT_MODEL,
       timeoutMs: parseOptionalPositiveInteger(env.AI_TIMEOUT_MS)
     });
@@ -189,6 +194,22 @@ function parseOptionalPositiveInteger(value: string | undefined): number | undef
   }
 
   return parsed;
+}
+
+function parseOptionalEndpointMode(
+  value: string | undefined
+): OpenAICompatibleEndpointMode | undefined {
+  const endpointMode = value?.trim();
+
+  if (!endpointMode) {
+    return undefined;
+  }
+
+  if (openAICompatibleEndpointModes.includes(endpointMode as OpenAICompatibleEndpointMode)) {
+    return endpointMode as OpenAICompatibleEndpointMode;
+  }
+
+  throw new Error("AI_ENDPOINT_MODE must be chat-completions or responses.");
 }
 
 if (process.argv[1]?.endsWith("evaluation-provider-smoke.ts")) {

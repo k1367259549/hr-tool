@@ -82,6 +82,7 @@ describe("LuminAI config adapter", () => {
 
     expect(provider.name).toBe("OPENAI_COMPATIBLE");
     expect(provider.version).toBe("openai-compatible-skeleton-v1");
+    expect(config.endpointMode).toBe("chat-completions");
   });
 
   it("normalizes trailing slashes from baseUrl", async () => {
@@ -108,6 +109,46 @@ describe("LuminAI config adapter", () => {
 
     expect(config.baseUrl).toBe("https://luminai.test");
     expect(requestUrl).toBe("https://luminai.test/v1/chat/completions");
+  });
+
+  it.each([
+    ["a v1 base URL", "https://luminai.test/v1", "chat-completions", "https://luminai.test/v1/chat/completions"],
+    ["a responses base URL", "https://luminai.test/v1/responses/", "responses", "https://luminai.test/v1/responses"]
+  ] as const)("does not duplicate endpoint segments for %s", async (_name, baseUrl, endpointMode, expectedUrl) => {
+    let requestUrl: string | null = null;
+    const provider = createLuminAIEvaluationProvider(
+      createLuminAIConfig({
+        apiKey: "test-key",
+        baseUrl,
+        endpointMode,
+        model: "custom-model"
+      }),
+      {
+        fetchImpl: async (url) => {
+          requestUrl = url;
+          return createFetchImpl()(url);
+        }
+      }
+    );
+
+    await provider.evaluate({
+      jobDescription: "Need backend API TypeScript experience.",
+      resumeText: "Built backend API TypeScript services.",
+      runId: "run-1"
+    });
+
+    expect(requestUrl).toBe(expectedUrl);
+  });
+
+  it("rejects unsupported endpoint modes", () => {
+    expect(() =>
+      createLuminAIConfig({
+        apiKey: "test-key",
+        baseUrl: "https://luminai.test",
+        endpointMode: "unknown" as never,
+        model: "custom-model"
+      })
+    ).toThrow();
   });
 
   it("rejects missing or blank apiKey", () => {
