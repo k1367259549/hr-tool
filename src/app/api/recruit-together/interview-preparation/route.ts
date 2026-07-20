@@ -3,7 +3,7 @@ import { recruitTogetherService } from "@/services/recruitTogether.service";
 import type { InterviewPreparationResult } from "@/types/recruitTogether";
 import { readJsonBody, successResponse } from "@/utils/apiResponse";
 import { parseInterviewPreparationPayload } from "@/utils/recruitTogetherValidation";
-import { handleRecruitTogetherApiError } from "../route";
+import { handleRecruitTogetherApiError } from "../errorHandling";
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {

@@ -1,17 +1,14 @@
 import type { NextRequest } from "next/server";
 import {
-  dailyWorkspaceService,
-  DailyWorkspaceServiceError
+  dailyWorkspaceService
 } from "@/services/dailyWorkspace.service";
 import type {
   DailyWorkspaceActivitySnapshot,
   DailyWorkspaceGenerateResult
 } from "@/types/dailyWorkspace";
-import { errorResponse, handleApiError, readJsonBody, successResponse } from "@/utils/apiResponse";
-import {
-  DailyWorkspaceValidationError,
-  parseDailyWorkspaceGeneratePayload
-} from "@/utils/dailyWorkspaceValidation";
+import { readJsonBody, successResponse } from "@/utils/apiResponse";
+import { parseDailyWorkspaceGeneratePayload } from "@/utils/dailyWorkspaceValidation";
+import { handleDailyWorkspaceApiError } from "./errorHandling";
 
 export async function GET(request: NextRequest): Promise<Response> {
   try {
@@ -34,22 +31,4 @@ export async function POST(request: NextRequest): Promise<Response> {
   } catch (error) {
     return handleDailyWorkspaceApiError(error);
   }
-}
-
-export function handleDailyWorkspaceApiError(error: unknown): Response {
-  if (error instanceof DailyWorkspaceValidationError) {
-    return errorResponse("VALIDATION_ERROR", error.message, 400);
-  }
-
-  if (error instanceof DailyWorkspaceServiceError) {
-    if (error.code === "VALIDATION_ERROR") {
-      return errorResponse("VALIDATION_ERROR", error.message, 400);
-    }
-
-    const status = error.code === "AI_ERROR" ? 502 : 500;
-
-    return errorResponse(error.code, error.message, status);
-  }
-
-  return handleApiError(error);
 }

@@ -3,7 +3,7 @@ import { dailyWorkspaceService } from "@/services/dailyWorkspace.service";
 import type { DailyRecruitingWorkspaceDto } from "@/types/dailyWorkspace";
 import { readJsonBody, successResponse } from "@/utils/apiResponse";
 import { parseDailyWorkspaceSavePayload } from "@/utils/dailyWorkspaceValidation";
-import { handleDailyWorkspaceApiError } from "../route";
+import { handleDailyWorkspaceApiError } from "../errorHandling";
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {

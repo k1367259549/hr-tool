@@ -22,7 +22,7 @@ AI_PROVIDER=openai-compatible
 AI_BASE_URL=https://your-relay.example.com/v1
 AI_API_KEY=your_relay_token_here
 AI_MODEL=your_model_name
-AI_ENDPOINT_MODE=chat-completions
+AI_ENDPOINT_MODE=responses
 ```
 
 Do not put the key in UI code, browser storage, GitHub workflow files, or committed documentation.
@@ -60,8 +60,11 @@ OpenAI-compatible relay required:
 - `AI_BASE_URL`
 - `AI_API_KEY`
 - `AI_MODEL`
+- `AI_ENDPOINT_MODE` (`chat-completions` or `responses`)
 
-Use the relay provider's OpenAI-compatible `/v1` endpoint when possible:
+Use the relay provider's OpenAI-compatible `/v1` endpoint when possible. The
+Base URL may include `/v1`; the application normalizes the final endpoint path
+and does not duplicate `/v1`, `/responses`, or `/chat/completions`.
 
 ```env
 AI_BASE_URL=https://your-relay.example.com/v1
@@ -85,11 +88,12 @@ Optional reliability settings:
 - `AI_TIMEOUT_MS=60000` controls the provider request timeout in milliseconds.
 - `AI_MAX_RETRIES=2` controls provider retry attempts after transient failures.
 
-Relay endpoint mode defaults to `chat-completions`, which sends requests to the
-OpenAI-compatible `/v1/chat/completions` endpoint. For a relay that explicitly
-supports the Responses API instead, set `AI_ENDPOINT_MODE=responses`; this sends
-requests to `/v1/responses`. The application does not automatically switch
-endpoints after an error.
+`AI_ENDPOINT_MODE` supports `chat-completions` and `responses`. The code default
+is `chat-completions`, while the example uses `responses` because a relay must be
+configured explicitly for the protocol it supports. These modes send requests to
+`/v1/chat/completions` and `/v1/responses` respectively. The application does
+not automatically switch endpoints after an error. Relay support for models and
+protocols varies by provider.
 
 For slower relay providers or larger models, increase `AI_TIMEOUT_MS` in `.env`, then restart Docker. Do not hardcode provider-specific timing inside workflow code.
 
@@ -191,6 +195,26 @@ docker compose up --build
 
 If optional AI settings are invalid, remove them and let the backend defaults apply.
 
+### `model_not_found`
+
+The relay accepted the endpoint but cannot route the configured `AI_MODEL`.
+Confirm the model name with the relay provider, update the local `.env`, restart
+the app, and do not commit the local configuration.
+
+### `protocol_not_supported`
+
+The configured model does not support the selected endpoint mode. Set
+`AI_ENDPOINT_MODE=chat-completions` or `AI_ENDPOINT_MODE=responses` according to
+the relay documentation, then restart the app. Do not rely on automatic fallback.
+
+### HTTP 404 Or Empty Responses Output
+
+An HTTP 404 commonly indicates an incorrect relay path; verify that the Base URL
+does not result in a duplicated `/v1` segment. A HTTP 200 response with an empty
+Responses API output is still invalid for Detailed Analysis and is recorded as a
+controlled failed Run. Contact the relay provider rather than accepting an empty
+result.
+
 ### AI Generation Timeout
 
 If AI generation times out, the UI should show a retryable error instead of freezing.
@@ -202,9 +226,29 @@ Fix:
 3. Increase `AI_TIMEOUT_MS` in `.env` if the provider is slow.
 4. Restart Docker and retry the workflow.
 
+### Schema Validation Failed
+
+Detailed Analysis only accepts the current structured contract. Verify the relay
+can return valid JSON for the configured model and rerun the Detailed Analysis;
+the failed Run remains in history for audit and retry does not overwrite prior
+successful Runs.
+
 ---
 
-## 6. Security Warnings
+## 6. Local AI Evaluation Port
+
+For local browser acceptance, run HR Tool on port `3002`:
+
+```powershell
+npm run dev -- -p 3002
+```
+
+Open `http://localhost:3002/feishu/evaluations`. The recruiting website uses
+port `3001`; keep the two processes separate when both are running.
+
+---
+
+## 7. Security Warnings
 
 - Never commit `.env`.
 - Never expose `OPENAI_API_KEY` or `AI_API_KEY` to frontend code.

@@ -165,6 +165,34 @@ Resume Evaluation Result Foundation is available at:
 
 It supports creating per-criterion evidence assessments for a Resume × JobProfile × EvaluationTemplateVersion context, DRAFT/REVIEWED lifecycle, optimistic concurrency via revision, event history, and evaluation entry points from the Resume detail page. Evaluations do not produce scores, rankings, weights, thresholds, or automatic pipeline movement.
 
+### AI Evaluation Release Baseline
+
+The formal AI evaluation workflow is available at:
+
+```text
+/feishu/evaluations
+```
+
+The supported workflow is:
+
+```text
+Quick Screening
+-> Detailed Analysis V2
+-> Human Review
+-> selectedRunId reference binding
+-> Criterion-Level AI Reference
+-> Manual Evaluation Review
+```
+
+- Quick Screening uses the Rule-Based Provider and creates a persisted canonical result.
+- Detailed Analysis uses the backend-only OpenAI-compatible Provider and persists the `detailed-screening.v2` contract.
+- A recruiter must explicitly review a Detailed Run before `selectedRunId` identifies it as the current AI reference.
+- Criterion-level references use exact `criterion.key === criterionAssessment.criterionKey` matching only.
+- AI results are advisory: they do not auto-hire, auto-reject, move Pipeline, or overwrite manual criterion assessments, evidence notes, or overall notes.
+- Legacy V1 Detailed Results remain readable, but must be rerun before they can provide criterion-level AI references.
+
+See [docs/AI_EVALUATION_RELEASE_READINESS.md](docs/AI_EVALUATION_RELEASE_READINESS.md) for local startup, regression checks, and manual acceptance.
+
 The M07 rule-based output schema foundation defines the shared AI Resume Evaluation output contract in `src/types/evaluation-output.ts` and `src/lib/evaluation/schema.ts`. This contract is for future EvaluationRun outputs across rule-based and AI providers. It validates structured suggestions, evidence, dimension scores, risks, and interview questions, but it does not call an AI provider, add prompts, change database schema, modify review APIs, rank candidates, or move pipeline stages.
 
 Additional V2 placeholder routes remain available for future modules:
@@ -232,6 +260,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run build
+npm run validate:ai-evaluation
 docker compose build
 ```
 

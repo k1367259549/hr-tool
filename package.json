@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "smoke:evaluation-provider": "npx tsx scripts/evaluation-provider-smoke.ts",
+    "validate:ai-evaluation": "vitest run src/lib/resume-screening/schema.test.ts src/lib/resume-screening/quick-screening-contract.test.ts src/lib/resume-screening/rule-based-quick-screening-engine.test.ts src/lib/resume-screening/detailed-screening-contract.test.ts src/lib/resume-screening/detailed-criterion-contract.test.ts src/lib/resume-screening/criterion-ai-reference.test.ts src/lib/evaluation/openai-compatible-provider.test.ts src/lib/evaluation/provider-runtime-config.test.ts src/lib/evaluation/provider-runner.test.ts src/services/resumeEvaluationRun.service.test.ts src/services/resumeEvaluationResult.service.test.ts src/features/evaluation-result/components/EvaluationDetailPage.test.ts tests/api/evaluationRun.test.ts tests/api/detailedAnalysisReview.test.ts tests/api/selectedRun.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
